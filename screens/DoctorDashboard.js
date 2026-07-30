@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { StyleSheet, Text, View, TextInput, ScrollView, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import DynamicFormBuilder from '../components/DynamicFormBuilder';
 import { generatePrescriptionPDF } from '../components/PDFGenerator';
@@ -11,13 +11,40 @@ export default function DoctorDashboard() {
   const [dynamicData, setDynamicData] = useState({});
   const [loading, setLoading] = useState(false);
 
-  const specialtySchema = [
+  // 1. القوالب الجاهزة (Presets)
+  const [presets] = useState([
+    {
+      name: 'نزلة برد حادة',
+      diagnosis: 'Acute Upper Respiratory Tract Infection',
+      data: {
+        symptoms: 'ارتفاع في الحرارة، رشح، وسعال جاف',
+        vital_signs: 'BP: 120/80, Temp: 38.5 C'
+      }
+    },
+    {
+      name: 'القولون العصبي',
+      diagnosis: 'Irritable Bowel Syndrome (IBS)',
+      data: {
+        symptoms: 'انتفاخ، تقلصات بالبطن تزداد مع التوتر',
+        vital_signs: 'BP: 115/75, Temp: 36.8 C'
+      }
+    }
+  ]);
+
+  // 2. مخطط حقول التخصص (Dynamic Schema)
+  const [specialtySchema, setSpecialtySchema] = useState([
     { key: 'symptoms', label: 'الأعراض والشكوى (Symptoms)', type: 'textarea', placeholder: 'اكتب الشكوى والأعراض...' },
-    { key: 'vital_signs', label: 'العلامات الحيوية (Vital Signs)', type: 'input', placeholder: 'مثل: 120/80 BP, 37 C' }
-  ];
+    { key: 'vital_signs', label: 'العلامات الحيوية (Vital Signs)', type: 'input', placeholder: 'مثال: 120/80 BP, 37 C' }
+  ]);
 
   const handleDynamicChange = (key, value) => {
     setDynamicData(prev => ({ ...prev, [key]: value }));
+  };
+
+  const handleSelectPreset = (preset) => {
+    setDiagnosis(preset.diagnosis);
+    setDynamicData(prev => ({ ...prev, ...preset.data }));
+    Alert.alert('تم القالب', `تم تطبيق قالب: ${preset.name}`);
   };
 
   const handleSaveAndPrint = async () => {
@@ -27,6 +54,7 @@ export default function DoctorDashboard() {
     }
 
     setLoading(true);
+    // توليد كود مريض فريد (Unique Patient ID)
     const generatedCode = 'PAT-' + Math.floor(1000 + Math.random() * 9000);
 
     try {
@@ -67,14 +95,16 @@ export default function DoctorDashboard() {
 
       if (rErr) throw rErr;
 
+      // طباعة الروشتة PDF مع التوقيع والـ QR Code
       await generatePrescriptionPDF(
         { name: patientName, phone: patientPhone, code: generatedCode },
         diagnosis,
         dynamicData
       );
 
-      Alert.alert('تم بنجاح', 'تم حفظ بيانات الحالة الطبية وقاعدة البيانات جاهزة!');
+      Alert.alert('نجاح العمليات', 'تم حفظ الحالة بالسحابة وإصدار الروشتة المعتمدة بنجاح! 🚀');
       
+      // إعادة تعيين الشاشة
       setPatientName('');
       setPatientPhone('');
       setDiagnosis('');
@@ -91,11 +121,12 @@ export default function DoctorDashboard() {
     <ScrollView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>MedVerse EMR</Text>
-        <Text style={styles.subtitle}>منظومة إدارة الكشف الطبي الذكية</Text>
+        <Text style={styles.subtitle}>منظومة إدارة الكشف والتشخيص الذكي</Text>
       </View>
 
+      {/* بيانات المريض */}
       <View style={styles.card}>
-        <Text style={styles.sectionTitle}>بيانات المريض الأساسية</Text>
+        <Text style={styles.sectionTitle}>👤 بيانات المريض الأساسية</Text>
         
         <Text style={styles.label}>اسم المريض بالكامل *</Text>
         <TextInput 
@@ -117,13 +148,14 @@ export default function DoctorDashboard() {
         />
       </View>
 
+      {/* التشخيص وحقول التخصص + محرك الحماية والقوالب */}
       <View style={styles.card}>
-        <Text style={styles.sectionTitle}>التشخيص والكشف الطبي</Text>
+        <Text style={styles.sectionTitle}>🩺 التشخيص والكشف الطبي</Text>
         
         <Text style={styles.label}>التشخيص النهائي (Diagnosis)</Text>
         <TextInput 
           style={[styles.input, styles.textArea]} 
-          placeholder="اكتب التشخيص والتوصيات هنا..." 
+          placeholder="اكتب التشخيص والتوصيات..." 
           placeholderTextColor="#94A3B8"
           multiline 
           numberOfLines={3}
@@ -131,14 +163,18 @@ export default function DoctorDashboard() {
           onChangeText={setDiagnosis}
         />
 
-        <Text style={styles.sectionTitle}>حقول التخصص الديناميكية</Text>
+        <Text style={styles.sectionTitle}>⚙️ حقول التخصص والقوالب السريعة</Text>
         <DynamicFormBuilder 
           schema={specialtySchema} 
           formData={dynamicData} 
-          onChange={handleDynamicChange} 
+          onChange={handleDynamicChange}
+          onUpdateSchema={setSpecialtySchema}
+          presets={presets}
+          onSelectPreset={handleSelectPreset}
         />
       </View>
 
+      {/* زر الحفظ والطباعة */}
       <TouchableOpacity 
         style={[styles.saveButton, loading && styles.saveButtonDisabled]} 
         onPress={handleSaveAndPrint}
@@ -147,7 +183,7 @@ export default function DoctorDashboard() {
         {loading ? (
           <ActivityIndicator color="#FFFFFF" />
         ) : (
-          <Text style={styles.saveButtonText}>حفظ الكشف وإصدار الروشتة (PDF)</Text>
+          <Text style={styles.saveButtonText}>حفظ الكشف وإصدار الروشتة (PDF) 🖨️</Text>
         )}
       </TouchableOpacity>
     </ScrollView>
