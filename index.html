@@ -8,7 +8,7 @@
   <link rel="manifest" href="./manifest.json" />
   <meta name="theme-color" content="#0f172a" />
   
-  <!-- Tailwind CSS للديزاين -->
+  <!-- Tailwind CSS للواجهات -->
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-slate-900 text-slate-100 min-h-screen">
@@ -108,11 +108,11 @@
                 </div>
                 <div>
                   <label class="block text-xs text-slate-400 mb-1">التشخيص والروشتة</label>
-                  <textarea rows="3" placeholder="اكتب العلاج والتعليمات..." class="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-sm text-white"></textarea>
+                  <textarea rows="4" placeholder="اكتب العلاج والتعليمات..." class="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-sm text-white"></textarea>
                 </div>
                 <button 
                   id="saveBtn"
-                  class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-3 rounded-xl transition-all">
+                  class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-3 rounded-xl transition-all shadow-lg shadow-emerald-600/20">
                   حفظ وطباعة الروشتة PDF 🖨️
                 </button>
               </div>
@@ -131,13 +131,39 @@
       }
     }
 
-    // التشغيل المباشر
+    // التشغيل المباشر للواجهة
     render();
 
-    // تسجيل Service Worker
+    // سكريبت التسجيل التلقائي والتحديث الفوري (Auto-Update)
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js').catch(() => {});
+        navigator.serviceWorker.register('./sw.js').then(reg => {
+          
+          // فحص التحديثات فور الاتصال بالإنترنت
+          window.addEventListener('online', () => {
+            console.log('تم الالتقاط بالشبكة، جاري فحص التحديثات...');
+            reg.update();
+          });
+
+          // عند اكتشاف ملفات جديدة على GitHub
+          reg.addEventListener('updatefound', () => {
+            const newWorker = reg.installing;
+            newWorker.addEventListener('statechange', () => {
+              if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                window.location.reload();
+              }
+            });
+          });
+
+        });
+      });
+
+      let refreshing = false;
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (!refreshing) {
+          window.location.reload();
+          refreshing = true;
+        }
       });
     }
   </script>
