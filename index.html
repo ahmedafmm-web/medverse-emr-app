@@ -5,33 +5,33 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>MedVerse EMR</title>
   
-  <!-- إعدادات الـ PWA -->
   <link rel="manifest" href="./manifest.json" />
   <meta name="theme-color" content="#0f172a" />
-  <link rel="apple-touch-icon" href="./icon.png" />
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-
-  <!-- Tailwind CSS للواجهات -->
   <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- استدعاء مكتبات React لتشغيل الكود مباشرة -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body class="bg-slate-900 text-white min-h-screen">
 
   <div id="root">
-    <!-- تحميل سريع أثناء فتح التطبيق -->
     <div class="flex flex-col items-center justify-center h-screen">
       <div class="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
       <h1 class="text-xl font-bold mt-4">جاري تحميل MedVerse...</h1>
     </div>
   </div>
 
-  <!-- تسجيل الـ Service Worker لتشغيل PWA -->
+  <!-- ربط ملفات المشروع لتشغيل الواجهة -->
+  <script type="text/babel" src="./supabaseClient.js"></script>
+  <script type="text/babel" src="./App.js"></script>
+
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js')
-          .then(reg => console.log('SW Registered!', reg))
-          .catch(err => console.log('SW Error:', err));
+        navigator.serviceWorker.register('./sw.js');
       });
     }
   </script>
