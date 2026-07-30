@@ -9,7 +9,7 @@
   <meta name="theme-color" content="#0f172a" />
   <script src="https://cdn.tailwindcss.com"></script>
 
-  <!-- استدعاء مكتبات React لتشغيل الكود مباشرة -->
+  <!-- React & Babel -->
   <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -17,21 +17,38 @@
 </head>
 <body class="bg-slate-900 text-white min-h-screen">
 
-  <div id="root">
-    <div class="flex flex-col items-center justify-center h-screen">
-      <div class="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-      <h1 class="text-xl font-bold mt-4">جاري تحميل MedVerse...</h1>
-    </div>
-  </div>
+  <div id="root"></div>
 
-  <!-- ربط ملفات المشروع لتشغيل الواجهة -->
-  <script type="text/babel" src="./supabaseClient.js"></script>
-  <script type="text/babel" src="./App.js"></script>
+  <!-- التطبيق المباشر -->
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    function App() {
+      return (
+        <div class="flex flex-col items-center justify-center min-h-screen p-4 text-center">
+          <div class="bg-slate-800 p-6 rounded-2xl shadow-xl max-w-sm w-full border border-slate-700">
+            <div class="w-16 h-16 bg-blue-600 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl font-bold">
+              🩺
+            </div>
+            <h1 class="text-2xl font-bold mb-2">MedVerse EMR</h1>
+            <p class="text-slate-400 text-sm mb-6">منصة إدارة العيادات والسجلات الطبية الذكية</p>
+            <button 
+              onClick={() => alert('مرحباً بك في MedVerse!')}
+              class="w-full bg-blue-600 hover:bg-blue-500 text-white font-semibold py-3 px-4 rounded-xl transition-all">
+              الدخول للنظام
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
 
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js');
+        navigator.serviceWorker.register('./sw.js').catch(() => {});
       });
     }
   </script>
