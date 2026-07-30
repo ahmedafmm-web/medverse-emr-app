@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { StyleSheet, Text, View, TextInput, ScrollView, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
+import React, { useState } from 'react';
+import { StyleSheet, Text, View, TextInput, ScrollView, TouchableOpacity, Alert, ActivityIndicator, FlatList } from 'react-native';
 import DynamicFormBuilder from '../components/DynamicFormBuilder';
 import { generatePrescriptionPDF } from '../components/PDFGenerator';
 import { supabase } from '../supabaseClient';
@@ -10,6 +10,10 @@ export default function DoctorDashboard() {
   const [diagnosis, setDiagnosis] = useState('');
   const [dynamicData, setDynamicData] = useState({});
   const [loading, setLoading] = useState(false);
+  
+  // 🕒 حالة سجل الزيارات الزمني للمريض
+  const [patientHistory, setPatientHistory] = useState([]);
+  const [searchingHistory, setSearchingHistory] = useState(false);
 
   // 1. القوالب الجاهزة (Presets)
   const [presets] = useState([
@@ -47,6 +51,39 @@ export default function DoctorDashboard() {
     Alert.alert('تم القالب', `تم تطبيق قالب: ${preset.name}`);
   };
 
+  // 🔍 البحث عن سجل الزيارات المترابط باسم المريض
+  const fetchPatientHistory = async (name) => {
+    if (!name || name.trim().length < 3) {
+      setPatientHistory([]);
+      return;
+    }
+    setSearchingHistory(true);
+    try {
+      const { data: patient } = await supabase
+        .from('patients')
+        .select('id')
+        .ilike('full_name', `%${name.trim()}%`)
+        .limit(1)
+        .single();
+
+      if (patient) {
+        const { data: records } = await supabase
+          .from('medical_records')
+          .select('*')
+          .eq('patient_id', patient.id)
+          .order('created_at', { ascending: false });
+
+        setPatientHistory(records || []);
+      } else {
+        setPatientHistory([]);
+      }
+    } catch (e) {
+      setPatientHistory([]);
+    } finally {
+      setSearchingHistory(false);
+    }
+  };
+
   const handleSaveAndPrint = async () => {
     if (!patientName.trim()) {
       Alert.alert('تنبيه', 'يرجى إدخال اسم المريض أولاً.');
@@ -54,7 +91,6 @@ export default function DoctorDashboard() {
     }
 
     setLoading(true);
-    // توليد كود مريض فريد (Unique Patient ID)
     const generatedCode = 'PAT-' + Math.floor(1000 + Math.random() * 9000);
 
     try {
@@ -70,18 +106,27 @@ export default function DoctorDashboard() {
         clinic = newClinic;
       }
 
-      const { data: patient, error: pErr } = await supabase
+      let { data: patient } = await supabase
         .from('patients')
-        .insert([{
-          full_name: patientName,
-          phone: patientPhone,
-          patient_code: generatedCode,
-          clinic_id: clinic.id
-        }])
-        .select()
+        .select('id')
+        .eq('full_name', patientName.trim())
         .single();
 
-      if (pErr) throw pErr;
+      if (!patient) {
+        const { data: newPatient, error: pErr } = await supabase
+          .from('patients')
+          .insert([{
+            full_name: patientName.trim(),
+            phone: patientPhone,
+            patient_code: generatedCode,
+            clinic_id: clinic.id
+          }])
+          .select()
+          .single();
+
+        if (pErr) throw pErr;
+        patient = newPatient;
+      }
 
       const { error: rErr } = await supabase
         .from('medical_records')
@@ -95,20 +140,19 @@ export default function DoctorDashboard() {
 
       if (rErr) throw rErr;
 
-      // طباعة الروشتة PDF مع التوقيع والـ QR Code
       await generatePrescriptionPDF(
         { name: patientName, phone: patientPhone, code: generatedCode },
         diagnosis,
         dynamicData
       );
 
-      Alert.alert('نجاح العمليات', 'تم حفظ الحالة بالسحابة وإصدار الروشتة المعتمدة بنجاح! 🚀');
+      Alert.alert('نجاح العمليات', 'تم حفظ الزيارة بالسحابة وإصدار الروشتة المعتمدة بنجاح! 🚀');
       
-      // إعادة تعيين الشاشة
       setPatientName('');
       setPatientPhone('');
       setDiagnosis('');
       setDynamicData({});
+      setPatientHistory([]);
 
     } catch (error) {
       Alert.alert('خطأ أثناء الحفظ', error.message);
@@ -124,7 +168,7 @@ export default function DoctorDashboard() {
         <Text style={styles.subtitle}>منظومة إدارة الكشف والتشخيص الذكي</Text>
       </View>
 
-      {/* بيانات المريض */}
+      {/* بيانات المريض والبحث عن التاريخ */}
       <View style={styles.card}>
         <Text style={styles.sectionTitle}>👤 بيانات المريض الأساسية</Text>
         
@@ -134,7 +178,10 @@ export default function DoctorDashboard() {
           placeholder="أدخل اسم المريض..." 
           placeholderTextColor="#94A3B8"
           value={patientName}
-          onChangeText={setPatientName}
+          onChangeText={(val) => {
+            setPatientName(val);
+            fetchPatientHistory(val);
+          }}
         />
 
         <Text style={styles.label}>رقم الهاتف</Text>
@@ -148,9 +195,25 @@ export default function DoctorDashboard() {
         />
       </View>
 
-      {/* التشخيص وحقول التخصص + محرك الحماية والقوالب */}
+      {/* 🕒 شريط سجل الزيارات الزمني (Visits Timeline) */}
+      {searchingHistory && <ActivityIndicator color="#0284C7" style={{ marginBottom: 15 }} />}
+      {patientHistory.length > 0 && (
+        <View style={styles.historyCard}>
+          <Text style={styles.historyTitle}>🕒 سجل الزيارات السابقة للمريض ({patientHistory.length} زيارات)</Text>
+          {patientHistory.map((item, index) => (
+            <View key={item.id || index} style={styles.historyItem}>
+              <View style={styles.historyHeader}>
+                <Text style={styles.historyDate}>📅 {new Date(item.created_at).toLocaleDateString('ar-EG')}</Text>
+              </View>
+              <Text style={styles.historyDiagnosis}><strong>التشخيص:</strong> {item.diagnosis || 'لا يوجد'}</Text>
+            </View>
+          ))}
+        </View>
+      )}
+
+      {/* التشخيص وحقول التخصص */}
       <View style={styles.card}>
-        <Text style={styles.sectionTitle}>🩺 التشخيص والكشف الطبي</Text>
+        <Text style={styles.sectionTitle}>🩺 التشخيص والكشف الطبي الحالي</Text>
         
         <Text style={styles.label}>التشخيص النهائي (Diagnosis)</Text>
         <TextInput 
@@ -183,7 +246,7 @@ export default function DoctorDashboard() {
         {loading ? (
           <ActivityIndicator color="#FFFFFF" />
         ) : (
-          <Text style={styles.saveButtonText}>حفظ الكشف وإصدار الروشتة (PDF) 🖨️</Text>
+          <Text style={styles.saveButtonText}>حفظ الزيارة وإصدار الروشتة (PDF) 🖨️</Text>
         )}
       </TouchableOpacity>
     </ScrollView>
@@ -202,5 +265,11 @@ const styles = StyleSheet.create({
   textArea: { height: 75, textAlignVertical: 'top' },
   saveButton: { backgroundColor: '#0F172A', padding: 16, borderRadius: 10, alignItems: 'center', marginBottom: 35 },
   saveButtonDisabled: { opacity: 0.6 },
-  saveButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: 'bold' }
+  saveButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: 'bold' },
+  historyCard: { backgroundColor: '#F0F9FF', padding: 14, borderRadius: 12, marginBottom: 15, borderWidth: 1, borderColor: '#BAE6FD' },
+  historyTitle: { fontSize: 13, fontWeight: 'bold', color: '#0369A1', marginBottom: 10, textAlign: 'right' },
+  historyItem: { backgroundColor: '#FFFFFF', padding: 10, borderRadius: 8, marginBottom: 8, borderWidth: 1, borderColor: '#E0F2FE' },
+  historyHeader: { flexDirection: 'row-reverse', justifyContent: 'space-between', marginBottom: 4 },
+  historyDate: { fontSize: 11, color: '#0284C7', fontWeight: 'bold' },
+  historyDiagnosis: { fontSize: 12, color: '#334155', textAlign: 'right' }
 });
