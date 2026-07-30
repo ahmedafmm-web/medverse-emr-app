@@ -1,18 +1,18 @@
-const CACHE_NAME = 'medverse-v1';
-const urlsToCache = [
-  './',
-  './index.html',
-  './manifest.json'
-];
+const CACHE_NAME = 'medverse-v2';
 
+// التثبيت الفوري وتخطي الانتظار
 self.addEventListener('install', event => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => cache.addAll(urlsToCache))
-  );
+  self.skipWaiting();
 });
 
+// تفعيل السيرفيس وركر والاستحواذ الفوري على الصفحات
+self.addEventListener('activate', event => {
+  event.waitUntil(clients.claim());
+});
+
+// التعامل مع الطلبات: جلب النسخة الجديدة فوراً من الشبكة، واستخدام الكاش عند انقطاع الإنترنت
 self.addEventListener('fetch', event => {
   event.respondWith(
-    caches.match(event.request).then(response => response || fetch(event.request))
+    fetch(event.request).catch(() => caches.match(event.request))
   );
 });
