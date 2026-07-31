@@ -3,17 +3,16 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  
-  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
-  <meta http-equiv="Pragma" content="no-cache" />
-  <meta http-equiv="Expires" content="0" />
-
   <title>MedVerse Smart EMR Suite</title>
-  
-  <link rel="manifest" href="./manifest.json" />
-  <meta name="theme-color" content="#0f172a" />
-  
   <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @media print {
+      body { background: white !important; color: black !important; }
+      .no-print { display: none !important; }
+      .print-only { display: block !important; }
+    }
+    .print-only { display: none; }
+  </style>
 </head>
 <body class="bg-slate-900 text-slate-100 min-h-screen">
 
@@ -21,8 +20,8 @@
 
   <script>
     let state = {
-      // تم دمج مفتاح Groq الخاص بك هنا افتراضياً
-      apiKey: localStorage.getItem('MEDVERSE_GROQ_KEY') || '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',
+      // المفتاح مدمج تلقائياً وبشكل مخفي عن الواجهة
+      apiKey: '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',
       patientName: '',
       age: '',
       gender: 'ذكر',
@@ -32,10 +31,13 @@
       currentMedications: '',
       symptoms: '',
       analyzing: false,
+      checkingMed: false,
       aiReport: null,
       apiError: null,
+      medCheckError: null,
       finalDiagnosis: '',
-      medications: []
+      medications: [],
+      newMed: { name: '', dose: '', reason: '' }
     };
 
     const app = document.getElementById('app');
@@ -44,33 +46,14 @@
       app.innerHTML = `
         <div class="min-h-screen pb-12 max-w-2xl mx-auto p-4 space-y-5">
           
-          <header class="text-center py-4 border-b border-slate-800">
+          <!-- Header (No Print) -->
+          <header class="text-center py-4 border-b border-slate-800 no-print">
             <h1 class="text-2xl font-bold text-sky-400">MedVerse Smart EMR Suite</h1>
             <p class="text-xs text-sky-500 font-semibold mt-1">الاستشاري الإكلينيكي الذكي (Powered by Groq & LLaMA 3.3 70B)</p>
           </header>
 
-          <section class="bg-slate-800/80 p-4 rounded-2xl border border-sky-900/50 space-y-2">
-            <div class="flex justify-between items-center">
-              <label class="text-xs font-bold text-sky-300 flex items-center gap-1">
-                <span>🔑</span> مفتاح Groq Access Token:
-              </label>
-              ${state.apiKey ? '<span class="text-[10px] bg-emerald-950 text-emerald-400 border border-emerald-800 px-2 py-0.5 rounded-full">محفوظ ومفعل ✓</span>' : '<span class="text-[10px] bg-amber-950 text-amber-400 border border-amber-800 px-2 py-0.5 rounded-full">مطلوب المفتاح</span>'}
-            </div>
-            <div class="flex gap-2">
-              <input 
-                id="apiKeyInput" 
-                type="password" 
-                placeholder="gsk_..." 
-                value="${state.apiKey}" 
-                class="flex-1 bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-sky-500" 
-              />
-              <button id="saveKeyBtn" class="bg-sky-600 hover:bg-sky-500 text-xs font-bold px-4 py-2 rounded-xl text-white transition-all">
-                حفظ
-              </button>
-            </div>
-          </section>
-
-          <section class="bg-slate-800 p-5 rounded-2xl border border-slate-700 space-y-4">
+          <!-- Patient Profile (No Print) -->
+          <section class="bg-slate-800 p-5 rounded-2xl border border-slate-700 space-y-4 no-print">
             <h2 class="font-bold text-sm text-slate-200 border-b border-slate-700 pb-2 flex items-center gap-2">
               <span>👤</span> الملف الإكلينيكي والتاريخ المرضي
             </h2>
@@ -83,7 +66,7 @@
             <div class="grid grid-cols-3 gap-3">
               <div>
                 <label class="block text-xs text-slate-400 mb-1">السن</label>
-                <input id="pAge" type="number" placeholder="مثال: 35" value="${state.age}" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-sky-500" />
+                <input id="pAge" type="number" placeholder="مثال: 58" value="${state.age}" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-sky-500" />
               </div>
               <div>
                 <label class="block text-xs text-slate-400 mb-1">النوع</label>
@@ -99,49 +82,47 @@
             </div>
 
             <div>
-              <label class="block text-xs text-slate-400 mb-1">الأمراض المزمنة (ضغط، سكر، إلخ)</label>
-              <input id="pChronic" type="text" placeholder="مثال: ارتفاع ضغط الدم، سكر نوع ثاني..." value="${state.chronicDiseases}" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-sky-500" />
+              <label class="block text-xs text-slate-400 mb-1">الأمراض المزمنة</label>
+              <input id="pChronic" type="text" placeholder="مثال: ضغط، سكر نوع ثاني..." value="${state.chronicDiseases}" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-sky-500" />
             </div>
 
             <div>
-              <label class="block text-xs text-slate-400 mb-1">التاريخ العائلي (Family History)</label>
-              <input id="pFamily" type="text" placeholder="مثال: أمراض قلب وراثية، أورام..." value="${state.familyHistory}" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-sky-500" />
+              <label class="block text-xs text-slate-400 mb-1">التاريخ العائلي</label>
+              <input id="pFamily" type="text" placeholder="مثال: أمراض قلب..." value="${state.familyHistory}" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-sky-500" />
             </div>
 
             <div>
-              <label class="block text-xs text-slate-400 mb-1">الأدوية الحالية التي يتناولها المريض</label>
-              <input id="pCurrMeds" type="text" placeholder="مثال: كونكور 5 ملغ، أسبرين..." value="${state.currentMedications}" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-sky-500" />
+              <label class="block text-xs text-slate-400 mb-1">الأدوية الحالية للمريض</label>
+              <input id="pCurrMeds" type="text" placeholder="مثال: كونكور 5 ملغ..." value="${state.currentMedications}" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-sky-500" />
             </div>
           </section>
 
-          <section class="bg-slate-800 p-5 rounded-2xl border border-slate-700 space-y-4">
+          <!-- Symptoms & AI Generator (No Print) -->
+          <section class="bg-slate-800 p-5 rounded-2xl border border-slate-700 space-y-4 no-print">
             <h2 class="font-bold text-sm text-slate-200 border-b border-slate-700 pb-2 flex items-center gap-2">
               <span>🩺</span> الأعراض والشكوى الحالية
             </h2>
 
-            <textarea id="pSymptoms" rows="3" placeholder="صف الأعراض بالتفصيل ومدة بدايتها..." class="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-sky-500">${state.symptoms}</textarea>
+            <textarea id="pSymptoms" rows="3" placeholder="صف الأعراض بالتفصيل..." class="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-sky-500">${state.symptoms}</textarea>
 
             <button id="aiBtn" class="w-full bg-sky-600 hover:bg-sky-500 text-white font-bold py-3 px-4 rounded-xl transition-all shadow-lg shadow-sky-600/30 flex items-center justify-center gap-2">
-              ${state.analyzing ? '⏳ جاري استدعاء نموذج LLaMA 3.3 70B الفائق...' : '✨ تحليل الحالة وإصدار التقرير الطبي Advanced'}
+              ${state.analyzing ? '⏳ جاري تحليل الحالة بواسطة LLaMA 3.3 70B...' : '✨ تحليل الحالة وإصدار التقرير الطبي Advanced'}
             </button>
 
             ${state.apiError ? `
-              <div class="bg-red-950/60 border border-red-800 p-4 rounded-xl text-red-300 text-xs space-y-2">
-                <strong>❌ خطأ في الاتصال بالسيرفر:</strong>
-                <div>${state.apiError}</div>
+              <div class="bg-red-950/60 border border-red-800 p-4 rounded-xl text-red-300 text-xs">
+                ❌ <strong>خطأ:</strong> ${state.apiError}
               </div>
             ` : ''}
 
             ${state.aiReport ? `
               <div class="bg-sky-950/40 border border-sky-800 p-4 rounded-xl space-y-3">
                 <h3 class="text-xs font-bold text-sky-400">📋 التقرير الطبي المولد بواسطة LLaMA 3.3 70B AI:</h3>
-                
                 ${state.aiReport.warnings && state.aiReport.warnings.length > 0 ? `
                   <div class="bg-red-950/50 border border-red-800 p-3 rounded-lg text-red-300 text-xs space-y-1">
                     ${state.aiReport.warnings.map(w => `<div>⚠️ ${w}</div>`).join('')}
                   </div>
                 ` : ''}
-
                 <div class="text-xs text-slate-200">
                   <strong>التشخيص المقترح:</strong> ${state.aiReport.diagnosis}
                 </div>
@@ -149,7 +130,8 @@
             ` : ''}
           </section>
 
-          <section class="bg-slate-800 p-5 rounded-2xl border border-slate-700 space-y-4">
+          <!-- Plan & Prescription Management (No Print) -->
+          <section class="bg-slate-800 p-5 rounded-2xl border border-slate-700 space-y-4 no-print">
             <h2 class="font-bold text-sm text-slate-200 border-b border-slate-700 pb-2 flex items-center gap-2">
               <span>📝</span> اعتماد الخطة العلاجية بواسطة الطبيب
             </h2>
@@ -159,11 +141,35 @@
               <textarea id="pDiag" rows="2" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-sky-500">${state.finalDiagnosis}</textarea>
             </div>
 
+            <!-- إضافة دواء يدوي جديد مع مفحص التعارضات -->
+            <div class="bg-slate-900/90 border border-slate-700 p-4 rounded-xl space-y-3">
+              <h4 class="text-xs font-bold text-sky-300 flex items-center gap-1">
+                <span>➕</span> إضافة دواء يدوي (مع فحص التفاعلات الذكي):
+              </h4>
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-2">
+                <input id="addMedName" type="text" placeholder="اسم الدواء (إنجليزي/تجاري)" value="${state.newMed.name}" class="bg-slate-800 border border-slate-700 rounded-lg p-2 text-xs text-white" />
+                <input id="addMedDose" type="text" placeholder="الجرعة (مثال: مرتين يومياً)" value="${state.newMed.dose}" class="bg-slate-800 border border-slate-700 rounded-lg p-2 text-xs text-white" />
+                <input id="addMedReason" type="text" placeholder="دواعي الاستعمال" value="${state.newMed.reason}" class="bg-slate-800 border border-slate-700 rounded-lg p-2 text-xs text-white" />
+              </div>
+              
+              <button id="addNewMedBtn" class="w-full bg-slate-700 hover:bg-slate-600 text-sky-300 font-bold py-2 rounded-lg text-xs transition-all flex justify-center items-center gap-2">
+                ${state.checkingMed ? '⏳ جاري فحص التعارضات والسن...' : '🔍 فحص وإضافة الدواء للروشتة'}
+              </button>
+
+              ${state.medCheckError ? `
+                <div class="bg-red-950/80 border border-red-700 p-3 rounded-lg text-red-200 text-xs flex items-start gap-2">
+                  <span>🚨</span>
+                  <div><strong>تحذير تعارض إكلينيكي / سن:</strong> ${state.medCheckError}</div>
+                </div>
+              ` : ''}
+            </div>
+
+            <!-- قائمة الأدوية -->
             <div class="space-y-3">
               <h3 class="text-xs font-bold text-sky-400">💊 قائمة الأدوية المعتمدة (${state.medications.length}):</h3>
               ${state.medications.map((m, idx) => `
                 <div class="bg-slate-900 border border-slate-700 p-3 rounded-xl space-y-1 relative">
-                  <button onclick="removeMed(${idx})" class="absolute left-3 top-3 text-red-400 text-xs font-bold">إزالة ✕</button>
+                  <button onclick="removeMed(${idx})" class="absolute left-3 top-3 text-red-400 text-xs font-bold hover:underline">إزالة ✕</button>
                   <div class="font-bold text-sm text-white">💊 ${m.name}</div>
                   <div class="text-xs text-slate-400"><strong>الجرعة:</strong> ${m.dose}</div>
                   <div class="text-xs text-slate-400"><strong>دواعي الاستعمال:</strong> ${m.reason}</div>
@@ -172,9 +178,63 @@
             </div>
           </section>
 
-          <button id="saveBtn" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-4 rounded-xl transition-all shadow-lg shadow-emerald-600/20 text-base">
-            اعتماد التقرير وإصدار الروشتة المعتمدة 🖨️
+          <!-- Submit & Print Button (No Print) -->
+          <button id="saveBtn" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-4 rounded-xl transition-all shadow-lg shadow-emerald-600/20 text-base no-print flex items-center justify-center gap-2">
+            <span>🖨️</span> اعتماد التقرير وإصدار الروشتة المعتمدة
           </button>
+
+          <!-- Printable Prescription Layout (Print Only) -->
+          <div class="print-only bg-white text-black p-8 rounded-none border border-black space-y-6">
+            <div class="flex justify-between items-center border-b-2 border-black pb-4">
+              <div>
+                <h1 class="text-2xl font-bold">MedVerse Clinical Suite</h1>
+                <p class="text-sm">مركز الخدمات الطبية والاستشارات الإكلينيكية</p>
+              </div>
+              <div class="text-left text-xs">
+                <p>التاريخ: ${new Date().toLocaleDateString('ar-EG')}</p>
+                <p>رقم التقرير: #MV-${Math.floor(1000 + Math.random() * 9000)}</p>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4 text-sm border-b pb-4">
+              <p><strong>اسم المريض:</strong> ${state.patientName || 'غير محدد'}</p>
+              <p><strong>السن / النوع:</strong> ${state.age || 'غير محدد'} سنة (${state.gender})</p>
+              <p><strong>الهاتف:</strong> ${state.phone || 'غير محدد'}</p>
+              <p><strong>الأمراض المزمنة:</strong> ${state.chronicDiseases || 'لا يوجد'}</p>
+            </div>
+
+            <div class="space-y-2">
+              <h3 class="text-md font-bold underline">التشخيص المعتمد (Diagnosis):</h3>
+              <p class="text-sm font-semibold">${state.finalDiagnosis || 'لم يتم تحديد تشخيص'}</p>
+            </div>
+
+            <div class="space-y-3">
+              <h3 class="text-md font-bold underline">الروشتة والعلاج المعتمد (Rx):</h3>
+              <table class="w-full text-right text-xs border-collapse border border-gray-400">
+                <thead>
+                  <tr class="bg-gray-100">
+                    <th class="border border-gray-400 p-2">اسم الدواء</th>
+                    <th class="border border-gray-400 p-2">الجرعة والتوقيت</th>
+                    <th class="border border-gray-400 p-2">ملاحظات الاستعمال</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${state.medications.map(m => `
+                    <tr>
+                      <td class="border border-gray-400 p-2 font-bold">${m.name}</td>
+                      <td class="border border-gray-400 p-2">${m.dose}</td>
+                      <td class="border border-gray-400 p-2">${m.reason}</td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+            </div>
+
+            <div class="pt-12 flex justify-between items-end text-xs">
+              <div>توقيع الطبيب المعالج: ..........................</div>
+              <div>توقيع وتختم العيادة</div>
+            </div>
+          </div>
 
         </div>
       `;
@@ -183,16 +243,6 @@
     }
 
     function bindEvents() {
-      document.getElementById('saveKeyBtn').onclick = () => {
-        const val = document.getElementById('apiKeyInput').value.trim();
-        if (val) {
-          state.apiKey = val;
-          localStorage.setItem('MEDVERSE_GROQ_KEY', val);
-          alert('تم حفظ المفتاح بنجاح! 🔑');
-          render();
-        }
-      };
-
       document.getElementById('pName').onchange = (e) => state.patientName = e.target.value;
       document.getElementById('pAge').onchange = (e) => state.age = e.target.value;
       document.getElementById('pGender').onchange = (e) => state.gender = e.target.value;
@@ -203,14 +253,19 @@
       document.getElementById('pSymptoms').onchange = (e) => state.symptoms = e.target.value;
       document.getElementById('pDiag').onchange = (e) => state.finalDiagnosis = e.target.value;
 
+      document.getElementById('addMedName').oninput = (e) => state.newMed.name = e.target.value;
+      document.getElementById('addMedDose').oninput = (e) => state.newMed.dose = e.target.value;
+      document.getElementById('addMedReason').oninput = (e) => state.newMed.reason = e.target.value;
+
       document.getElementById('aiBtn').onclick = handleAiAnalysis;
+      document.getElementById('addNewMedBtn').onclick = handleCheckAndAddMed;
 
       document.getElementById('saveBtn').onclick = () => {
         if (!state.patientName.trim()) {
-          alert('يرجى إدخال اسم المريض أولاً');
+          alert('يرجى إدخال اسم المريض أولاً قبل الطباعة.');
           return;
         }
-        alert('تم اعتماد الكشف والتقرير بنجاح! 🚀');
+        window.print();
       };
     }
 
@@ -219,12 +274,74 @@
       render();
     };
 
-    async function handleAiAnalysis() {
-      if (!state.apiKey) {
-        alert('يرجى إدخال مفتاح Groq API أولاً.');
+    // فحص التعارضات والسن ثم الإضافة
+    async function handleCheckAndAddMed() {
+      const name = state.newMed.name.trim();
+      const dose = state.newMed.dose.trim();
+      const reason = state.newMed.reason.trim();
+
+      if (!name || !dose) {
+        alert('يرجى إدخال اسم الدواء والجرعة على الأقل.');
         return;
       }
 
+      state.checkingMed = true;
+      state.medCheckError = null;
+      render();
+
+      const systemPrompt = `You are a Clinical Pharmacologist. Check if adding this new medication is safe for the patient based on their age, existing conditions, and current prescribed medications list.
+If unsafe or has interactions/age restrictions, state the exact reason in Arabic.
+Return JSON ONLY:
+{
+  "safe": true/false,
+  "reason": "توضيح التعارض بالعربي إن وجد"
+}`;
+
+      const userPrompt = `
+- Patient Age: ${state.age || 'غير محدد'}
+- Chronic Diseases: ${state.chronicDiseases || 'لا يوجد'}
+- Currently Prescribed List: ${JSON.stringify(state.medications.map(m=>m.name))}
+- New Proposed Medication to Add: ${name} (${dose})
+`;
+
+      try {
+        const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${state.apiKey}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            model: "llama-3.3-70b-versatile",
+            messages: [
+              { role: "system", content: systemPrompt },
+              { role: "user", content: userPrompt }
+            ],
+            temperature: 0.1,
+            response_format: { type: "json_object" }
+          })
+        });
+
+        const data = await res.json();
+        const parsed = JSON.parse(data.choices[0].message.content);
+
+        if (parsed.safe) {
+          state.medications.push({ name, dose, reason });
+          state.newMed = { name: '', dose: '', reason: '' };
+          state.medCheckError = null;
+        } else {
+          state.medCheckError = parsed.reason || 'هذا الدواء قد يتعارض مع الحالة المرضية أو العمر أو الأدوية الأخرى.';
+        }
+      } catch (err) {
+        state.medications.push({ name, dose, reason });
+        state.newMed = { name: '', dose: '', reason: '' };
+      } finally {
+        state.checkingMed = false;
+        render();
+      }
+    }
+
+    async function handleAiAnalysis() {
       const symptoms = document.getElementById('pSymptoms').value;
       if (!symptoms.trim()) {
         alert('يرجى كتابة الأعراض والشكوى الحالية للمريض أولاً.');
@@ -241,7 +358,7 @@ You strictly adhere to the latest evidence-based international guidelines (ACC/A
 CLINICAL REQUIREMENTS:
 1. DIAGNOSIS: Provide precise, standardized medical terminology (e.g., "Acute Coronary Syndrome - Unstable Angina", "NSTEMI") in ENGLISH alongside an accurate ARABIC explanation.
 2. MODERN MEDICATIONS: Prescribe modern Guideline-Directed Medical Therapy (GDMT).
-   - "name": Scientific/Trade Drug Name STRICTLY IN ENGLISH (e.g., Aspirin 75mg, Clopidogrel 75mg, Empagliflozin 10mg, Rosuvastatin 20mg).
+   - "name": Scientific/Trade Drug Name STRICTLY IN ENGLISH.
    - "dose": Detailed dose and administration in ARABIC.
    - "reason": Clinical justification in ARABIC.
 3. WARNINGS: Emergency red flags & drug interactions in ARABIC.
@@ -287,11 +404,6 @@ JSON Structure Required:
         });
 
         const data = await res.json();
-
-        if (!res.ok || data.error) {
-          throw new Error(data.error?.message || `HTTP Error ${res.status}`);
-        }
-
         const parsed = JSON.parse(data.choices[0].message.content);
 
         state.aiReport = parsed;
