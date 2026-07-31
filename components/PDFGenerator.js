@@ -1,14 +1,11 @@
-import * as Print from 'expo-print';
-import * as Sharing from 'expo-sharing';
+import { Platform } from 'react-native';
 
 export const generatePrescriptionPDF = async (patientData, diagnosis, dynamicData, medications = [], clinicInfo = {}) => {
   const currentDate = new Date().toLocaleDateString('ar-EG');
   
-  // توليد كود التحقق الإلكتروني
   const qrVerificationCode = `VERIFY-${patientData.code || 'PAT'}-${Date.now().toString().slice(-4)}`;
   const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=80x80&data=${encodeURIComponent(qrVerificationCode)}`;
 
-  // جدول الأدوية المعتمدة
   const medsRows = medications.map(m => `
     <tr>
       <td style="padding: 10px; border: 1px solid #CBD5E1; font-weight: bold; font-family: monospace; text-align: left; direction: ltr;">${m.name}</td>
@@ -17,7 +14,6 @@ export const generatePrescriptionPDF = async (patientData, diagnosis, dynamicDat
     </tr>
   `).join('');
 
-  // تفاصيل الفحوصات والبيانات الديناميكية
   const dynamicRows = Object.keys(dynamicData).map(key => `
     <tr>
       <td style="padding: 8px; border-bottom: 1px dashed #E2E8F0; font-weight: bold; width: 35%; color: #334155;">${key}:</td>
@@ -32,29 +28,17 @@ export const generatePrescriptionPDF = async (patientData, diagnosis, dynamicDat
       <meta charset="utf-8">
       <style>
         body { font-family: 'Helvetica', 'Arial', sans-serif; padding: 20px 40px; color: #0F172A; background-color: #FFFFFF; }
-        
-        /* هيدر العيادة والدكتور المبرز */
         .clinic-header { border-bottom: 3px solid #0F172A; padding-bottom: 15px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: flex-start; }
         .clinic-info h1 { margin: 0; font-size: 26px; font-weight: 900; color: #0F172A; }
         .clinic-info h2 { margin: 5px 0 0 0; font-size: 17px; font-weight: bold; color: #334155; }
         .clinic-info p { margin: 5px 0 0 0; font-size: 13px; color: #64748B; }
-        
-        /* حقوق البرنامج بصورة مصغرة وبسيطة جداً */
         .software-watermark { text-align: left; font-size: 10px; color: #94A3B8; display: flex; flex-direction: column; align-items: flex-end; }
-        
-        /* كارت بيانات المريض */
         .patient-box { background: #F8FAFC; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #E2E8F0; display: flex; justify-content: space-between; font-size: 13px; }
         .patient-box div { margin-bottom: 4px; }
-        
-        /* عناوين الأقسام والتشخيص */
         .section-title { font-size: 15px; font-weight: bold; color: #0F172A; margin-top: 22px; margin-bottom: 8px; border-right: 4px solid #0F172A; padding-right: 8px; }
         .diagnosis-box { background: #FFFFFF; padding: 12px; border: 1px solid #CBD5E1; border-radius: 8px; font-size: 14px; font-weight: bold; min-height: 40px; }
-        
-        /* جدول الأدوية */
         table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 13px; }
         th { background-color: #F1F5F9; color: #1E293B; border: 1px solid #CBD5E1; padding: 8px; text-align: right; }
-        
-        /* الفوتر والتوقيعات */
         .footer { margin-top: 45px; padding-top: 15px; display: flex; justify-content: space-between; align-items: flex-end; page-break-inside: avoid; }
         .qr-section { text-align: center; }
         .qr-section p { font-size: 9px; color: #94A3B8; margin-top: 4px; }
@@ -63,23 +47,18 @@ export const generatePrescriptionPDF = async (patientData, diagnosis, dynamicDat
       </style>
     </head>
     <body>
-
-      <!-- رأس الروشتة (بيانات الطبيب والعيادة) -->
       <div class="clinic-header">
         <div class="clinic-info">
           <h1>${clinicInfo.doctorName || 'د. أحمد محمد'}</h1>
           <h2>${clinicInfo.clinicName || 'عيادة MedVerse التخصصية'}</h2>
           <p>${clinicInfo.specialty || 'استشاري الطب الباطني والتشخيص الذكي'}</p>
         </div>
-        
-        <!-- إمضاء البرنامج المصغر -->
         <div class="software-watermark">
           <span>Powered by</span>
           <strong style="color: #0284C7;">MedVerse Smart EMR Suite</strong>
         </div>
       </div>
 
-      <!-- كارت بيانات المريض -->
       <div class="patient-box">
         <div>
           <div><strong>اسم المريض:</strong> ${patientData.name || '---'}</div>
@@ -91,13 +70,11 @@ export const generatePrescriptionPDF = async (patientData, diagnosis, dynamicDat
         </div>
       </div>
 
-      <!-- التشخيص -->
       <div class="section-title">التشخيص (Diagnosis)</div>
       <div class="diagnosis-box">
         ${diagnosis || 'لم يتم تدوين تشخيص.'}
       </div>
 
-      <!-- الخطة العلاجية والروشتة -->
       ${medications.length > 0 ? `
         <div class="section-title">الخطة العلاجية والروشتة (Rx)</div>
         <table>
@@ -114,7 +91,6 @@ export const generatePrescriptionPDF = async (patientData, diagnosis, dynamicDat
         </table>
       ` : ''}
 
-      <!-- بيانات الفحوصات والملاحظات -->
       ${dynamicRows ? `
         <div class="section-title">تفاصيل الفحوصات والتقرير المخصص</div>
         <table style="border: none;">
@@ -124,26 +100,37 @@ export const generatePrescriptionPDF = async (patientData, diagnosis, dynamicDat
         </table>
       ` : ''}
 
-      <!-- الفوتر والختم والـ QR -->
       <div class="footer">
         <div class="qr-section">
           <img src="${qrCodeUrl}" alt="QR Code" />
           <p>رمز تحقق إلكتروني معتمد</p>
         </div>
-
         <div class="signatures">
           <div class="sig-box">توقيع الطبيب المعالج</div>
           <div class="sig-box">ختم العيادة</div>
         </div>
       </div>
-
     </body>
     </html>
   `;
 
   try {
-    const { uri } = await Print.printToFileAsync({ html: htmlContent });
-    await Sharing.shareAsync(uri);
+    if (Platform.OS === 'web') {
+      const printWindow = window.open('', '_blank');
+      if (printWindow) {
+        printWindow.document.write(htmlContent);
+        printWindow.document.close();
+        printWindow.focus();
+        setTimeout(() => {
+          printWindow.print();
+        }, 500);
+      }
+    } else {
+      const Print = require('expo-print');
+      const Sharing = require('expo-sharing');
+      const { uri } = await Print.printToFileAsync({ html: htmlContent });
+      await Sharing.shareAsync(uri);
+    }
   } catch (error) {
     console.error('خطأ في إنتاج ملف الـ PDF:', error);
   }
