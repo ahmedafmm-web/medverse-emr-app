@@ -1,6 +1,7 @@
 {
   "name": "medverse-emr-app",
   "version": "1.0.0",
+  "homepage": "https://ahmedafmm-web.github.io/medverse-emr-app",
   "main": "node_modules/expo/AppEntry.js",
   "scripts": {
     "start": "expo start",
@@ -8,7 +9,7 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "build:web": "npx expo export -p web",
-    "deploy": "npx expo export -p web && npx gh-pages -d dist"
+    "deploy": "npx expo export -p web --clear && npx gh-pages -d dist"
   },
   "dependencies": {
     "@expo/metro-runtime": "~3.2.3",
