@@ -4,11 +4,13 @@ import DynamicFormBuilder from '../components/DynamicFormBuilder';
 import { generatePrescriptionPDF } from '../components/PDFGenerator';
 import { supabase } from '../supabaseClient';
 
-// 🔑 تم دمج مفتاح Gemini API الخاص بك
-const GEMINI_API_KEY = "AQ.Ab8RN6LIuoiJFa9xuw93wRdHRMOF3y89PeeyA7kItoZpriGgAA";
+// 🔑 مفتاح Groq API لتشغيل LLaMA 3.3 70B
+const GROQ_API_KEY = "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";
 
 export default function DoctorDashboard() {
-  // بيانات المريض
+  const [specialty, setSpecialty] = useState('Cardiology & Internal Medicine');
+  
+  // بيانات المريض والديموغرافية
   const [patientName, setPatientName] = useState('');
   const [patientPhone, setPatientPhone] = useState('');
   const [age, setAge] = useState('');
@@ -16,126 +18,167 @@ export default function DoctorDashboard() {
   const [chronicDiseases, setChronicDiseases] = useState('');
   const [familyHistory, setFamilyHistory] = useState('');
   const [symptomsInput, setSymptomsInput] = useState('');
+  const [doctorNotes, setDoctorNotes] = useState('');
 
-  // حالة التحليل بالذكاء الاصطناعي
+  // حالات AI والأدوية
   const [analyzing, setAnalyzing] = useState(false);
+  const [checkingMed, setCheckingMed] = useState(false);
   const [aiReport, setAiReport] = useState(null);
+  const [medCheckError, setMedCheckError] = useState(null);
 
-  // القرار الطبي القابل للتعديل
+  // الخطة المعتمدة
   const [finalDiagnosis, setFinalDiagnosis] = useState('');
   const [prescribedMeds, setPrescribedMeds] = useState([]);
   const [newMedName, setNewMedName] = useState('');
   const [newMedDose, setNewMedDose] = useState('');
   const [newMedReason, setNewMedReason] = useState('');
 
-  const [dynamicData, setDynamicData] = useState({});
   const [loading, setLoading] = useState(false);
-
-  // 🕒 سجل الزيارات الزمني
   const [patientHistory, setPatientHistory] = useState([]);
   const [searchingHistory, setSearchingHistory] = useState(false);
 
-  const [specialtySchema, setSpecialtySchema] = useState([
-    { key: 'vital_signs', label: 'العلامات الحيوية (Vital Signs)', type: 'input', placeholder: 'مثال: 120/80 BP, 37 C' }
-  ]);
-
-  // 🤖 الربط المباشر مع نموذج Gemini 1.5 Flash المجاني
-  const handleClinicalAnalysisWithGemini = async () => {
+  // 🤖 التحليل الإكلينيكي بواسطة LLaMA 3.3 70B عبر Groq
+  const handleClinicalAnalysis = async () => {
     if (!symptomsInput.trim()) {
       Alert.alert('تنبيه', 'يرجى كتابة الأعراض والشكوى الحالية للمريض أولاً.');
       return;
     }
 
-    if (!GEMINI_API_KEY || GEMINI_API_KEY === "YOUR_GEMINI_API_KEY") {
-      Alert.alert('تنبيه الـ API Key', 'يرجى وضع مفتاح Gemini API Key المجاني داخل الكود أولاً لتفعيل الذكاء الاصطناعي.');
-      return;
-    }
-
     setAnalyzing(true);
 
-    // صياغة البرومبت الإكلينيكي الموجه للنموذج
-    const promptText = `
-أنت استشاري طبي وتعمل كمساعد إكلينيكي في نظام EMR.
-قم بتحليل بيانات المريض التالية بجدية ودقة طبية عالية:
-- السن: ${age || 'غير محدد'}
-- النوع: ${gender}
-- الأمراض المزمنة/الحالية: ${chronicDiseases || 'لا يوجد'}
-- التاريخ المرضي العائلي: ${familyHistory || 'لا يوجد'}
-- الشكوى والأعراض الحالية: ${symptomsInput}
+    const systemPrompt = `You are a Senior Consultant Specialist in: ${specialty}.
+You strictly adhere to international evidence-based guidelines.
 
-المطلوب:
-ارسل الإجابة فقط بتنسيق JSON صحيح تماماً وبدون أي نصوص إضافية قبل أو بعد الـ JSON، مستخدماً الهيكل التالي بالظبط:
+CLINICAL REQUIREMENTS:
+1. DIAGNOSIS: Precise medical terminology in ENGLISH with accurate ARABIC explanation.
+2. MODERN MEDICATIONS: Prescribe modern GDMT tailored to specialty ${specialty}.
+   - "name": Drug Name STRICTLY IN ENGLISH.
+   - "dose": Detailed dose in ARABIC.
+   - "reason": Clinical justification in ARABIC.
+3. WARNINGS: Emergency red flags & drug interactions in ARABIC.
+4. Return ONLY valid JSON matching the exact schema requested without markdown.`;
+
+    const userPrompt = `Analyze the following patient case for ${specialty}:
+- Age: ${age || 'Unspecified'} | Gender: ${gender}
+- Chronic Diseases: ${chronicDiseases || 'None'}
+- Family History: ${familyHistory || 'None'}
+- Current Symptoms: ${symptomsInput}
+- Clinical Findings/Notes: ${doctorNotes || 'None'}
+
+JSON Structure Required:
 {
-  "diagnosis": "التشخيص الدقيق والمفصل باللغة العربية مع الاسم العلمي",
-  "warnings": ["قائمة بأي تعارضات دارجية أو محاذير مع الأمراض المزمنة أو السن إن وجدت"],
+  "diagnosis": "English Medical Term - الشرح بالعربي",
+  "warnings": ["تحذير إكلينيكي بالعربي"],
   "medications": [
     {
-      "name": "اسم الدواء العلمي أو التجاري الشهير",
-      "dose": "الجرعة المقترحة وكيفية الاستخدام",
-      "reason": "سبب اختيار هذا الدواء بالظبط للحالة",
-      "alternatives": "أسماء الأدوبة البديلة المتاحة"
+      "name": "English Scientific/Trade Name",
+      "dose": "الجرعة بالعربي",
+      "reason": "دواعي الاستعمال بالعربي"
     }
   ]
-}
-`;
+}`;
 
     try {
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: promptText }] }]
-          })
-        }
-      );
+      const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${GROQ_API_KEY}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          model: "llama-3.3-70b-versatile",
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userPrompt }
+          ],
+          temperature: 0.1,
+          response_format: { type: "json_object" }
+        })
+      });
 
       const data = await response.json();
-      
-      if (data.candidates && data.candidates[0].content.parts[0].text) {
-        let rawText = data.candidates[0].content.parts[0].text;
-        
-        // تنظيف النص للحصول على الـ JSON بشكل صافي
-        rawText = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
-        const parsedResult = JSON.parse(rawText);
+      const parsedResult = JSON.parse(data.choices[0].message.content);
 
-        setAiReport(parsedResult);
-        setFinalDiagnosis(parsedResult.diagnosis || '');
-        setPrescribedMeds(parsedResult.medications || []);
-      } else {
-        throw new Error("لم يتم استلام استجابة صحيحة من النموذج.");
-      }
+      setAiReport(parsedResult);
+      setFinalDiagnosis(parsedResult.diagnosis || '');
+      setPrescribedMeds(parsedResult.medications || []);
 
     } catch (error) {
-      console.error("Gemini API Error:", error);
-      Alert.alert('خطأ في الاتصال بالذكاء الاصطناعي', 'تأكد من صحة المفتاح والاتصال بالإنترنت.');
+      console.error("Groq API Error:", error);
+      Alert.alert('خطأ الاتصال', 'تعذر الاتصال بمحرك LLaMA 3.3 70B، تأكد من الاتصال.');
     } finally {
       setAnalyzing(false);
     }
   };
 
-  const handleAddManualMed = () => {
-    if (!newMedName.trim()) {
-      Alert.alert('تنبيه', 'أدخل اسم الدواء أولاً.');
+  // 🔍 فحص وإضافة دواء يدوي عبر الـ AI
+  const handleCheckAndAddManualMed = async () => {
+    if (!newMedName.trim() || !newMedDose.trim()) {
+      Alert.alert('تنبيه', 'أدخل اسم الدواء والجرعة على الأقل.');
       return;
     }
-    const newMed = {
-      name: newMedName,
-      dose: newMedDose || 'حسب إرشادات الطبيب',
-      reason: newMedReason || 'إضافة مباشرة من الطبيب المعالج',
-      alternatives: 'غير محدد'
-    };
-    setPrescribedMeds(prev => [...prev, newMed]);
-    setNewMedName('');
-    setNewMedDose('');
-    setNewMedReason('');
+
+    setCheckingMed(true);
+    setMedCheckError(null);
+
+    const systemPrompt = `You are a Clinical Pharmacologist for specialty: ${specialty}. Check if adding this new medication is safe for the patient based on age, chronic conditions, and current prescribed list.
+Return JSON ONLY:
+{
+  "safe": true/false,
+  "reason": "توضيح التعارض بالعربي إن وجد"
+}`;
+
+    const userPrompt = `
+- Specialty: ${specialty} | Age: ${age || 'Unspecified'}
+- Chronic Diseases: ${chronicDiseases || 'None'}
+- Currently Prescribed: ${JSON.stringify(prescribedMeds.map(m => m.name))}
+- New Proposed Drug: ${newMedName} (${newMedDose})
+`;
+
+    try {
+      const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${GROQ_API_KEY}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          model: "llama-3.3-70b-versatile",
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userPrompt }
+          ],
+          temperature: 0.1,
+          response_format: { type: "json_object" }
+        })
+      });
+
+      const data = await res.json();
+      const parsed = JSON.parse(data.choices[0].message.content);
+
+      if (parsed.safe) {
+        setPrescribedMeds(prev => [...prev, { name: newMedName, dose: newMedDose, reason: newMedReason || 'إضافة مباشرة من الطبيب' }]);
+        setNewMedName('');
+        setNewMedDose('');
+        setNewMedReason('');
+      } else {
+        setMedCheckError(parsed.reason || 'قد يتعارض هذا الدواء مع الحالة الحالية.');
+      }
+    } catch (e) {
+      setPrescribedMeds(prev => [...prev, { name: newMedName, dose: newMedDose, reason: newMedReason || 'إضافة مباشرة من الطبيب' }]);
+      setNewMedName('');
+      setNewMedDose('');
+      setNewMedReason('');
+    } finally {
+      setCheckingMed(false);
+    }
   };
 
   const handleRemoveMed = (index) => {
     setPrescribedMeds(prev => prev.filter((_, i) => i !== index));
   };
 
+  // 📂 البحث عن المريض واستدعاء سجل الزيارات من Supabase
   const fetchPatientHistory = async (name) => {
     if (!name || name.trim().length < 3) {
       setPatientHistory([]);
@@ -145,7 +188,7 @@ export default function DoctorDashboard() {
     try {
       const { data: patient } = await supabase
         .from('patients')
-        .select('id')
+        .select('id, patient_code')
         .ilike('full_name', `%${name.trim()}%`)
         .limit(1)
         .single();
@@ -166,6 +209,7 @@ export default function DoctorDashboard() {
     }
   };
 
+  // 📄 اعتماد الكشف وتخزينه سحابياً وتنزيل PDF
   const handleSaveAndPrint = async () => {
     if (!patientName.trim()) {
       Alert.alert('تنبيه', 'يرجى إدخال اسم المريض أولاً.');
@@ -173,7 +217,7 @@ export default function DoctorDashboard() {
     }
 
     setLoading(true);
-    const generatedCode = 'PAT-' + Math.floor(1000 + Math.random() * 9000);
+    const generatedCode = 'PAT-' + Math.floor(10000 + Math.random() * 90000);
 
     try {
       let { data: clinic } = await supabase.from('clinics').select('id').limit(1).single();
@@ -181,7 +225,7 @@ export default function DoctorDashboard() {
       if (!clinic) {
         const { data: newClinic, error: cErr } = await supabase
           .from('clinics')
-          .insert([{ doctor_name: 'د. أحمد محمد', specialty: 'طب عام', clinic_name: 'MedVerse Clinic' }])
+          .insert([{ doctor_name: 'د. أحمد محمد', specialty, clinic_name: 'MedVerse Clinic' }])
           .select()
           .single();
         if (cErr) throw cErr;
@@ -190,7 +234,7 @@ export default function DoctorDashboard() {
 
       let { data: patient } = await supabase
         .from('patients')
-        .select('id')
+        .select('id, patient_code')
         .eq('full_name', patientName.trim())
         .single();
 
@@ -210,13 +254,15 @@ export default function DoctorDashboard() {
         patient = newPatient;
       }
 
-      const fullReportData = {
-        ...dynamicData,
+      const activeCode = patient.patient_code || generatedCode;
+
+      const fullRecord = {
         age,
         gender,
         chronicDiseases,
         familyHistory,
         symptoms: symptomsInput,
+        doctorNotes,
         medications: prescribedMeds
       };
 
@@ -226,33 +272,24 @@ export default function DoctorDashboard() {
           patient_id: patient.id,
           clinic_id: clinic.id,
           diagnosis: finalDiagnosis,
-          dynamic_fields: fullReportData,
-          qr_verification_code: 'VERIFY-' + Math.random().toString(36).substring(7).toUpperCase()
+          dynamic_fields: fullRecord,
+          qr_verification_code: 'VERIFY-' + activeCode
         }]);
 
       if (rErr) throw rErr;
 
       await generatePrescriptionPDF(
-        { name: patientName, phone: patientPhone, code: generatedCode },
+        { name: patientName, phone: patientPhone, code: activeCode },
         finalDiagnosis,
         {
           'السن والنوع': `${age || 'غير محدد'} سنة (${gender})`,
           'الأمراض المزمنة': chronicDiseases || 'لا يوجد',
-          'الأدوية المعتمدة': prescribedMeds.map(m => `• ${m.name} - ${m.dose}\n  السبب: ${m.reason}\n  البديل: ${m.alternatives}`).join('\n\n')
-        }
+          'ملاحظات الفحوصات والأشعة': doctorNotes || 'لا يوجد'
+        },
+        prescribedMeds
       );
 
-      Alert.alert('تم اعتماد التقرير', 'تم حفظ التقرير الطبي الشامل وإصدار الروشتة المعتمدة بالسحابة! 🚀');
-
-      setPatientName('');
-      setPatientPhone('');
-      setAge('');
-      setChronicDiseases('');
-      setFamilyHistory('');
-      setSymptomsInput('');
-      setFinalDiagnosis('');
-      setPrescribedMeds([]);
-      setAiReport(null);
+      Alert.alert('تم اعتماد الزيارة', `تم حفظ الكشف برقم [${activeCode}] وتوليد الروشتة PDF بنجاح! 🚀`);
 
     } catch (error) {
       Alert.alert('خطأ أثناء الحفظ', error.message);
@@ -265,12 +302,12 @@ export default function DoctorDashboard() {
     <ScrollView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>MedVerse Smart EMR Suite</Text>
-        <Text style={styles.subtitle}>الاستشاري الإكلينيكي الذكي (Powered by Gemini AI)</Text>
+        <Text style={styles.subtitle}>لوحة تحكم الطبيب السريرية (Powered by LLaMA 3.3 70B)</Text>
       </View>
 
-      {/* 1. الملف الطبي والديموغرافي الشامل */}
+      {/* البيانات الكلينيكية والمريض */}
       <View style={styles.card}>
-        <Text style={styles.sectionTitle}>👤 البيانات الشخصية والمرضية الشاملة</Text>
+        <Text style={styles.sectionTitle}>👤 البيانات الأساسية لكارت المريض</Text>
         
         <Text style={styles.label}>اسم المريض بالكامل *</Text>
         <TextInput 
@@ -289,7 +326,7 @@ export default function DoctorDashboard() {
             <Text style={styles.label}>السن</Text>
             <TextInput 
               style={styles.input} 
-              placeholder="مثال: 35" 
+              placeholder="مثال: 58" 
               placeholderTextColor="#94A3B8"
               keyboardType="numeric"
               value={age}
@@ -310,30 +347,30 @@ export default function DoctorDashboard() {
           </View>
         </View>
 
-        <Text style={styles.label}>الأمراض الحالية والمزمنة (إن وجدت)</Text>
+        <Text style={styles.label}>الأمراض المزمنة</Text>
         <TextInput 
           style={styles.input} 
-          placeholder="مثال: ضغط، سكر، حساسية بنسلين..." 
+          placeholder="مثال: ضغط، سكر نوع ثاني..." 
           placeholderTextColor="#94A3B8"
           value={chronicDiseases}
           onChangeText={setChronicDiseases}
         />
 
-        <Text style={styles.label}>التاريخ المرضي العائلي (Family History)</Text>
+        <Text style={styles.label}>التاريخ المرضي العائلي</Text>
         <TextInput 
           style={styles.input} 
-          placeholder="مثال: تاريخ عائلي لأمراض القلب أو أمراض وراثية..." 
+          placeholder="مثال: أمراض قلب..." 
           placeholderTextColor="#94A3B8"
           value={familyHistory}
           onChangeText={setFamilyHistory}
         />
       </View>
 
-      {/* 🕒 سجل الزيارات الزمني */}
+      {/* سجل الزيارات السابق */}
       {searchingHistory && <ActivityIndicator color="#0284C7" style={{ marginBottom: 15 }} />}
       {patientHistory.length > 0 && (
         <View style={styles.historyCard}>
-          <Text style={styles.historyTitle}>🕒 الزيارات السابقة ({patientHistory.length} زيارة مسجلة)</Text>
+          <Text style={styles.historyTitle}>📚 تاريخ الزيارات السابقة للمريض ({patientHistory.length} زيارات)</Text>
           {patientHistory.map((item, index) => (
             <View key={item.id || index} style={styles.historyItem}>
               <Text style={styles.historyDate}>📅 {new Date(item.created_at).toLocaleDateString('ar-EG')}</Text>
@@ -343,12 +380,14 @@ export default function DoctorDashboard() {
         </View>
       )}
 
-      {/* 2. الشكوى والتحليل عبر Gemini AI */}
+      {/* الأعراض وملاحظات الأشعة والذكاء الاصطناعي */}
       <View style={styles.card}>
-        <Text style={styles.sectionTitle}>🩺 الأعراض والشكوى الحالية</Text>
+        <Text style={styles.sectionTitle}>🩺 الشكوى الحالية وملاحظات الفحوصات</Text>
+        
+        <Text style={styles.label}>الأعراض والشكوى الحالية:</Text>
         <TextInput 
           style={[styles.input, styles.textArea]} 
-          placeholder="صف الأعراض وملاحظات الكشف بالتفصيل..." 
+          placeholder="صف الأعراض بالتفصيل..." 
           placeholderTextColor="#94A3B8"
           multiline 
           numberOfLines={3}
@@ -356,22 +395,32 @@ export default function DoctorDashboard() {
           onChangeText={setSymptomsInput}
         />
 
+        <Text style={styles.label}>ملاحظات الأشعة والتحاليل والمتابعة:</Text>
+        <TextInput 
+          style={[styles.input, styles.textArea]} 
+          placeholder="اكتب ملاحظات الفحوصات أو نتائج الأشعة..." 
+          placeholderTextColor="#94A3B8"
+          multiline 
+          numberOfLines={2}
+          value={doctorNotes}
+          onChangeText={setDoctorNotes}
+        />
+
         <TouchableOpacity 
           style={styles.aiButton} 
-          onPress={handleClinicalAnalysisWithGemini}
+          onPress={handleClinicalAnalysis}
           disabled={analyzing}
         >
           {analyzing ? (
             <ActivityIndicator color="#FFFFFF" size="small" />
           ) : (
-            <Text style={styles.aiButtonText}>✨ تحليل الحالة بـ Gemini AI وكشف التعارضات</Text>
+            <Text style={styles.aiButtonText}>✨ تحليل الحالة بـ LLaMA 3.3 70B AI</Text>
           )}
         </TouchableOpacity>
 
         {aiReport && (
           <View style={styles.aiReportBox}>
-            <Text style={styles.aiReportHeader}>📋 التقرير الاستشاري المولد من Gemini AI:</Text>
-            
+            <Text style={styles.aiReportHeader}>📋 التقرير الطبي المولد من الذكاء الاصطناعي:</Text>
             {aiReport.warnings && aiReport.warnings.length > 0 && (
               <View style={styles.warningBox}>
                 {aiReport.warnings.map((w, idx) => (
@@ -379,18 +428,16 @@ export default function DoctorDashboard() {
                 ))}
               </View>
             )}
-
             <Text style={styles.aiDiagText}><strong>التشخيص المقترح:</strong> {aiReport.diagnosis}</Text>
           </View>
         )}
       </View>
 
-      {/* 3. لوحة مراجعة الطبيب وتعديل الأدوية */}
+      {/* القرارات الطبية وتنسيق الأدوية */}
       <View style={styles.card}>
-        <Text style={styles.sectionTitle}>📝 مراجعة القرارات الطبية والتعديل الحر</Text>
-        <Text style={styles.hintText}>* يحق للطبيب تعديل أو إضافة أو حذف أي عنصر من التشخيص أو الخطة العلاجية.</Text>
+        <Text style={styles.sectionTitle}>📝 اعتماد الخطة العلاجية والروشتة</Text>
 
-        <Text style={styles.label}>التشخيص المعتمد:</Text>
+        <Text style={styles.label}>التشخيص المعتمد النهائي:</Text>
         <TextInput 
           style={[styles.input, styles.textArea]} 
           multiline 
@@ -409,42 +456,52 @@ export default function DoctorDashboard() {
               </TouchableOpacity>
             </View>
             <Text style={styles.medDetail}><strong>الجرعة:</strong> {med.dose}</Text>
-            <Text style={styles.medDetail}><strong>سبب الاختيار:</strong> {med.reason}</Text>
-            <Text style={styles.medDetail}><strong>البدائل المتاحة:</strong> {med.alternatives}</Text>
+            <Text style={styles.medDetail}><strong>دواعي الاستعمال:</strong> {med.reason}</Text>
           </View>
         ))}
 
-        {/* إضافة دواء يدوياً */}
+        {/* إضافة دواء مع الفحص */}
         <View style={styles.addMedBox}>
-          <Text style={styles.label}>إضافة دواء جديد يدوياً للروشتة:</Text>
+          <Text style={styles.label}>إضافة دواء يدوي (مع فحص التفاعلات):</Text>
           <TextInput 
             style={styles.input} 
-            placeholder="اسم الدواء..." 
+            placeholder="اسم الدواء (إنجليزي)" 
             placeholderTextColor="#94A3B8"
             value={newMedName}
             onChangeText={setNewMedName}
           />
           <TextInput 
             style={styles.input} 
-            placeholder="الجرعة وطريقة الاستعمال..." 
+            placeholder="الجرعة والتوقيت" 
             placeholderTextColor="#94A3B8"
             value={newMedDose}
             onChangeText={setNewMedDose}
           />
           <TextInput 
             style={styles.input} 
-            placeholder="سبب الاختيار (اختياري)..." 
+            placeholder="دواعي الاستعمال" 
             placeholderTextColor="#94A3B8"
             value={newMedReason}
             onChangeText={setNewMedReason}
           />
-          <TouchableOpacity style={styles.addMedBtn} onPress={handleAddManualMed}>
-            <Text style={styles.addMedBtnText}>+ إضافة الدواء للقائمة</Text>
+          
+          <TouchableOpacity style={styles.addMedBtn} onPress={handleCheckAndAddManualMed} disabled={checkingMed}>
+            {checkingMed ? (
+              <ActivityIndicator color="#FFFFFF" size="small" />
+            ) : (
+              <Text style={styles.addMedBtnText}>🔍 فحص وإضافة الدواء للروشتة</Text>
+            )}
           </TouchableOpacity>
+
+          {medCheckError && (
+            <View style={styles.warningBox}>
+              <Text style={styles.warningText}>🚨 تحذير تعارض: {medCheckError}</Text>
+            </View>
+          )}
         </View>
       </View>
 
-      {/* زر الاعتماد النهائي */}
+      {/* زر الاعتماد وحفظ الـ PDF */}
       <TouchableOpacity 
         style={[styles.saveButton, loading && styles.saveButtonDisabled]} 
         onPress={handleSaveAndPrint}
@@ -453,7 +510,7 @@ export default function DoctorDashboard() {
         {loading ? (
           <ActivityIndicator color="#FFFFFF" />
         ) : (
-          <Text style={styles.saveButtonText}>اعتماد التقرير وإصدار الروشتة المعتمدة (PDF) 🖨️</Text>
+          <Text style={styles.saveButtonText}>اعتماد التقرير وتنزيل الروشتة PDF 🖨️</Text>
         )}
       </TouchableOpacity>
     </ScrollView>
@@ -461,39 +518,38 @@ export default function DoctorDashboard() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F8FAFC', padding: 15 },
+  container: { flex: 1, backgroundColor: '#0F172A', padding: 15 },
   header: { marginBottom: 20, alignItems: 'center', marginTop: 15 },
-  title: { fontSize: 20, fontWeight: 'bold', color: '#0F172A' },
-  subtitle: { fontSize: 12, color: '#0284C7', marginTop: 4, fontWeight: '600' },
-  card: { backgroundColor: '#FFFFFF', padding: 16, borderRadius: 12, marginBottom: 15, borderWidth: 1, borderColor: '#E2E8F0' },
-  sectionTitle: { fontSize: 15, fontWeight: 'bold', color: '#0F172A', marginBottom: 10, textAlign: 'right' },
-  subSectionTitle: { fontSize: 13, fontWeight: 'bold', color: '#0284C7', marginTop: 12, marginBottom: 8, textAlign: 'right' },
-  hintText: { fontSize: 11, color: '#0284C7', marginBottom: 10, textAlign: 'right' },
-  label: { fontSize: 12, color: '#475569', marginBottom: 4, textAlign: 'right' },
-  input: { borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 8, padding: 10, backgroundColor: '#FFFFFF', marginBottom: 12, textAlign: 'right', color: '#0F172A', fontSize: 13 },
+  title: { fontSize: 20, fontWeight: 'bold', color: '#38BDF8' },
+  subtitle: { fontSize: 12, color: '#94A3B8', marginTop: 4, fontWeight: '600' },
+  card: { backgroundColor: '#1E293B', padding: 16, borderRadius: 12, marginBottom: 15, borderWidth: 1, borderColor: '#334155' },
+  sectionTitle: { fontSize: 15, fontWeight: 'bold', color: '#F8FAFC', marginBottom: 10, textAlign: 'right' },
+  subSectionTitle: { fontSize: 13, fontWeight: 'bold', color: '#38BDF8', marginTop: 12, marginBottom: 8, textAlign: 'right' },
+  label: { fontSize: 12, color: '#CBD5E1', marginBottom: 4, textAlign: 'right' },
+  input: { borderWidth: 1, borderColor: '#475569', borderRadius: 8, padding: 10, backgroundColor: '#0F172A', marginBottom: 12, textAlign: 'right', color: '#FFFFFF', fontSize: 13 },
   rowInputs: { flexDirection: 'row-reverse' },
-  textArea: { height: 75, textAlignVertical: 'top' },
+  textArea: { height: 70, textAlignVertical: 'top' },
   aiButton: { backgroundColor: '#0284C7', padding: 12, borderRadius: 8, alignItems: 'center', marginBottom: 12 },
   aiButtonText: { color: '#FFFFFF', fontSize: 13, fontWeight: 'bold' },
-  aiReportBox: { backgroundColor: '#F0F9FF', padding: 12, borderRadius: 10, borderWidth: 1, borderColor: '#BAE6FD' },
-  aiReportHeader: { fontSize: 13, fontWeight: 'bold', color: '#0369A1', marginBottom: 6, textAlign: 'right' },
-  warningBox: { backgroundColor: '#FEF2F2', padding: 10, borderRadius: 6, borderWidth: 1, borderColor: '#FCA5A5', marginBottom: 8 },
-  warningText: { color: '#991B1B', fontSize: 11, fontWeight: 'bold', textAlign: 'right' },
-  aiDiagText: { fontSize: 12, color: '#0F172A', textAlign: 'right' },
-  medCard: { backgroundColor: '#F8FAFC', padding: 12, borderRadius: 8, borderWidth: 1, borderColor: '#E2E8F0', marginBottom: 10 },
+  aiReportBox: { backgroundColor: '#0369A1/30', padding: 12, borderRadius: 10, borderWidth: 1, borderColor: '#0284C7' },
+  aiReportHeader: { fontSize: 12, fontWeight: 'bold', color: '#38BDF8', marginBottom: 6, textAlign: 'right' },
+  warningBox: { backgroundColor: '#991B1B/40', padding: 10, borderRadius: 6, borderWidth: 1, borderColor: '#EF4444', marginTop: 6, marginBottom: 6 },
+  warningText: { color: '#FCA5A5', fontSize: 11, fontWeight: 'bold', textAlign: 'right' },
+  aiDiagText: { fontSize: 12, color: '#F8FAFC', textAlign: 'right' },
+  medCard: { backgroundColor: '#0F172A', padding: 12, borderRadius: 8, borderWidth: 1, borderColor: '#334155', marginBottom: 10 },
   medHeader: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
-  medName: { fontSize: 13, fontWeight: 'bold', color: '#0F172A' },
+  medName: { fontSize: 13, fontWeight: 'bold', color: '#FFFFFF' },
   deleteText: { color: '#EF4444', fontSize: 11, fontWeight: 'bold' },
-  medDetail: { fontSize: 11, color: '#334155', textAlign: 'right', marginTop: 2 },
-  addMedBox: { backgroundColor: '#F1F5F9', padding: 12, borderRadius: 8, marginTop: 10 },
-  addMedBtn: { backgroundColor: '#0F172A', padding: 10, borderRadius: 6, alignItems: 'center', marginTop: 4 },
-  addMedBtnText: { color: '#FFFFFF', fontSize: 12, fontWeight: 'bold' },
+  medDetail: { fontSize: 11, color: '#94A3B8', textAlign: 'right', marginTop: 2 },
+  addMedBox: { backgroundColor: '#0F172A', padding: 12, borderRadius: 8, marginTop: 10, borderWidth: 1, borderColor: '#334155' },
+  addMedBtn: { backgroundColor: '#334155', padding: 10, borderRadius: 6, alignItems: 'center', marginTop: 4 },
+  addMedBtnText: { color: '#38BDF8', fontSize: 12, fontWeight: 'bold' },
   saveButton: { backgroundColor: '#059669', padding: 16, borderRadius: 10, alignItems: 'center', marginBottom: 35 },
   saveButtonDisabled: { opacity: 0.6 },
-  saveButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: 'bold' },
-  historyCard: { backgroundColor: '#F0F9FF', padding: 12, borderRadius: 12, marginBottom: 15, borderWidth: 1, borderColor: '#BAE6FD' },
-  historyTitle: { fontSize: 12, fontWeight: 'bold', color: '#0369A1', marginBottom: 6, textAlign: 'right' },
-  historyItem: { backgroundColor: '#FFFFFF', padding: 8, borderRadius: 6, marginBottom: 6 },
-  historyDate: { fontSize: 10, color: '#0284C7', fontWeight: 'bold', textAlign: 'right' },
-  historyDiagnosis: { fontSize: 11, color: '#334155', textAlign: 'right' }
+  saveButtonText: { color: '#FFFFFF', fontSize: 15, fontWeight: 'bold' },
+  historyCard: { backgroundColor: '#1E293B', padding: 12, borderRadius: 12, marginBottom: 15, borderWidth: 1, borderColor: '#0284C7' },
+  historyTitle: { fontSize: 12, fontWeight: 'bold', color: '#38BDF8', marginBottom: 6, textAlign: 'right' },
+  historyItem: { backgroundColor: '#0F172A', padding: 8, borderRadius: 6, marginBottom: 6 },
+  historyDate: { fontSize: 10, color: '#38BDF8', fontWeight: 'bold', textAlign: 'right' },
+  historyDiagnosis: { fontSize: 11, color: '#CBD5E1', textAlign: 'right' }
 });
