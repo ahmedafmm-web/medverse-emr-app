@@ -235,7 +235,11 @@
       state.apiError = null;
       render();
 
-      const promptText = `قم بتحليل الملف الإكلينيكي التالي بأسلوب استشاري طبي محترف:
+      const systemPrompt = `You are an expert medical AI assistant.
+CRITICAL MANDATE: You MUST write ALL values in the returned JSON STRICTLY in ARABIC. Absolute zero Chinese or foreign characters allowed.
+Return ONLY valid raw JSON with no markdown formatting.`;
+
+      const userPrompt = `قم بتحليل الحالة الطبية التالية وتوليد التقرير باللغة العربية فقط:
 - السن: ${state.age || 'غير محدد'}
 - النوع: ${state.gender}
 - الأمراض المزمنة: ${state.chronicDiseases || 'لا يوجد'}
@@ -243,15 +247,15 @@
 - الأدوية الحالية: ${state.currentMedications || 'لا يوجد'}
 - الأعراض والشكوى الحالية: ${symptoms}
 
-أجب بصيغة JSON فقط بهذا الشكل وبدون أي مقدمات أو أكواد ماركداون:
+أعد الناتج كـ JSON باللغة العربية حصراً وفق التنسيق الآتي:
 {
-  "diagnosis": "التشخيص الدقيق باللغة العربية",
-  "warnings": ["أي تحذيرات إكلينيكية أو تعارضات دوائية باللغة العربية"],
+  "diagnosis": "التشخيص الطبي باللغة العربية",
+  "warnings": ["تحذير إكلينيكي بالعربي"],
   "medications": [
     {
-      "name": "اسم الدواء",
-      "dose": "الجرعة التفصيلية",
-      "reason": "السبب الطبي"
+      "name": "اسم الدواء العلمي أو التجاري",
+      "dose": "الجرعة باللغة العربية",
+      "reason": "السبب الطبي باللغة العربية"
     }
   ]
 }`;
@@ -266,17 +270,11 @@
           body: JSON.stringify({
             model: "Qwen/Qwen2.5-7B-Instruct",
             messages: [
-              {
-                role: "system",
-                content: "You are an expert AI clinical assistant. You MUST ALWAYS respond strictly in the ARABIC language only. Never output Chinese or English in the diagnosis or warnings text, except for drug trade names if needed. Return ONLY valid JSON."
-              },
-              { 
-                role: "user", 
-                content: promptText 
-              }
+              { role: "system", content: systemPrompt },
+              { role: "user", content: userPrompt }
             ],
             max_tokens: 800,
-            temperature: 0.2
+            temperature: 0.1
           })
         });
 
@@ -288,7 +286,6 @@
 
         let rawText = data.choices[0].message.content;
         
-        // استخراج كائن الـ JSON بذكاء لتفادي النصوص الزائدة
         const jsonMatch = rawText.match(/\{[\s\S]*\}/);
         if (!jsonMatch) throw new Error("لم يتم استرجاع تنسيق JSON صحيح من النموذج.");
 
