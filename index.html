@@ -220,7 +220,7 @@
 - التاريخ المرضي العائلي: ${state.familyHistory || 'لا يوجد'}
 - الشكوى والأعراض الحالية: ${symptoms}
 
-المطلوب: ارسل الإجابة فقط بتنسيق JSON صحيح تماماً بدون أي نصوص أخرى:
+المطلوب: ارسل الإجابة فقط بتنسيق JSON صحيح تماماً بدون أي علامات markdown أو أسطر إضافية:
 {
   "diagnosis": "التشخيص الدقيق باللغة العربية مع الاسم العلمي",
   "warnings": ["قائمة بأي تعارضات دارجية أو محاذير إن وجدت"],
@@ -235,11 +235,16 @@
 `;
 
       try {
-        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ contents: [{ parts: [{ text: promptText }] }] })
         });
+
+        if (!res.ok) {
+          throw new Error('API Key Issue');
+        }
+
         const data = await res.json();
         let rawText = data.candidates[0].content.parts[0].text;
         rawText = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
@@ -249,7 +254,7 @@
         state.finalDiagnosis = parsed.diagnosis || '';
         state.medications = parsed.medications || [];
       } catch (err) {
-        alert('خطأ أثناء الاتصال بالذكاء الاصطناعي، تأكد من الاتصال.');
+        alert('حدثت مشكلة في مفتاح الذكاء الاصطناعي (API Key). يرجى التأكد من صلاحية المفتاح من Google AI Studio.');
       } finally {
         state.analyzing = false;
         render();
@@ -277,3 +282,4 @@
   </script>
 </body>
 </html>
+ 
