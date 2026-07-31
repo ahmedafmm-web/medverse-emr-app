@@ -4,14 +4,13 @@ import DoctorDashboard from './screens/DoctorDashboard';
 import PatientPortal from './screens/PatientPortal';
 
 export default function App() {
-  // حالة التنقل بين الشاشات: 'doctor' أو 'patient'
   const [currentScreen, setCurrentScreen] = useState('doctor');
 
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#0F172A" />
 
-      {/* شريط التنقل التجريبي العلوي */}
+      {/* شريط التنقل العلوي */}
       <View style={styles.navBar}>
         <TouchableOpacity 
           style={[styles.navButton, currentScreen === 'doctor' && styles.activeNavButton]} 
@@ -32,7 +31,7 @@ export default function App() {
         </TouchableOpacity>
       </View>
 
-      {/* عرض الشاشة المختارة */}
+      {/* الشاشات */}
       <View style={styles.body}>
         {currentScreen === 'doctor' ? (
           <DoctorDashboard />
@@ -45,10 +44,7 @@ export default function App() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#0F172A',
-  },
+  container: { flex: 1, backgroundColor: '#0F172A' },
   navBar: {
     flexDirection: 'row-reverse',
     backgroundColor: '#1E293B',
@@ -59,24 +55,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-around',
     alignItems: 'center',
   },
-  navButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    backgroundColor: 'transparent',
-  },
-  activeNavButton: {
-    backgroundColor: '#0284C7',
-  },
-  navText: {
-    color: '#94A3B8',
-    fontSize: 14,
-    fontWeight: 'bold',
-  },
-  activeNavText: {
-    color: '#FFFFFF',
-  },
-  body: {
-    flex: 1,
-  },
+  navButton: { paddingVertical: 8, paddingHorizontal: 16, borderRadius: 8 },
+  activeNavButton: { backgroundColor: '#0284C7' },
+  navText: { color: '#94A3B8', fontSize: 14, fontWeight: 'bold' },
+  activeNavText: { color: '#FFFFFF' },
+  body: { flex: 1 }
 });
