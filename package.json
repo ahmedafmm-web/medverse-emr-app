@@ -6,7 +6,9 @@
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "build:web": "npx expo export -p web",
+    "deploy": "npx expo export -p web && npx gh-pages -d dist"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.39.0",
@@ -15,6 +17,9 @@
     "expo-sharing": "~12.0.1",
     "react": "18.2.0",
     "react-native": "0.74.5"
+  },
+  "devDependencies": {
+    "gh-pages": "^6.1.1"
   },
   "private": true
 }
