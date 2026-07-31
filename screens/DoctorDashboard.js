@@ -4,40 +4,46 @@ import DynamicFormBuilder from '../components/DynamicFormBuilder';
 import { generatePrescriptionPDF } from '../components/PDFGenerator';
 import { supabase } from '../supabaseClient';
 
-// 🔑 مفتاح Groq API لتشغيل LLaMA 3.3 70B
+// 🔑 مفتاح Groq API لتشغيل نموذج LLaMA 3.3 70B
 const GROQ_API_KEY = "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";
 
 export default function DoctorDashboard() {
-  const [specialty, setSpecialty] = useState('Cardiology & Internal Medicine');
-  
-  // بيانات المريض والديموغرافية
+  // ⚙️ إعدادات الطبيب والعيادة (تطبع على رأس الروشتة)
+  const [clinicDoctorName, setClinicDoctorName] = useState('د. أحمد محمد');
+  const [clinicName, setClinicName] = useState('عيادة MedVerse التخصصية');
+  const [specialty, setSpecialty] = useState('استشاري أمراض القلب والباطنة');
+
+  // 👤 البيانات الديموغرافية للمريض
   const [patientName, setPatientName] = useState('');
   const [patientPhone, setPatientPhone] = useState('');
   const [age, setAge] = useState('');
   const [gender, setGender] = useState('ذكر');
   const [chronicDiseases, setChronicDiseases] = useState('');
   const [familyHistory, setFamilyHistory] = useState('');
+
+  // 🩺 الشكوى والأعراض وملاحظات الأشعة
   const [symptomsInput, setSymptomsInput] = useState('');
   const [doctorNotes, setDoctorNotes] = useState('');
 
-  // حالات AI والأدوية
+  // 🤖 حالات الذكاء الاصطناعي وفحص الأدوية
   const [analyzing, setAnalyzing] = useState(false);
   const [checkingMed, setCheckingMed] = useState(false);
   const [aiReport, setAiReport] = useState(null);
   const [medCheckError, setMedCheckError] = useState(null);
 
-  // الخطة المعتمدة
+  // 📝 الخطة المعتمدة للروشتة
   const [finalDiagnosis, setFinalDiagnosis] = useState('');
   const [prescribedMeds, setPrescribedMeds] = useState([]);
   const [newMedName, setNewMedName] = useState('');
   const [newMedDose, setNewMedDose] = useState('');
   const [newMedReason, setNewMedReason] = useState('');
 
+  // 🕒 سجلات السحابة والتخزين
   const [loading, setLoading] = useState(false);
   const [patientHistory, setPatientHistory] = useState([]);
   const [searchingHistory, setSearchingHistory] = useState(false);
 
-  // 🤖 التحليل الإكلينيكي بواسطة LLaMA 3.3 70B عبر Groq
+  // 🤖 التحليل السريري الذكي عبر LLaMA 3.3 70B
   const handleClinicalAnalysis = async () => {
     if (!symptomsInput.trim()) {
       Alert.alert('تنبيه', 'يرجى كتابة الأعراض والشكوى الحالية للمريض أولاً.');
@@ -105,13 +111,13 @@ JSON Structure Required:
 
     } catch (error) {
       console.error("Groq API Error:", error);
-      Alert.alert('خطأ الاتصال', 'تعذر الاتصال بمحرك LLaMA 3.3 70B، تأكد من الاتصال.');
+      Alert.alert('خطأ الاتصال', 'تعذر الاتصال بمحرك LLaMA 3.3 70B، تأكد من الاتصال بالإنترنت.');
     } finally {
       setAnalyzing(false);
     }
   };
 
-  // 🔍 فحص وإضافة دواء يدوي عبر الـ AI
+  // 🔍 فحص سلامة الدواء اليدوي
   const handleCheckAndAddManualMed = async () => {
     if (!newMedName.trim() || !newMedDose.trim()) {
       Alert.alert('تنبيه', 'أدخل اسم الدواء والجرعة على الأقل.');
@@ -178,7 +184,7 @@ Return JSON ONLY:
     setPrescribedMeds(prev => prev.filter((_, i) => i !== index));
   };
 
-  // 📂 البحث عن المريض واستدعاء سجل الزيارات من Supabase
+  // 📂 استدعاء سجل المريض والزيارات السابقة من Supabase
   const fetchPatientHistory = async (name) => {
     if (!name || name.trim().length < 3) {
       setPatientHistory([]);
@@ -209,7 +215,7 @@ Return JSON ONLY:
     }
   };
 
-  // 📄 اعتماد الكشف وتخزينه سحابياً وتنزيل PDF
+  // 📄 اعتماد الزيارة وتوليد ملف PDF
   const handleSaveAndPrint = async () => {
     if (!patientName.trim()) {
       Alert.alert('تنبيه', 'يرجى إدخال اسم المريض أولاً.');
@@ -225,7 +231,7 @@ Return JSON ONLY:
       if (!clinic) {
         const { data: newClinic, error: cErr } = await supabase
           .from('clinics')
-          .insert([{ doctor_name: 'د. أحمد محمد', specialty, clinic_name: 'MedVerse Clinic' }])
+          .insert([{ doctor_name: clinicDoctorName, specialty, clinic_name: clinicName }])
           .select()
           .single();
         if (cErr) throw cErr;
@@ -254,7 +260,7 @@ Return JSON ONLY:
         patient = newPatient;
       }
 
-      const activeCode = patient.patient_code || generatedCode;
+      const activeCode = patient?.patient_code || generatedCode;
 
       const fullRecord = {
         age,
@@ -278,6 +284,7 @@ Return JSON ONLY:
 
       if (rErr) throw rErr;
 
+      // توليد الروشتة ببيانات العيادة الكاملة
       await generatePrescriptionPDF(
         { name: patientName, phone: patientPhone, code: activeCode },
         finalDiagnosis,
@@ -286,10 +293,15 @@ Return JSON ONLY:
           'الأمراض المزمنة': chronicDiseases || 'لا يوجد',
           'ملاحظات الفحوصات والأشعة': doctorNotes || 'لا يوجد'
         },
-        prescribedMeds
+        prescribedMeds,
+        {
+          doctorName: clinicDoctorName,
+          clinicName: clinicName,
+          specialty: specialty
+        }
       );
 
-      Alert.alert('تم اعتماد الزيارة', `تم حفظ الكشف برقم [${activeCode}] وتوليد الروشتة PDF بنجاح! 🚀`);
+      Alert.alert('تم اعتماد الزيارة', `تم حفظ الكشف برقم [${activeCode}] وتنزيل الروشتة PDF! 🚀`);
 
     } catch (error) {
       Alert.alert('خطأ أثناء الحفظ', error.message);
@@ -305,7 +317,36 @@ Return JSON ONLY:
         <Text style={styles.subtitle}>لوحة تحكم الطبيب السريرية (Powered by LLaMA 3.3 70B)</Text>
       </View>
 
-      {/* البيانات الكلينيكية والمريض */}
+      {/* ⚙️ 1. إعدادات اسم الطبيب والعيادة المطبوعة */}
+      <View style={styles.card}>
+        <Text style={styles.sectionTitle}>⚙️ بيانات الطبيب والعيادة (تطبع أعلى الروشتة)</Text>
+        <View style={styles.rowInputs}>
+          <View style={{ flex: 1, marginLeft: 8 }}>
+            <Text style={styles.label}>اسم الطبيب</Text>
+            <TextInput 
+              style={styles.input} 
+              value={clinicDoctorName}
+              onChangeText={setClinicDoctorName}
+            />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.label}>اسم العيادة</Text>
+            <TextInput 
+              style={styles.input} 
+              value={clinicName}
+              onChangeText={setClinicName}
+            />
+          </View>
+        </View>
+        <Text style={styles.label}>التخصص الطبي</Text>
+        <TextInput 
+          style={styles.input} 
+          value={specialty}
+          onChangeText={setSpecialty}
+        />
+      </View>
+
+      {/* 👤 2. البيانات الأساسية لكارت المريض */}
       <View style={styles.card}>
         <Text style={styles.sectionTitle}>👤 البيانات الأساسية لكارت المريض</Text>
         
@@ -366,7 +407,7 @@ Return JSON ONLY:
         />
       </View>
 
-      {/* سجل الزيارات السابق */}
+      {/* 📚 3. سجل الزيارات السابق للمريض */}
       {searchingHistory && <ActivityIndicator color="#0284C7" style={{ marginBottom: 15 }} />}
       {patientHistory.length > 0 && (
         <View style={styles.historyCard}>
@@ -380,7 +421,7 @@ Return JSON ONLY:
         </View>
       )}
 
-      {/* الأعراض وملاحظات الأشعة والذكاء الاصطناعي */}
+      {/* 🩺 4. الأعراض والتحليل الذكي عبر LLaMA 3.3 70B */}
       <View style={styles.card}>
         <Text style={styles.sectionTitle}>🩺 الشكوى الحالية وملاحظات الفحوصات</Text>
         
@@ -433,7 +474,7 @@ Return JSON ONLY:
         )}
       </View>
 
-      {/* القرارات الطبية وتنسيق الأدوية */}
+      {/* 📝 5. اعتماد الخطة العلاجية وإضافة الأدوية */}
       <View style={styles.card}>
         <Text style={styles.sectionTitle}>📝 اعتماد الخطة العلاجية والروشتة</Text>
 
@@ -460,7 +501,7 @@ Return JSON ONLY:
           </View>
         ))}
 
-        {/* إضافة دواء مع الفحص */}
+        {/* إضافة دواء يدوي */}
         <View style={styles.addMedBox}>
           <Text style={styles.label}>إضافة دواء يدوي (مع فحص التفاعلات):</Text>
           <TextInput 
@@ -501,7 +542,7 @@ Return JSON ONLY:
         </View>
       </View>
 
-      {/* زر الاعتماد وحفظ الـ PDF */}
+      {/* 🖨️ 6. زر الاعتماد وتوليد الـ PDF */}
       <TouchableOpacity 
         style={[styles.saveButton, loading && styles.saveButtonDisabled]} 
         onPress={handleSaveAndPrint}
