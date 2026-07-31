@@ -21,9 +21,9 @@
   <div id="app"></div>
 
   <script>
-    // حالة الواجهة البياناتية (جلب المفتاح المحفوظ من ذاكرة المتصفح إن وجد)
+    // حالة الواجهة البياناتية (جلب المفتاح المحفوظ أوتوماتيكياً من ذاكرة الجهاز)
     let state = {
-      apiKey: localStorage.getItem('MEDVERSE_GEMINI_KEY') || '',
+      apiKey: localStorage.getItem('MEDVERSE_HF_KEY') || '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',
       patientName: '',
       age: '',
       phone: '',
@@ -33,6 +33,7 @@
       symptoms: '',
       analyzing: false,
       aiReport: null,
+      apiError: null,
       finalDiagnosis: '',
       medications: []
     };
@@ -46,22 +47,22 @@
           <!-- Header -->
           <header class="text-center py-4 border-b border-slate-800">
             <h1 class="text-2xl font-bold text-sky-400">MedVerse Smart EMR Suite</h1>
-            <p class="text-xs text-sky-500 font-semibold mt-1">الاستشاري الإكلينيكي الذكي (Powered by Gemini AI)</p>
+            <p class="text-xs text-sky-500 font-semibold mt-1">الاستشاري الإكلينيكي الذكي (Powered by DeepSeek AI)</p>
           </header>
 
-          <!-- ⚙️ إعدادات المفتاح الآمنة (Client-Side Storage) -->
+          <!-- ⚙️ إعدادات المفتاح (Hugging Face API Key) -->
           <section class="bg-slate-800/80 p-4 rounded-2xl border border-sky-900/50 space-y-2">
             <div class="flex justify-between items-center">
               <label class="text-xs font-bold text-sky-300 flex items-center gap-1">
-                <span>🔑</span> مفتاح Gemini API الخاص بك:
+                <span>🔑</span> مفتاح Hugging Face Access Token:
               </label>
-              ${state.apiKey ? '<span class="text-[10px] bg-emerald-950 text-emerald-400 border border-emerald-800 px-2 py-0.5 rounded-full">محفوظ آمن آلياً ✓</span>' : '<span class="text-[10px] bg-amber-950 text-amber-400 border border-amber-800 px-2 py-0.5 rounded-full">مطلوب للتحليل الذكي</span>'}
+              ${state.apiKey ? '<span class="text-[10px] bg-emerald-950 text-emerald-400 border border-emerald-800 px-2 py-0.5 rounded-full">محفوظ وآمن ✓</span>' : '<span class="text-[10px] bg-amber-950 text-amber-400 border border-amber-800 px-2 py-0.5 rounded-full">مطلوب المفتاح</span>'}
             </div>
             <div class="flex gap-2">
               <input 
                 id="apiKeyInput" 
                 type="password" 
-                placeholder="أدخل المفتاح الذي ينتهي بـ AQ... أو يبدأ بـ AIzaSy..." 
+                placeholder="hf_..." 
                 value="${state.apiKey}" 
                 class="flex-1 bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-sky-500" 
               />
@@ -74,7 +75,7 @@
           <!-- 1. البيانات الشخصية والمرضية -->
           <section class="bg-slate-800 p-5 rounded-2xl border border-slate-700 space-y-4">
             <h2 class="font-bold text-sm text-slate-200 border-b border-slate-700 pb-2 flex items-center gap-2">
-              <span>👤</span> البيانات الشخصية والمرضية الشاملة
+              <span>👤</span> البيانات الشخصية والمرضية
             </h2>
 
             <div>
@@ -94,31 +95,33 @@
             </div>
 
             <div>
-              <label class="block text-xs text-slate-400 mb-1">الأمراض الحالية والمزمنة (إن وجدت)</label>
+              <label class="block text-xs text-slate-400 mb-1">الأمراض المزمنة / الحساسية</label>
               <input id="pChronic" type="text" placeholder="مثال: ضغط، سكر، حساسية بنسلين..." value="${state.chronicDiseases}" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-sky-500" />
-            </div>
-
-            <div>
-              <label class="block text-xs text-slate-400 mb-1">التاريخ المرضي العائلي (Family History)</label>
-              <input id="pFamily" type="text" placeholder="مثال: تاريخ عائلي لأمراض القلب..." value="${state.familyHistory}" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-sky-500" />
             </div>
           </section>
 
-          <!-- 2. الشكوى والتحليل الذكي -->
+          <!-- 2. الأعراض والتحليل الذكي -->
           <section class="bg-slate-800 p-5 rounded-2xl border border-slate-700 space-y-4">
             <h2 class="font-bold text-sm text-slate-200 border-b border-slate-700 pb-2 flex items-center gap-2">
               <span>🩺</span> الأعراض والشكوى الحالية
             </h2>
 
-            <textarea id="pSymptoms" rows="3" placeholder="صف الأعراض وملاحظات الكشف بالتفصيل..." class="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-sky-500">${state.symptoms}</textarea>
+            <textarea id="pSymptoms" rows="3" placeholder="صف الأعراض بالتفصيل..." class="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-sky-500">${state.symptoms}</textarea>
 
             <button id="aiBtn" class="w-full bg-sky-600 hover:bg-sky-500 text-white font-bold py-3 px-4 rounded-xl transition-all shadow-lg shadow-sky-600/30 flex items-center justify-center gap-2">
-              ${state.analyzing ? '⏳ جاري التحليل برادارات Gemini...' : '✨ تحليل الحالة بـ Gemini AI وكشف التعارضات'}
+              ${state.analyzing ? '⏳ جاري استدعاء نموذج DeepSeek-R1 الطبي...' : '✨ تحليل الحالة بـ DeepSeek AI'}
             </button>
+
+            ${state.apiError ? `
+              <div class="bg-red-950/60 border border-red-800 p-4 rounded-xl text-red-300 text-xs space-y-1">
+                <strong>❌ خطأ في الاتصال بالسيرفر:</strong>
+                <div>${state.apiError}</div>
+              </div>
+            ` : ''}
 
             ${state.aiReport ? `
               <div class="bg-sky-950/40 border border-sky-800 p-4 rounded-xl space-y-3">
-                <h3 class="text-xs font-bold text-sky-400">📋 التقرير الاستشاري المولد من Gemini AI:</h3>
+                <h3 class="text-xs font-bold text-sky-400">📋 التقرير الطبي المولد بواسطة DeepSeek AI:</h3>
                 
                 ${state.aiReport.warnings && state.aiReport.warnings.length > 0 ? `
                   <div class="bg-red-950/50 border border-red-800 p-3 rounded-lg text-red-300 text-xs space-y-1">
@@ -127,7 +130,7 @@
                 ` : ''}
 
                 <div class="text-xs text-slate-200">
-                  <strong>التشخيص المقترح:</strong> ${state.aiReport.diagnosis}
+                  <strong>التشخيص المباشر:</strong> ${state.aiReport.diagnosis}
                 </div>
               </div>
             ` : ''}
@@ -136,16 +139,14 @@
           <!-- 3. اعتماد القرارات والأدوية -->
           <section class="bg-slate-800 p-5 rounded-2xl border border-slate-700 space-y-4">
             <h2 class="font-bold text-sm text-slate-200 border-b border-slate-700 pb-2 flex items-center gap-2">
-              <span>📝</span> مراجعة القرارات الطبية والتعديل الحر
+              <span>📝</span> اعتماد الخطة العلاجية بواسطة الطبيب
             </h2>
-            <p class="text-xs text-sky-400">* يحق للطبيب تعديل أو إضافة أو حذف أي عنصر من الخطة العلاجية.</p>
 
             <div>
               <label class="block text-xs text-slate-400 mb-1">التشخيص المعتمد النهائي:</label>
               <textarea id="pDiag" rows="2" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-sky-500">${state.finalDiagnosis}</textarea>
             </div>
 
-            <!-- قائمة الأدوية -->
             <div class="space-y-3">
               <h3 class="text-xs font-bold text-sky-400">💊 قائمة الأدوية المعتمدة (${state.medications.length}):</h3>
               ${state.medications.map((m, idx) => `
@@ -153,23 +154,12 @@
                   <button onclick="removeMed(${idx})" class="absolute left-3 top-3 text-red-400 text-xs font-bold">إزالة ✕</button>
                   <div class="font-bold text-sm text-white">💊 ${m.name}</div>
                   <div class="text-xs text-slate-400"><strong>الجرعة:</strong> ${m.dose}</div>
-                  <div class="text-xs text-slate-400"><strong>السبب:</strong> ${m.reason}</div>
+                  <div class="text-xs text-slate-400"><strong>دواعي الاستعمال:</strong> ${m.reason}</div>
                 </div>
               `).join('')}
             </div>
-
-            <!-- إضافة دواء يدوي -->
-            <div class="bg-slate-900/60 p-3 rounded-xl border border-slate-700 space-y-2">
-              <label class="block text-xs text-slate-400">إضافة دواء جديد يدوياً للروشتة:</label>
-              <input id="mName" type="text" placeholder="اسم الدواء..." class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white" />
-              <input id="mDose" type="text" placeholder="الجرعة واستعمالها..." class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white" />
-              <button id="addMedBtn" class="w-full bg-slate-700 hover:bg-slate-600 text-xs font-bold py-2 rounded-lg text-white">
-                + إضافة الدواء للقائمة
-              </button>
-            </div>
           </section>
 
-          <!-- زر الاعتماد والطباعة -->
           <button id="saveBtn" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-4 rounded-xl transition-all shadow-lg shadow-emerald-600/20 text-base">
             اعتماد التقرير وإصدار الروشتة المعتمدة 🖨️
           </button>
@@ -181,42 +171,25 @@
     }
 
     function bindEvents() {
-      // حفظ المفتاح في LocalStorage
       document.getElementById('saveKeyBtn').onclick = () => {
         const val = document.getElementById('apiKeyInput').value.trim();
         if (val) {
           state.apiKey = val;
-          localStorage.setItem('MEDVERSE_GEMINI_KEY', val);
-          alert('تم حفظ مفتاح API بنجاح في جهازك! 🔑');
+          localStorage.setItem('MEDVERSE_HF_KEY', val);
+          alert('تم حفظ المفتاح بنجاح! 🔑');
           render();
-        } else {
-          alert('يرجى كتابة المفتاح أولاً');
         }
       };
 
-      // مزامنة المدخلات
       document.getElementById('pName').onchange = (e) => state.patientName = e.target.value;
       document.getElementById('pAge').onchange = (e) => state.age = e.target.value;
       document.getElementById('pPhone').onchange = (e) => state.phone = e.target.value;
       document.getElementById('pChronic').onchange = (e) => state.chronicDiseases = e.target.value;
-      document.getElementById('pFamily').onchange = (e) => state.familyHistory = e.target.value;
       document.getElementById('pSymptoms').onchange = (e) => state.symptoms = e.target.value;
       document.getElementById('pDiag').onchange = (e) => state.finalDiagnosis = e.target.value;
 
-      // زر تحليل Gemini AI
       document.getElementById('aiBtn').onclick = handleAiAnalysis;
 
-      // زر إضافة دواء
-      document.getElementById('addMedBtn').onclick = () => {
-        const name = document.getElementById('mName').value;
-        const dose = document.getElementById('mDose').value;
-        if (name.trim()) {
-          state.medications.push({ name, dose: dose || 'حسب إرشادات الطبيب', reason: 'إضافة يدوية' });
-          render();
-        }
-      };
-
-      // زر الحفظ
       document.getElementById('saveBtn').onclick = () => {
         if (!state.patientName.trim()) {
           alert('يرجى إدخال اسم المريض أولاً');
@@ -233,7 +206,7 @@
 
     async function handleAiAnalysis() {
       if (!state.apiKey) {
-        alert('يرجى إدخال مفتاح Gemini API الخاص بك في الخانة المخصصة بالأعلى أولاً.');
+        alert('يرجى إدخال مفتاح Hugging Face أولاً.');
         return;
       }
 
@@ -244,6 +217,7 @@
       }
 
       state.analyzing = true;
+      state.apiError = null;
       render();
 
       const promptText = `
@@ -252,44 +226,54 @@
 - السن: ${state.age || 'غير محدد'}
 - النوع: ${state.gender}
 - الأمراض المزمنة/الحالية: ${state.chronicDiseases || 'لا يوجد'}
-- التاريخ المرضي العائلي: ${state.familyHistory || 'لا يوجد'}
 - الشكوى والأعراض الحالية: ${symptoms}
 
-المطلوب: ارسل الإجابة فقط بتنسيق JSON صحيح تماماً بدون أي علامات markdown أو أسطر إضافية:
+المطلوب: ارسل الإجابة فقط بتنسيق JSON صحيح تماماً بدون أي مقدمات أو أسطر إضافية:
 {
   "diagnosis": "التشخيص الدقيق باللغة العربية مع الاسم العلمي",
-  "warnings": ["قائمة بأي تعارضات دارجية أو محاذير إن وجدت"],
+  "warnings": ["قائمة بأي تعارضات دوائية أو محاذير إن وجدت"],
   "medications": [
     {
-      "name": "اسم الدواء الشهير",
-      "dose": "الجرعة المقترحة",
-      "reason": "سبب الاختيار"
+      "name": "اسم الدواء العلمي أو التجاري",
+      "dose": "الجرعة التفصيلية",
+      "reason": "السبب الطبي للملاحظة"
     }
   ]
 }
 `;
 
       try {
-        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${state.apiKey}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ contents: [{ parts: [{ text: promptText }] }] })
+        const res = await fetch("https://api-inference.huggingface.co/models/deepseek-ai/DeepSeek-R1-Distill-Qwen-32B", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${state.apiKey}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            inputs: promptText,
+            parameters: { max_new_tokens: 600, return_full_text: false }
+          })
         });
 
-        if (!res.ok) {
-          throw new Error('API Key Issue');
+        const data = await res.json();
+
+        if (!res.ok || data.error) {
+          throw new Error(data.error || `HTTP Error ${res.status}`);
         }
 
-        const data = await res.json();
-        let rawText = data.candidates[0].content.parts[0].text;
-        rawText = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
-        const parsed = JSON.parse(rawText);
+        let rawText = Array.isArray(data) ? data[0].generated_text : data.generated_text;
+        
+        // استخراج الـ JSON بدقة
+        const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+        if (!jsonMatch) throw new Error("لم يتم استرجاع تنسيق JSON صحيح من النموذج.");
+
+        const parsed = JSON.parse(jsonMatch[0]);
 
         state.aiReport = parsed;
         state.finalDiagnosis = parsed.diagnosis || '';
         state.medications = parsed.medications || [];
       } catch (err) {
-        alert('حدثت مشكلة أثناء الاتصال بـ Gemini AI. يرجى التأكد من صحة المفتاح المدخل ومن الاتصال.');
+        state.apiError = err.message;
       } finally {
         state.analyzing = false;
         render();
@@ -298,7 +282,7 @@
 
     render();
 
-    // 🔄 كود التحديث الفوري المباشر
+    // 🔄 Service Worker للإنعاش السريع
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
         navigator.serviceWorker.register('./sw.js').then(reg => {
