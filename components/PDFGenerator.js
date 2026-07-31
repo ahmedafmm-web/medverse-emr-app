@@ -1,27 +1,27 @@
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 
-export const generatePrescriptionPDF = async (patientData, diagnosis, dynamicData, medications = []) => {
+export const generatePrescriptionPDF = async (patientData, diagnosis, dynamicData, medications = [], clinicInfo = {}) => {
   const currentDate = new Date().toLocaleDateString('ar-EG');
   
-  // توليد كود التحقق ضد التزوير
+  // توليد كود التحقق الإلكتروني
   const qrVerificationCode = `VERIFY-${patientData.code || 'PAT'}-${Date.now().toString().slice(-4)}`;
-  const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(qrVerificationCode)}`;
+  const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=80x80&data=${encodeURIComponent(qrVerificationCode)}`;
 
-  // تحويل جدول الأدوية إلى صفوف أنيقة
+  // جدول الأدوية المعتمدة
   const medsRows = medications.map(m => `
     <tr>
-      <td style="padding: 10px; border: 1px solid #CBD5E1; font-weight: bold; font-family: monospace;">${m.name}</td>
+      <td style="padding: 10px; border: 1px solid #CBD5E1; font-weight: bold; font-family: monospace; text-align: left; direction: ltr;">${m.name}</td>
       <td style="padding: 10px; border: 1px solid #CBD5E1;">${m.dose}</td>
       <td style="padding: 10px; border: 1px solid #CBD5E1;">${m.reason || '---'}</td>
     </tr>
   `).join('');
 
-  // تحويل البيانات الديناميكية والملاحظات إلى جدول
+  // تفاصيل الفحوصات والبيانات الديناميكية
   const dynamicRows = Object.keys(dynamicData).map(key => `
     <tr>
-      <td style="padding: 8px; border-bottom: 1px solid #E2E8F0; font-weight: bold; width: 35%; color: #334155;">${key}:</td>
-      <td style="padding: 8px; border-bottom: 1px solid #E2E8F0; color: #0F172A;">${dynamicData[key]}</td>
+      <td style="padding: 8px; border-bottom: 1px dashed #E2E8F0; font-weight: bold; width: 35%; color: #334155;">${key}:</td>
+      <td style="padding: 8px; border-bottom: 1px dashed #E2E8F0; color: #0F172A;">${dynamicData[key]}</td>
     </tr>
   `).join('');
 
@@ -31,62 +31,81 @@ export const generatePrescriptionPDF = async (patientData, diagnosis, dynamicDat
     <head>
       <meta charset="utf-8">
       <style>
-        body { font-family: 'Helvetica', 'Arial', sans-serif; padding: 30px; color: #0F172A; background-color: #FFFFFF; }
-        .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 3px solid #0284C7; padding-bottom: 15px; margin-bottom: 20px; }
-        .doc-details h1 { color: #0284C7; margin: 0; font-size: 22px; font-weight: bold; }
-        .doc-details p { color: #64748B; margin: 3px 0; font-size: 13px; }
-        .brand-logo { font-size: 24px; font-weight: 900; color: #0F172A; text-align: left; }
-        .info-box { background: #F8FAFC; padding: 12px 18px; border-radius: 10px; margin-bottom: 20px; border: 1px solid #E2E8F0; display: flex; justify-content: space-between; font-size: 13px; }
-        .info-item { margin-bottom: 4px; }
-        .section-title { font-size: 15px; font-weight: bold; color: #0284C7; margin-top: 20px; margin-bottom: 8px; border-right: 4px solid #0284C7; padding-right: 8px; }
-        .diagnosis-box { background: #FFFFFF; padding: 12px; border: 1px solid #CBD5E1; border-radius: 8px; font-size: 14px; min-height: 40px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 13px; text-align: right; }
-        th { background-color: #F1F5F9; color: #1E293B; border: 1px solid #CBD5E1; padding: 8px; }
-        .footer { margin-top: 40px; border-top: 2px dashed #E2E8F0; padding-top: 15px; display: flex; justify-content: space-between; align-items: center; }
+        body { font-family: 'Helvetica', 'Arial', sans-serif; padding: 20px 40px; color: #0F172A; background-color: #FFFFFF; }
+        
+        /* هيدر العيادة والدكتور المبرز */
+        .clinic-header { border-bottom: 3px solid #0F172A; padding-bottom: 15px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: flex-start; }
+        .clinic-info h1 { margin: 0; font-size: 26px; font-weight: 900; color: #0F172A; }
+        .clinic-info h2 { margin: 5px 0 0 0; font-size: 17px; font-weight: bold; color: #334155; }
+        .clinic-info p { margin: 5px 0 0 0; font-size: 13px; color: #64748B; }
+        
+        /* حقوق البرنامج بصورة مصغرة وبسيطة جداً */
+        .software-watermark { text-align: left; font-size: 10px; color: #94A3B8; display: flex; flex-direction: column; align-items: flex-end; }
+        
+        /* كارت بيانات المريض */
+        .patient-box { background: #F8FAFC; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #E2E8F0; display: flex; justify-content: space-between; font-size: 13px; }
+        .patient-box div { margin-bottom: 4px; }
+        
+        /* عناوين الأقسام والتشخيص */
+        .section-title { font-size: 15px; font-weight: bold; color: #0F172A; margin-top: 22px; margin-bottom: 8px; border-right: 4px solid #0F172A; padding-right: 8px; }
+        .diagnosis-box { background: #FFFFFF; padding: 12px; border: 1px solid #CBD5E1; border-radius: 8px; font-size: 14px; font-weight: bold; min-height: 40px; }
+        
+        /* جدول الأدوية */
+        table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 13px; }
+        th { background-color: #F1F5F9; color: #1E293B; border: 1px solid #CBD5E1; padding: 8px; text-align: right; }
+        
+        /* الفوتر والتوقيعات */
+        .footer { margin-top: 45px; padding-top: 15px; display: flex; justify-content: space-between; align-items: flex-end; page-break-inside: avoid; }
         .qr-section { text-align: center; }
-        .qr-section img { width: 70px; height: 70px; }
-        .qr-section p { font-size: 9px; color: #94A3B8; margin-top: 2px; }
-        .stamp-section { text-align: center; }
-        .stamp-box { border: 2px dashed #94A3B8; padding: 10px 25px; border-radius: 8px; color: #64748B; font-size: 11px; font-weight: bold; margin-top: 5px; }
+        .qr-section p { font-size: 9px; color: #94A3B8; margin-top: 4px; }
+        .signatures { display: flex; gap: 40px; text-align: center; }
+        .sig-box { width: 140px; border-top: 1px dashed #94A3B8; padding-top: 5px; font-size: 12px; font-weight: bold; color: #334155; }
       </style>
     </head>
     <body>
 
-      <div class="header">
-        <div class="doc-details">
-          <h1>MedVerse Clinical Suite</h1>
-          <p>الاستشارات الطبية والرعاية الإكلينيكية المتخصصة</p>
+      <!-- رأس الروشتة (بيانات الطبيب والعيادة) -->
+      <div class="clinic-header">
+        <div class="clinic-info">
+          <h1>${clinicInfo.doctorName || 'د. أحمد محمد'}</h1>
+          <h2>${clinicInfo.clinicName || 'عيادة MedVerse التخصصية'}</h2>
+          <p>${clinicInfo.specialty || 'استشاري الطب الباطني والتشخيص الذكي'}</p>
         </div>
-        <div class="brand-logo">
-          MedVerse <br/>
-          <span style="font-size: 10px; color: #0284C7; display: block; font-weight: normal;">Smart EMR Suite</span>
+        
+        <!-- إمضاء البرنامج المصغر -->
+        <div class="software-watermark">
+          <span>Powered by</span>
+          <strong style="color: #0284C7;">MedVerse Smart EMR Suite</strong>
         </div>
       </div>
 
-      <div class="info-box">
+      <!-- كارت بيانات المريض -->
+      <div class="patient-box">
         <div>
-          <div class="info-item"><strong>اسم المريض:</strong> ${patientData.name || '---'}</div>
-          <div class="info-item"><strong>رقم الهاتف:</strong> ${patientData.phone || 'غير مسجل'}</div>
+          <div><strong>اسم المريض:</strong> ${patientData.name || '---'}</div>
+          <div><strong>رقم الهاتف:</strong> ${patientData.phone || 'غير مسجل'}</div>
         </div>
         <div style="text-align: left;">
-          <div class="info-item"><strong>Patient ID:</strong> ${patientData.code || '---'}</div>
-          <div class="info-item"><strong>التاريخ:</strong> ${currentDate}</div>
+          <div><strong>Patient ID:</strong> ${patientData.code || '---'}</div>
+          <div><strong>التاريخ:</strong> ${currentDate}</div>
         </div>
       </div>
 
-      <div class="section-title">التشخيص والتوصيات العلاجية (Diagnosis)</div>
+      <!-- التشخيص -->
+      <div class="section-title">التشخيص (Diagnosis)</div>
       <div class="diagnosis-box">
-        ${diagnosis || 'لا يوجد تشخيص مدون'}
+        ${diagnosis || 'لم يتم تدوين تشخيص.'}
       </div>
 
+      <!-- الخطة العلاجية والروشتة -->
       ${medications.length > 0 ? `
-        <div class="section-title">الروشتة والعلاج المعتمد (Rx)</div>
+        <div class="section-title">الخطة العلاجية والروشتة (Rx)</div>
         <table>
           <thead>
             <tr>
-              <th>اسم الدواء</th>
-              <th>الجرعة والتوقيت</th>
-              <th>ملاحظات الاستعمال</th>
+              <th style="width: 40%;">اسم الدواء (Drug Name)</th>
+              <th style="width: 30%;">الجرعة (Dose)</th>
+              <th style="width: 30%;">دواعي الاستعمال (Notes)</th>
             </tr>
           </thead>
           <tbody>
@@ -95,26 +114,26 @@ export const generatePrescriptionPDF = async (patientData, diagnosis, dynamicDat
         </table>
       ` : ''}
 
+      <!-- بيانات الفحوصات والملاحظات -->
       ${dynamicRows ? `
         <div class="section-title">تفاصيل الفحوصات والتقرير المخصص</div>
-        <table>
+        <table style="border: none;">
           <tbody>
             ${dynamicRows}
           </tbody>
         </table>
       ` : ''}
 
+      <!-- الفوتر والختم والـ QR -->
       <div class="footer">
         <div class="qr-section">
           <img src="${qrCodeUrl}" alt="QR Code" />
-          <p>رمز تحقق معتمد ضد التزوير</p>
+          <p>رمز تحقق إلكتروني معتمد</p>
         </div>
 
-        <div class="stamp-section">
-          <p style="font-size: 12px; font-weight: bold; margin: 0; color: #334155;">توقيع وختم الطبيب المعالج</p>
-          <div class="stamp-box">
-            توقيع الكتروني معتمد <br/> MedVerse Verified
-          </div>
+        <div class="signatures">
+          <div class="sig-box">توقيع الطبيب المعالج</div>
+          <div class="sig-box">ختم العيادة</div>
         </div>
       </div>
 
@@ -129,3 +148,4 @@ export const generatePrescriptionPDF = async (patientData, diagnosis, dynamicDat
     console.error('خطأ في إنتاج ملف الـ PDF:', error);
   }
 };
+ 
