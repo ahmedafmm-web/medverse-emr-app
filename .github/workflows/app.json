@@ -1,0 +1,14 @@
+{
+  "expo": {
+    "name": "medverse-emr-app",
+    "slug": "medverse-emr-app",
+    "version": "1.0.0",
+    "web": {
+      "bundler": "metro",
+      "output": "single"
+    },
+    "experiments": {
+      "baseUrl": "/medverse-emr-app"
+    }
+  }
+}
