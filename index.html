@@ -21,7 +21,8 @@
 
   <script>
     let state = {
-      apiKey: localStorage.getItem('MEDVERSE_HF_KEY') || '',
+      // تم دمج مفتاح Groq الخاص بك هنا افتراضياً
+      apiKey: localStorage.getItem('MEDVERSE_GROQ_KEY') || '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',
       patientName: '',
       age: '',
       gender: 'ذكر',
@@ -45,21 +46,21 @@
           
           <header class="text-center py-4 border-b border-slate-800">
             <h1 class="text-2xl font-bold text-sky-400">MedVerse Smart EMR Suite</h1>
-            <p class="text-xs text-sky-500 font-semibold mt-1">الاستشاري الإكلينيكي الذكي (Powered by Meta LLaMA 3.1 AI)</p>
+            <p class="text-xs text-sky-500 font-semibold mt-1">الاستشاري الإكلينيكي الذكي (Powered by Groq & LLaMA 3.3 70B)</p>
           </header>
 
           <section class="bg-slate-800/80 p-4 rounded-2xl border border-sky-900/50 space-y-2">
             <div class="flex justify-between items-center">
               <label class="text-xs font-bold text-sky-300 flex items-center gap-1">
-                <span>🔑</span> مفتاح Hugging Face Access Token:
+                <span>🔑</span> مفتاح Groq Access Token:
               </label>
-              ${state.apiKey ? '<span class="text-[10px] bg-emerald-950 text-emerald-400 border border-emerald-800 px-2 py-0.5 rounded-full">محفوظ وآمن ✓</span>' : '<span class="text-[10px] bg-amber-950 text-amber-400 border border-amber-800 px-2 py-0.5 rounded-full">مطلوب المفتاح</span>'}
+              ${state.apiKey ? '<span class="text-[10px] bg-emerald-950 text-emerald-400 border border-emerald-800 px-2 py-0.5 rounded-full">محفوظ ومفعل ✓</span>' : '<span class="text-[10px] bg-amber-950 text-amber-400 border border-amber-800 px-2 py-0.5 rounded-full">مطلوب المفتاح</span>'}
             </div>
             <div class="flex gap-2">
               <input 
                 id="apiKeyInput" 
                 type="password" 
-                placeholder="hf_..." 
+                placeholder="gsk_..." 
                 value="${state.apiKey}" 
                 class="flex-1 bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-sky-500" 
               />
@@ -121,20 +122,19 @@
             <textarea id="pSymptoms" rows="3" placeholder="صف الأعراض بالتفصيل ومدة بدايتها..." class="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-sky-500">${state.symptoms}</textarea>
 
             <button id="aiBtn" class="w-full bg-sky-600 hover:bg-sky-500 text-white font-bold py-3 px-4 rounded-xl transition-all shadow-lg shadow-sky-600/30 flex items-center justify-center gap-2">
-              ${state.analyzing ? '⏳ جاري استدعاء LLaMA 3.1 للتحليل الإكلينيكي...' : '✨ تحليل الحالة وإصدار التقرير الطبي'}
+              ${state.analyzing ? '⏳ جاري استدعاء نموذج LLaMA 3.3 70B الفائق...' : '✨ تحليل الحالة وإصدار التقرير الطبي Advanced'}
             </button>
 
             ${state.apiError ? `
               <div class="bg-red-950/60 border border-red-800 p-4 rounded-xl text-red-300 text-xs space-y-2">
                 <strong>❌ خطأ في الاتصال بالسيرفر:</strong>
                 <div>${state.apiError}</div>
-                <div class="text-[10px] text-slate-400">💡 ملاحظة: إذا كان الخطأ 503، فهذا يعني أن النموذج قيد التحميل المبدئي على سيرفرات Hugging Face، يرجى المحاولة بعد قليل.</div>
               </div>
             ` : ''}
 
             ${state.aiReport ? `
               <div class="bg-sky-950/40 border border-sky-800 p-4 rounded-xl space-y-3">
-                <h3 class="text-xs font-bold text-sky-400">📋 التقرير الطبي المولد بواسطة LLaMA 3.1 AI:</h3>
+                <h3 class="text-xs font-bold text-sky-400">📋 التقرير الطبي المولد بواسطة LLaMA 3.3 70B AI:</h3>
                 
                 ${state.aiReport.warnings && state.aiReport.warnings.length > 0 ? `
                   <div class="bg-red-950/50 border border-red-800 p-3 rounded-lg text-red-300 text-xs space-y-1">
@@ -187,7 +187,7 @@
         const val = document.getElementById('apiKeyInput').value.trim();
         if (val) {
           state.apiKey = val;
-          localStorage.setItem('MEDVERSE_HF_KEY', val);
+          localStorage.setItem('MEDVERSE_GROQ_KEY', val);
           alert('تم حفظ المفتاح بنجاح! 🔑');
           render();
         }
@@ -221,7 +221,7 @@
 
     async function handleAiAnalysis() {
       if (!state.apiKey) {
-        alert('يرجى إدخال مفتاح Hugging Face أولاً.');
+        alert('يرجى إدخال مفتاح Groq API أولاً.');
         return;
       }
 
@@ -235,14 +235,19 @@
       state.apiError = null;
       render();
 
-      const systemPrompt = `You are a professional medical consultant.
-CRITICAL INSTRUCTIONS:
-1. Write diagnosis and warnings STRICTLY in ARABIC.
-2. Write medication names STRICTLY in ENGLISH scientific/trade names (e.g. Aspirin 75mg, Clopidogrel 75mg, Nitroglycerin).
-3. Write medication doses and reasons in ARABIC.
-4. Return ONLY valid JSON with no markdown syntax.`;
+      const systemPrompt = `You are a Senior Consultant Cardiologist and Clinical Decision Support System.
+You strictly adhere to the latest evidence-based international guidelines (ACC/AHA, ESC, ADA).
 
-      const userPrompt = `قم بتحليل الحالة الطبية التالية وتوليد التقرير:
+CLINICAL REQUIREMENTS:
+1. DIAGNOSIS: Provide precise, standardized medical terminology (e.g., "Acute Coronary Syndrome - Unstable Angina", "NSTEMI") in ENGLISH alongside an accurate ARABIC explanation.
+2. MODERN MEDICATIONS: Prescribe modern Guideline-Directed Medical Therapy (GDMT).
+   - "name": Scientific/Trade Drug Name STRICTLY IN ENGLISH (e.g., Aspirin 75mg, Clopidogrel 75mg, Empagliflozin 10mg, Rosuvastatin 20mg).
+   - "dose": Detailed dose and administration in ARABIC.
+   - "reason": Clinical justification in ARABIC.
+3. WARNINGS: Emergency red flags & drug interactions in ARABIC.
+4. Return ONLY valid JSON matching the exact schema requested without markdown syntax.`;
+
+      const userPrompt = `قم بتحليل حالة المريض التالية وإصدار الخطة العلاجية الأحدث:
 - السن: ${state.age || 'غير محدد'}
 - النوع: ${state.gender}
 - الأمراض المزمنة: ${state.chronicDiseases || 'لا يوجد'}
@@ -250,49 +255,44 @@ CRITICAL INSTRUCTIONS:
 - الأدوية الحالية: ${state.currentMedications || 'لا يوجد'}
 - الأعراض والشكوى الحالية: ${symptoms}
 
-أخرج الناتج بطلب JSON محدد كالتالي:
+JSON Structure Required:
 {
-  "diagnosis": "التشخيص الطبي الدقيق باللغة العربية",
-  "warnings": ["تحذيرات طارئة أو تعارضات دوائية باللغة العربية"],
+  "diagnosis": "English Medical Term - الشرح بالعربي",
+  "warnings": ["تحذير إكلينيكي بالعربي"],
   "medications": [
     {
-      "name": "English Scientific or Trade Drug Name",
-      "dose": "الجرعة وطريقة الاستخدام باللغة العربية",
-      "reason": "دواعي الاستعمال باللغة العربية"
+      "name": "English Scientific Drug Name",
+      "dose": "الجرعة بالعربي",
+      "reason": "دواعي الاستعمال بالعربي"
     }
   ]
 }`;
 
       try {
-        const res = await fetch("https://router.huggingface.co/v1/chat/completions", {
+        const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
           method: "POST",
           headers: {
             "Authorization": `Bearer ${state.apiKey}`,
             "Content-Type": "application/json"
           },
           body: JSON.stringify({
-            model: "meta-llama/Llama-3.1-8B-Instruct",
+            model: "llama-3.3-70b-versatile",
             messages: [
               { role: "system", content: systemPrompt },
               { role: "user", content: userPrompt }
             ],
-            max_tokens: 800,
-            temperature: 0.1
+            temperature: 0.1,
+            response_format: { type: "json_object" }
           })
         });
 
         const data = await res.json();
 
         if (!res.ok || data.error) {
-          throw new Error(data.error?.message || data.error || `HTTP Error ${res.status}`);
+          throw new Error(data.error?.message || `HTTP Error ${res.status}`);
         }
 
-        let rawText = data.choices[0].message.content;
-        
-        const jsonMatch = rawText.match(/\{[\s\S]*\}/);
-        if (!jsonMatch) throw new Error("لم يتم استرجاع تنسيق JSON صحيح من النموذج.");
-
-        const parsed = JSON.parse(jsonMatch[0]);
+        const parsed = JSON.parse(data.choices[0].message.content);
 
         state.aiReport = parsed;
         state.finalDiagnosis = parsed.diagnosis || '';
