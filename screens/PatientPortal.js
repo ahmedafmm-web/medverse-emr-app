@@ -9,16 +9,15 @@ export default function PatientPortal({ onBackToDashboard }) {
   const [patientData, setPatientData] = useState(null);
   const [medicalRecords, setMedicalRecords] = useState([]);
 
-  // 🔍 البحث عن بيانات المريض والزيارات السابقة عبر الكود
+  // 🔍 استعلام عن بيانات وسجلات المريض
   const handleFetchRecords = async () => {
     if (!patientCode.trim()) {
-      Alert.alert('تنبيه', 'يرجى إدخال كود المريض الخاص بك.');
+      Alert.alert('تنبيه', 'يرجى إدخال كود المريض الفريد (Patient ID).');
       return;
     }
 
     setLoading(true);
     try {
-      // 1. جلب بيانات المريض
       const { data: patient, error: pErr } = await supabase
         .from('patients')
         .select('*')
@@ -26,7 +25,7 @@ export default function PatientPortal({ onBackToDashboard }) {
         .single();
 
       if (pErr || !patient) {
-        Alert.alert('خطأ', 'لم يتم العثور على مريض بهذا الكود، يرجى التأكد من الرقم.');
+        Alert.alert('خطأ', 'لم يتم العثور على مريض بهذا الرقم الفريد.');
         setPatientData(null);
         setMedicalRecords([]);
         return;
@@ -34,7 +33,6 @@ export default function PatientPortal({ onBackToDashboard }) {
 
       setPatientData(patient);
 
-      // 2. جلب السجلات والزيارات المعتمدة حصراً
       const { data: records, error: rErr } = await supabase
         .from('medical_records')
         .select('*')
@@ -52,31 +50,35 @@ export default function PatientPortal({ onBackToDashboard }) {
     }
   };
 
-  // 🖨️ إعادة تنزيل الروشتة PDF للمريض
+  // 🖨️ طباعة وإعادة تنزيل الـ PDF
   const handleDownloadPDF = async (record) => {
+    const fields = record.dynamic_fields || {};
     await generatePrescriptionPDF(
       { name: patientData.full_name, phone: patientData.phone, code: patientData.patient_code },
       record.diagnosis,
-      record.dynamic_fields || {}
+      {
+        'السن والنوع': `${fields.age || 'غير محدد'} سنة (${fields.gender || 'غير محدد'})`,
+        'الأمراض المزمنة': fields.chronicDiseases || 'لا يوجد',
+        'ملاحظات الفحوصات': fields.doctorNotes || 'لا يوجد'
+      },
+      fields.medications || []
     );
   };
 
   return (
     <ScrollView style={styles.container}>
-      {/* الهيدر الرئيسي للبوابة */}
       <View style={styles.header}>
         <Text style={styles.title}>MedVerse Patient Portal</Text>
-        <Text style={styles.subtitle}>بوابة استعراض الروشتات والتقارير الطبية المعتمدة</Text>
+        <Text style={styles.subtitle}>بوابة استعراض السجلات والروشتات الطبية المعتمدة</Text>
       </View>
 
-      {/* شاشة الدخول عبر الكود */}
       {!patientData ? (
         <View style={styles.card}>
-          <Text style={styles.sectionTitle}>🔐 الدخول إلى ملفك الطبي</Text>
-          <Text style={styles.label}>أدخل كود المريض الفريد (Patient ID):</Text>
+          <Text style={styles.sectionTitle}>🔐 الدخول برقم المريض الفريد</Text>
+          <Text style={styles.label}>أدخل كود المريض الخاص بك (Patient ID):</Text>
           <TextInput
             style={styles.input}
-            placeholder="مثال: PAT-4821"
+            placeholder="مثال: PAT-89210"
             placeholderTextColor="#94A3B8"
             value={patientCode}
             onChangeText={setPatientCode}
@@ -101,9 +103,7 @@ export default function PatientPortal({ onBackToDashboard }) {
           )}
         </View>
       ) : (
-        /* عرض التقرير والروشتات بعد جلب البيانات */
         <View>
-          {/* كارت المريض */}
           <View style={styles.patientCard}>
             <View style={styles.row}>
               <Text style={styles.patientName}>👤 {patientData.full_name}</Text>
@@ -111,15 +111,14 @@ export default function PatientPortal({ onBackToDashboard }) {
                 <Text style={styles.logoutText}>خروج ✕</Text>
               </TouchableOpacity>
             </View>
-            <Text style={styles.patientCodeText}>كود المريض: {patientData.patient_code}</Text>
+            <Text style={styles.patientCodeText}>Patient ID: {patientData.patient_code}</Text>
           </View>
 
-          {/* قائمة الروشتات المعتمدة */}
-          <Text style={styles.sectionTitleHeader}>📋 الروشتات والتقارير المعتمدة ({medicalRecords.length})</Text>
+          <Text style={styles.sectionTitleHeader}>📋 السجلات والروشتات المعتمدة ({medicalRecords.length})</Text>
 
           {medicalRecords.length === 0 ? (
             <View style={styles.emptyBox}>
-              <Text style={styles.emptyText}>لا توجد تقارير معتمدة متاحة حالياً.</Text>
+              <Text style={styles.emptyText}>لا توجد تقارير معتمدة متاحة حالياً لهذا الكود.</Text>
             </View>
           ) : (
             medicalRecords.map((item, idx) => (
@@ -131,10 +130,9 @@ export default function PatientPortal({ onBackToDashboard }) {
 
                 <View style={styles.divider} />
 
-                <Text style={styles.recordLabel}>التشخيص والتوصيات العلاجية:</Text>
+                <Text style={styles.recordLabel}>التشخيص المعتمد:</Text>
                 <Text style={styles.recordValue}>{item.diagnosis || 'لا يوجد تشخيص مدون'}</Text>
 
-                {/* طباعة وتنزيل PDF */}
                 <TouchableOpacity
                   style={styles.downloadPdfBtn}
                   onPress={() => handleDownloadPDF(item)}
