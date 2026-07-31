@@ -4,16 +4,13 @@ import DynamicFormBuilder from '../components/DynamicFormBuilder';
 import { generatePrescriptionPDF } from '../components/PDFGenerator';
 import { supabase } from '../supabaseClient';
 
-// 🔑 مفتاح Groq API لتشغيل نموذج LLaMA 3.3 70B
 const GROQ_API_KEY = "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";
 
 export default function DoctorDashboard() {
-  // ⚙️ إعدادات الطبيب والعيادة (تطبع على رأس الروشتة)
   const [clinicDoctorName, setClinicDoctorName] = useState('د. أحمد محمد');
   const [clinicName, setClinicName] = useState('عيادة MedVerse التخصصية');
   const [specialty, setSpecialty] = useState('استشاري أمراض القلب والباطنة');
 
-  // 👤 البيانات الديموغرافية للمريض
   const [patientName, setPatientName] = useState('');
   const [patientPhone, setPatientPhone] = useState('');
   const [age, setAge] = useState('');
@@ -21,29 +18,24 @@ export default function DoctorDashboard() {
   const [chronicDiseases, setChronicDiseases] = useState('');
   const [familyHistory, setFamilyHistory] = useState('');
 
-  // 🩺 الشكوى والأعراض وملاحظات الأشعة
   const [symptomsInput, setSymptomsInput] = useState('');
   const [doctorNotes, setDoctorNotes] = useState('');
 
-  // 🤖 حالات الذكاء الاصطناعي وفحص الأدوية
   const [analyzing, setAnalyzing] = useState(false);
   const [checkingMed, setCheckingMed] = useState(false);
   const [aiReport, setAiReport] = useState(null);
   const [medCheckError, setMedCheckError] = useState(null);
 
-  // 📝 الخطة المعتمدة للروشتة
   const [finalDiagnosis, setFinalDiagnosis] = useState('');
   const [prescribedMeds, setPrescribedMeds] = useState([]);
   const [newMedName, setNewMedName] = useState('');
   const [newMedDose, setNewMedDose] = useState('');
   const [newMedReason, setNewMedReason] = useState('');
 
-  // 🕒 سجلات السحابة والتخزين
   const [loading, setLoading] = useState(false);
   const [patientHistory, setPatientHistory] = useState([]);
   const [searchingHistory, setSearchingHistory] = useState(false);
 
-  // 🤖 التحليل السريري الذكي عبر LLaMA 3.3 70B
   const handleClinicalAnalysis = async () => {
     if (!symptomsInput.trim()) {
       Alert.alert('تنبيه', 'يرجى كتابة الأعراض والشكوى الحالية للمريض أولاً.');
@@ -117,7 +109,6 @@ JSON Structure Required:
     }
   };
 
-  // 🔍 فحص سلامة الدواء اليدوي
   const handleCheckAndAddManualMed = async () => {
     if (!newMedName.trim() || !newMedDose.trim()) {
       Alert.alert('تنبيه', 'أدخل اسم الدواء والجرعة على الأقل.');
@@ -184,7 +175,6 @@ Return JSON ONLY:
     setPrescribedMeds(prev => prev.filter((_, i) => i !== index));
   };
 
-  // 📂 استدعاء سجل المريض والزيارات السابقة من Supabase
   const fetchPatientHistory = async (name) => {
     if (!name || name.trim().length < 3) {
       setPatientHistory([]);
@@ -215,7 +205,6 @@ Return JSON ONLY:
     }
   };
 
-  // 📄 اعتماد الزيارة وتوليد ملف PDF
   const handleSaveAndPrint = async () => {
     if (!patientName.trim()) {
       Alert.alert('تنبيه', 'يرجى إدخال اسم المريض أولاً.');
@@ -284,7 +273,6 @@ Return JSON ONLY:
 
       if (rErr) throw rErr;
 
-      // توليد الروشتة ببيانات العيادة الكاملة
       await generatePrescriptionPDF(
         { name: patientName, phone: patientPhone, code: activeCode },
         finalDiagnosis,
@@ -317,36 +305,22 @@ Return JSON ONLY:
         <Text style={styles.subtitle}>لوحة تحكم الطبيب السريرية (Powered by LLaMA 3.3 70B)</Text>
       </View>
 
-      {/* ⚙️ 1. إعدادات اسم الطبيب والعيادة المطبوعة */}
       <View style={styles.card}>
         <Text style={styles.sectionTitle}>⚙️ بيانات الطبيب والعيادة (تطبع أعلى الروشتة)</Text>
         <View style={styles.rowInputs}>
           <View style={{ flex: 1, marginLeft: 8 }}>
             <Text style={styles.label}>اسم الطبيب</Text>
-            <TextInput 
-              style={styles.input} 
-              value={clinicDoctorName}
-              onChangeText={setClinicDoctorName}
-            />
+            <TextInput style={styles.input} value={clinicDoctorName} onChangeText={setClinicDoctorName} />
           </View>
           <View style={{ flex: 1 }}>
             <Text style={styles.label}>اسم العيادة</Text>
-            <TextInput 
-              style={styles.input} 
-              value={clinicName}
-              onChangeText={setClinicName}
-            />
+            <TextInput style={styles.input} value={clinicName} onChangeText={setClinicName} />
           </View>
         </View>
         <Text style={styles.label}>التخصص الطبي</Text>
-        <TextInput 
-          style={styles.input} 
-          value={specialty}
-          onChangeText={setSpecialty}
-        />
+        <TextInput style={styles.input} value={specialty} onChangeText={setSpecialty} />
       </View>
 
-      {/* 👤 2. البيانات الأساسية لكارت المريض */}
       <View style={styles.card}>
         <Text style={styles.sectionTitle}>👤 البيانات الأساسية لكارت المريض</Text>
         
@@ -389,25 +363,12 @@ Return JSON ONLY:
         </View>
 
         <Text style={styles.label}>الأمراض المزمنة</Text>
-        <TextInput 
-          style={styles.input} 
-          placeholder="مثال: ضغط، سكر نوع ثاني..." 
-          placeholderTextColor="#94A3B8"
-          value={chronicDiseases}
-          onChangeText={setChronicDiseases}
-        />
+        <TextInput style={styles.input} placeholder="مثال: ضغط، سكر نوع ثاني..." placeholderTextColor="#94A3B8" value={chronicDiseases} onChangeText={setChronicDiseases} />
 
         <Text style={styles.label}>التاريخ المرضي العائلي</Text>
-        <TextInput 
-          style={styles.input} 
-          placeholder="مثال: أمراض قلب..." 
-          placeholderTextColor="#94A3B8"
-          value={familyHistory}
-          onChangeText={setFamilyHistory}
-        />
+        <TextInput style={styles.input} placeholder="مثال: أمراض قلب..." placeholderTextColor="#94A3B8" value={familyHistory} onChangeText={setFamilyHistory} />
       </View>
 
-      {/* 📚 3. سجل الزيارات السابق للمريض */}
       {searchingHistory && <ActivityIndicator color="#0284C7" style={{ marginBottom: 15 }} />}
       {patientHistory.length > 0 && (
         <View style={styles.historyCard}>
@@ -421,42 +382,17 @@ Return JSON ONLY:
         </View>
       )}
 
-      {/* 🩺 4. الأعراض والتحليل الذكي عبر LLaMA 3.3 70B */}
       <View style={styles.card}>
         <Text style={styles.sectionTitle}>🩺 الشكوى الحالية وملاحظات الفحوصات</Text>
         
         <Text style={styles.label}>الأعراض والشكوى الحالية:</Text>
-        <TextInput 
-          style={[styles.input, styles.textArea]} 
-          placeholder="صف الأعراض بالتفصيل..." 
-          placeholderTextColor="#94A3B8"
-          multiline 
-          numberOfLines={3}
-          value={symptomsInput}
-          onChangeText={setSymptomsInput}
-        />
+        <TextInput style={[styles.input, styles.textArea]} placeholder="صف الأعراض بالتفصيل..." placeholderTextColor="#94A3B8" multiline numberOfLines={3} value={symptomsInput} onChangeText={setSymptomsInput} />
 
         <Text style={styles.label}>ملاحظات الأشعة والتحاليل والمتابعة:</Text>
-        <TextInput 
-          style={[styles.input, styles.textArea]} 
-          placeholder="اكتب ملاحظات الفحوصات أو نتائج الأشعة..." 
-          placeholderTextColor="#94A3B8"
-          multiline 
-          numberOfLines={2}
-          value={doctorNotes}
-          onChangeText={setDoctorNotes}
-        />
+        <TextInput style={[styles.input, styles.textArea]} placeholder="اكتب ملاحظات الفحوصات أو نتائج الأشعة..." placeholderTextColor="#94A3B8" multiline numberOfLines={2} value={doctorNotes} onChangeText={setDoctorNotes} />
 
-        <TouchableOpacity 
-          style={styles.aiButton} 
-          onPress={handleClinicalAnalysis}
-          disabled={analyzing}
-        >
-          {analyzing ? (
-            <ActivityIndicator color="#FFFFFF" size="small" />
-          ) : (
-            <Text style={styles.aiButtonText}>✨ تحليل الحالة بـ LLaMA 3.3 70B AI</Text>
-          )}
+        <TouchableOpacity style={styles.aiButton} onPress={handleClinicalAnalysis} disabled={analyzing}>
+          {analyzing ? <ActivityIndicator color="#FFFFFF" size="small" /> : <Text style={styles.aiButtonText}>✨ تحليل الحالة بـ LLaMA 3.3 70B AI</Text>}
         </TouchableOpacity>
 
         {aiReport && (
@@ -464,9 +400,7 @@ Return JSON ONLY:
             <Text style={styles.aiReportHeader}>📋 التقرير الطبي المولد من الذكاء الاصطناعي:</Text>
             {aiReport.warnings && aiReport.warnings.length > 0 && (
               <View style={styles.warningBox}>
-                {aiReport.warnings.map((w, idx) => (
-                  <Text key={idx} style={styles.warningText}>⚠️ {w}</Text>
-                ))}
+                {aiReport.warnings.map((w, idx) => <Text key={idx} style={styles.warningText}>⚠️ {w}</Text>)}
               </View>
             )}
             <Text style={styles.aiDiagText}><strong>التشخيص المقترح:</strong> {aiReport.diagnosis}</Text>
@@ -474,17 +408,11 @@ Return JSON ONLY:
         )}
       </View>
 
-      {/* 📝 5. اعتماد الخطة العلاجية وإضافة الأدوية */}
       <View style={styles.card}>
         <Text style={styles.sectionTitle}>📝 اعتماد الخطة العلاجية والروشتة</Text>
 
         <Text style={styles.label}>التشخيص المعتمد النهائي:</Text>
-        <TextInput 
-          style={[styles.input, styles.textArea]} 
-          multiline 
-          value={finalDiagnosis}
-          onChangeText={setFinalDiagnosis}
-        />
+        <TextInput style={[styles.input, styles.textArea]} multiline value={finalDiagnosis} onChangeText={setFinalDiagnosis} />
 
         <Text style={styles.subSectionTitle}>💊 قائمة الأدوية المعتمدة للروشتة ({prescribedMeds.length}):</Text>
 
@@ -501,37 +429,14 @@ Return JSON ONLY:
           </View>
         ))}
 
-        {/* إضافة دواء يدوي */}
         <View style={styles.addMedBox}>
           <Text style={styles.label}>إضافة دواء يدوي (مع فحص التفاعلات):</Text>
-          <TextInput 
-            style={styles.input} 
-            placeholder="اسم الدواء (إنجليزي)" 
-            placeholderTextColor="#94A3B8"
-            value={newMedName}
-            onChangeText={setNewMedName}
-          />
-          <TextInput 
-            style={styles.input} 
-            placeholder="الجرعة والتوقيت" 
-            placeholderTextColor="#94A3B8"
-            value={newMedDose}
-            onChangeText={setNewMedDose}
-          />
-          <TextInput 
-            style={styles.input} 
-            placeholder="دواعي الاستعمال" 
-            placeholderTextColor="#94A3B8"
-            value={newMedReason}
-            onChangeText={setNewMedReason}
-          />
+          <TextInput style={styles.input} placeholder="اسم الدواء (إنجليزي)" placeholderTextColor="#94A3B8" value={newMedName} onChangeText={setNewMedName} />
+          <TextInput style={styles.input} placeholder="الجرعة والتوقيت" placeholderTextColor="#94A3B8" value={newMedDose} onChangeText={setNewMedDose} />
+          <TextInput style={styles.input} placeholder="دواعي الاستعمال" placeholderTextColor="#94A3B8" value={newMedReason} onChangeText={setNewMedReason} />
           
           <TouchableOpacity style={styles.addMedBtn} onPress={handleCheckAndAddManualMed} disabled={checkingMed}>
-            {checkingMed ? (
-              <ActivityIndicator color="#FFFFFF" size="small" />
-            ) : (
-              <Text style={styles.addMedBtnText}>🔍 فحص وإضافة الدواء للروشتة</Text>
-            )}
+            {checkingMed ? <ActivityIndicator color="#FFFFFF" size="small" /> : <Text style={styles.addMedBtnText}>🔍 فحص وإضافة الدواء للروشتة</Text>}
           </TouchableOpacity>
 
           {medCheckError && (
@@ -542,17 +447,8 @@ Return JSON ONLY:
         </View>
       </View>
 
-      {/* 🖨️ 6. زر الاعتماد وتوليد الـ PDF */}
-      <TouchableOpacity 
-        style={[styles.saveButton, loading && styles.saveButtonDisabled]} 
-        onPress={handleSaveAndPrint}
-        disabled={loading}
-      >
-        {loading ? (
-          <ActivityIndicator color="#FFFFFF" />
-        ) : (
-          <Text style={styles.saveButtonText}>اعتماد التقرير وتنزيل الروشتة PDF 🖨️</Text>
-        )}
+      <TouchableOpacity style={[styles.saveButton, loading && styles.saveButtonDisabled]} onPress={handleSaveAndPrint} disabled={loading}>
+        {loading ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.saveButtonText}>اعتماد التقرير وتنزيل الروشتة PDF 🖨️</Text>}
       </TouchableOpacity>
     </ScrollView>
   );
@@ -572,9 +468,9 @@ const styles = StyleSheet.create({
   textArea: { height: 70, textAlignVertical: 'top' },
   aiButton: { backgroundColor: '#0284C7', padding: 12, borderRadius: 8, alignItems: 'center', marginBottom: 12 },
   aiButtonText: { color: '#FFFFFF', fontSize: 13, fontWeight: 'bold' },
-  aiReportBox: { backgroundColor: '#0369A1/30', padding: 12, borderRadius: 10, borderWidth: 1, borderColor: '#0284C7' },
+  aiReportBox: { backgroundColor: 'rgba(3, 105, 161, 0.3)', padding: 12, borderRadius: 10, borderWidth: 1, borderColor: '#0284C7' },
   aiReportHeader: { fontSize: 12, fontWeight: 'bold', color: '#38BDF8', marginBottom: 6, textAlign: 'right' },
-  warningBox: { backgroundColor: '#991B1B/40', padding: 10, borderRadius: 6, borderWidth: 1, borderColor: '#EF4444', marginTop: 6, marginBottom: 6 },
+  warningBox: { backgroundColor: 'rgba(153, 27, 27, 0.4)', padding: 10, borderRadius: 6, borderWidth: 1, borderColor: '#EF4444', marginTop: 6, marginBottom: 6 },
   warningText: { color: '#FCA5A5', fontSize: 11, fontWeight: 'bold', textAlign: 'right' },
   aiDiagText: { fontSize: 12, color: '#F8FAFC', textAlign: 'right' },
   medCard: { backgroundColor: '#0F172A', padding: 12, borderRadius: 8, borderWidth: 1, borderColor: '#334155', marginBottom: 10 },
@@ -594,3 +490,4 @@ const styles = StyleSheet.create({
   historyDate: { fontSize: 10, color: '#38BDF8', fontWeight: 'bold', textAlign: 'right' },
   historyDiagnosis: { fontSize: 11, color: '#CBD5E1', textAlign: 'right' }
 });
+ 
