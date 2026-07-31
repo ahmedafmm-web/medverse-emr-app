@@ -3,167 +3,41 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  
+  <!-- 🚫 منع المتصفح من تخزين النسخة القديمة نهائياً -->
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
+
   <title>MedVerse EMR</title>
   
   <link rel="manifest" href="./manifest.json" />
   <meta name="theme-color" content="#0f172a" />
-  
-  <!-- Tailwind CSS للواجهات -->
-  <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-slate-900 text-slate-100 min-h-screen">
 
-  <div id="app"></div>
+  <div id="root"></div>
 
   <script>
-    // حالة التطبيق
-    let isLoggedIn = false;
-    let doctorName = '';
-
-    const app = document.getElementById('app');
-
-    function render() {
-      if (!isLoggedIn) {
-        // شاشة تسجيل الدخول
-        app.innerHTML = `
-          <div class="flex flex-col items-center justify-center min-h-screen p-4">
-            <div class="bg-slate-800 p-6 rounded-2xl shadow-xl max-w-sm w-full border border-slate-700 text-center">
-              <div class="w-16 h-16 bg-blue-600 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">
-                🩺
-              </div>
-              <h1 class="text-2xl font-bold mb-1">MedVerse EMR</h1>
-              <p class="text-slate-400 text-xs mb-6">منصة إدارة العيادات والسجلات الطبية</p>
-              
-              <div class="space-y-4 text-right">
-                <div>
-                  <label class="block text-xs text-slate-400 mb-1">اسم الطبيب / العيادة</label>
-                  <input 
-                    id="docInput"
-                    type="text" 
-                    placeholder="د. أحمد محمد" 
-                    value="${doctorName}"
-                    class="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-blue-500"
-                  />
-                </div>
-                <button 
-                  id="loginBtn"
-                  class="w-full bg-blue-600 hover:bg-blue-500 text-white font-semibold py-3 px-4 rounded-xl transition-all shadow-lg shadow-blue-600/30">
-                  الدخول للنظام 🚀
-                </button>
-              </div>
-            </div>
-          </div>
-        `;
-
-        document.getElementById('loginBtn').onclick = () => {
-          const val = document.getElementById('docInput').value;
-          if (val.trim() !== '') {
-            doctorName = val;
-            isLoggedIn = true;
-            render();
-          } else {
-            alert('يرجى إدخال اسم الطبيب أولاً');
-          }
-        };
-      } else {
-        // شاشة لوحة التحكم
-        app.innerHTML = `
-          <div class="min-h-screen pb-10">
-            <header class="bg-slate-800 border-b border-slate-700 p-4 flex justify-between items-center sticky top-0 z-10">
-              <div class="flex items-center gap-2">
-                <span class="text-2xl">🩺</span>
-                <div>
-                  <h2 class="font-bold text-sm">${doctorName}</h2>
-                  <span class="text-xs text-emerald-400 flex items-center gap-1">
-                    ● متصل بالخدمة السحابية
-                  </span>
-                </div>
-              </div>
-              <button 
-                id="logoutBtn"
-                class="bg-slate-700 hover:bg-slate-600 text-xs py-2 px-3 rounded-lg text-slate-300">
-                خروج
-              </button>
-            </header>
-
-            <main class="p-4 space-y-4 max-w-md mx-auto">
-              <div class="grid grid-cols-2 gap-3">
-                <div class="bg-slate-800 p-4 rounded-2xl border border-slate-700">
-                  <p class="text-xs text-slate-400 mb-1">حالات اليوم</p>
-                  <h3 class="text-2xl font-bold text-blue-400">12 مريض</h3>
-                </div>
-                <div class="bg-slate-800 p-4 rounded-2xl border border-slate-700">
-                  <p class="text-xs text-slate-400 mb-1">الروشتات المطبوعة</p>
-                  <h3 class="text-2xl font-bold text-emerald-400">8 روشتات</h3>
-                </div>
-              </div>
-
-              <div class="bg-slate-800 p-5 rounded-2xl border border-slate-700 space-y-3">
-                <h3 class="font-bold text-base border-b border-slate-700 pb-2 flex items-center gap-2">
-                  <span>📝</span> تسجيل كشف جديد
-                </h3>
-                <div>
-                  <label class="block text-xs text-slate-400 mb-1">اسم المريض</label>
-                  <input type="text" placeholder="أدخل اسم المريض..." class="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-sm text-white" />
-                </div>
-                <div>
-                  <label class="block text-xs text-slate-400 mb-1">التشخيص والروشتة</label>
-                  <textarea rows="4" placeholder="اكتب العلاج والتعليمات..." class="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-sm text-white"></textarea>
-                </div>
-                <button 
-                  id="saveBtn"
-                  class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-3 rounded-xl transition-all shadow-lg shadow-emerald-600/20">
-                  حفظ وطباعة الروشتة PDF 🖨️
-                </button>
-              </div>
-            </main>
-          </div>
-        `;
-
-        document.getElementById('logoutBtn').onclick = () => {
-          isLoggedIn = false;
-          render();
-        };
-
-        document.getElementById('saveBtn').onclick = () => {
-          alert('تم حفظ الكشف بنجاح!');
-        };
-      }
-    }
-
-    // التشغيل المباشر للواجهة
-    render();
-
-    // سكريبت التسجيل التلقائي والتحديث الفوري (Auto-Update)
+    // 🔄 كود إعادة التحميل التلقائي فور وجود أي تحديث جديد على GitHub
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
         navigator.serviceWorker.register('./sw.js').then(reg => {
-          
-          // فحص التحديثات فور الاتصال بالإنترنت
-          window.addEventListener('online', () => {
-            console.log('تم الالتقاط بالشبكة، جاري فحص التحديثات...');
+          // فحص السيرفر كل 30 ثانية بحثاً عن أي push جديد
+          setInterval(() => {
             reg.update();
-          });
+          }, 30000);
 
-          // عند اكتشاف ملفات جديدة على GitHub
           reg.addEventListener('updatefound', () => {
             const newWorker = reg.installing;
             newWorker.addEventListener('statechange', () => {
               if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                window.location.reload();
+                // يعمل Refresh تلقائي فوراً أول ما ترفع تعديل جديد
+                window.location.reload(true);
               }
             });
           });
-
         });
-      });
-
-      let refreshing = false;
-      navigator.serviceWorker.addEventListener('controllerchange', () => {
-        if (!refreshing) {
-          window.location.reload();
-          refreshing = true;
-        }
       });
     }
   </script>
