@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   
-  <!-- 🚫 منع التخزين المؤقت لضمان التحديث التلقائي الفوري -->
+  <!-- 🚫 منع التخزين المؤقت لضمان التحديث الفوري -->
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
@@ -21,15 +21,16 @@
   <div id="app"></div>
 
   <script>
-    // حالة الواجهة البياناتية (جلب المفتاح المحفوظ أوتوماتيكياً من ذاكرة الجهاز)
+    // حالة الواجهة والبيانات الكاملة للمريض
     let state = {
       apiKey: localStorage.getItem('MEDVERSE_HF_KEY') || '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',
       patientName: '',
       age: '',
-      phone: '',
       gender: 'ذكر',
+      phone: '',
       chronicDiseases: '',
       familyHistory: '',
+      currentMedications: '',
       symptoms: '',
       analyzing: false,
       aiReport: null,
@@ -72,10 +73,10 @@
             </div>
           </section>
 
-          <!-- 1. البيانات الشخصية والمرضية -->
+          <!-- 1. الملف الشخصي والتاريخ الطبي الكامل -->
           <section class="bg-slate-800 p-5 rounded-2xl border border-slate-700 space-y-4">
             <h2 class="font-bold text-sm text-slate-200 border-b border-slate-700 pb-2 flex items-center gap-2">
-              <span>👤</span> البيانات الشخصية والمرضية
+              <span>👤</span> الملف الإكلينيكي والتاريخ المرضي
             </h2>
 
             <div>
@@ -83,10 +84,17 @@
               <input id="pName" type="text" placeholder="أدخل اسم المريض..." value="${state.patientName}" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-sky-500" />
             </div>
 
-            <div class="grid grid-cols-2 gap-3">
+            <div class="grid grid-cols-3 gap-3">
               <div>
                 <label class="block text-xs text-slate-400 mb-1">السن</label>
                 <input id="pAge" type="number" placeholder="مثال: 35" value="${state.age}" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-sky-500" />
+              </div>
+              <div>
+                <label class="block text-xs text-slate-400 mb-1">النوع</label>
+                <select id="pGender" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-sky-500">
+                  <option value="ذكر" ${state.gender === 'ذكر' ? 'selected' : ''}>ذكر</option>
+                  <option value="أنثى" ${state.gender === 'أنثى' ? 'selected' : ''}>أنثى</option>
+                </select>
               </div>
               <div>
                 <label class="block text-xs text-slate-400 mb-1">رقم الهاتف</label>
@@ -95,8 +103,18 @@
             </div>
 
             <div>
-              <label class="block text-xs text-slate-400 mb-1">الأمراض المزمنة / الحساسية</label>
-              <input id="pChronic" type="text" placeholder="مثال: ضغط، سكر، حساسية بنسلين..." value="${state.chronicDiseases}" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-sky-500" />
+              <label class="block text-xs text-slate-400 mb-1">الأمراض المزمنة (ضغط، سكر، إلخ)</label>
+              <input id="pChronic" type="text" placeholder="مثال: ارتفاع ضغط الدم، سكر نوع ثاني..." value="${state.chronicDiseases}" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-sky-500" />
+            </div>
+
+            <div>
+              <label class="block text-xs text-slate-400 mb-1">التاريخ العائلي (Family History)</label>
+              <input id="pFamily" type="text" placeholder="مثال: أمراض قلب وراثية، أورام..." value="${state.familyHistory}" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-sky-500" />
+            </div>
+
+            <div>
+              <label class="block text-xs text-slate-400 mb-1">الأدوية الحالية التي يتناولها المريض</label>
+              <input id="pCurrMeds" type="text" placeholder="مثال: كونكور 5 ملغ، أسبرين..." value="${state.currentMedications}" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-sky-500" />
             </div>
           </section>
 
@@ -106,10 +124,10 @@
               <span>🩺</span> الأعراض والشكوى الحالية
             </h2>
 
-            <textarea id="pSymptoms" rows="3" placeholder="صف الأعراض بالتفصيل..." class="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-sky-500">${state.symptoms}</textarea>
+            <textarea id="pSymptoms" rows="3" placeholder="صف الأعراض بالتفصيل ومدة بدايتها..." class="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-sky-500">${state.symptoms}</textarea>
 
             <button id="aiBtn" class="w-full bg-sky-600 hover:bg-sky-500 text-white font-bold py-3 px-4 rounded-xl transition-all shadow-lg shadow-sky-600/30 flex items-center justify-center gap-2">
-              ${state.analyzing ? '⏳ جاري استدعاء نموذج DeepSeek-R1 الطبي...' : '✨ تحليل الحالة بـ DeepSeek AI'}
+              ${state.analyzing ? '⏳ جاري تحليل الحالة بذكاء DeepSeek-R1 الطبي...' : '✨ تحليل الحالة وإصدار التقرير بـ DeepSeek AI'}
             </button>
 
             ${state.apiError ? `
@@ -130,7 +148,7 @@
                 ` : ''}
 
                 <div class="text-xs text-slate-200">
-                  <strong>التشخيص المباشر:</strong> ${state.aiReport.diagnosis}
+                  <strong>التشخيص المقترح:</strong> ${state.aiReport.diagnosis}
                 </div>
               </div>
             ` : ''}
@@ -183,8 +201,11 @@
 
       document.getElementById('pName').onchange = (e) => state.patientName = e.target.value;
       document.getElementById('pAge').onchange = (e) => state.age = e.target.value;
+      document.getElementById('pGender').onchange = (e) => state.gender = e.target.value;
       document.getElementById('pPhone').onchange = (e) => state.phone = e.target.value;
       document.getElementById('pChronic').onchange = (e) => state.chronicDiseases = e.target.value;
+      document.getElementById('pFamily').onchange = (e) => state.familyHistory = e.target.value;
+      document.getElementById('pCurrMeds').onchange = (e) => state.currentMedications = e.target.value;
       document.getElementById('pSymptoms').onchange = (e) => state.symptoms = e.target.value;
       document.getElementById('pDiag').onchange = (e) => state.finalDiagnosis = e.target.value;
 
@@ -222,16 +243,18 @@
 
       const promptText = `
 أنت استشاري طبي وتعمل كمساعد إكلينيكي في نظام EMR.
-قم بتحليل بيانات المريض التالية بجدية ودقة طبية عالية:
+قم بتحليل الملف الإكلينيكي الشامل للمريض بدقة طبية بالغة، مع مراعاة التعارضات الدوائية والتاريخ المرضي:
 - السن: ${state.age || 'غير محدد'}
 - النوع: ${state.gender}
-- الأمراض المزمنة/الحالية: ${state.chronicDiseases || 'لا يوجد'}
+- الأمراض المزمنة: ${state.chronicDiseases || 'لا يوجد'}
+- التاريخ العائلي: ${state.familyHistory || 'لا يوجد'}
+- الأدوية الحالية: ${state.currentMedications || 'لا يوجد'}
 - الشكوى والأعراض الحالية: ${symptoms}
 
 المطلوب: ارسل الإجابة فقط بتنسيق JSON صحيح تماماً بدون أي مقدمات أو أسطر إضافية:
 {
   "diagnosis": "التشخيص الدقيق باللغة العربية مع الاسم العلمي",
-  "warnings": ["قائمة بأي تعارضات دوائية أو محاذير إن وجدت"],
+  "warnings": ["قائمة بأي تعارضات دوائية مع الأدوية الحالية أو محاذير إن وجدت"],
   "medications": [
     {
       "name": "اسم الدواء العلمي أو التجاري",
@@ -251,7 +274,7 @@
           },
           body: JSON.stringify({
             inputs: promptText,
-            parameters: { max_new_tokens: 600, return_full_text: false }
+            parameters: { max_new_tokens: 700, return_full_text: false }
           })
         });
 
@@ -282,7 +305,7 @@
 
     render();
 
-    // 🔄 Service Worker للإنعاش السريع
+    // 🔄 Service Worker للتحديث الفوري
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
         navigator.serviceWorker.register('./sw.js').then(reg => {
