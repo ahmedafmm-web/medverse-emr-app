@@ -21,7 +21,7 @@
 
   <script>
     let state = {
-      apiKey: localStorage.getItem('MEDVERSE_HF_KEY') || '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',
+      apiKey: localStorage.getItem('MEDVERSE_HF_KEY') || '',
       patientName: '',
       age: '',
       gender: 'ذكر',
@@ -45,7 +45,7 @@
           
           <header class="text-center py-4 border-b border-slate-800">
             <h1 class="text-2xl font-bold text-sky-400">MedVerse Smart EMR Suite</h1>
-            <p class="text-xs text-sky-500 font-semibold mt-1">الاستشاري الإكلينيكي الذكي (Powered by DeepSeek AI)</p>
+            <p class="text-xs text-sky-500 font-semibold mt-1">الاستشاري الإكلينيكي الذكي (Powered by Qwen Medical AI)</p>
           </header>
 
           <section class="bg-slate-800/80 p-4 rounded-2xl border border-sky-900/50 space-y-2">
@@ -121,7 +121,7 @@
             <textarea id="pSymptoms" rows="3" placeholder="صف الأعراض بالتفصيل ومدة بدايتها..." class="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-sky-500">${state.symptoms}</textarea>
 
             <button id="aiBtn" class="w-full bg-sky-600 hover:bg-sky-500 text-white font-bold py-3 px-4 rounded-xl transition-all shadow-lg shadow-sky-600/30 flex items-center justify-center gap-2">
-              ${state.analyzing ? '⏳ جاري استدعاء نموذج DeepSeek الطبي (قد يستغرق بضع ثوانٍ للتحميل)...' : '✨ تحليل الحالة وإصدار التقرير بـ DeepSeek AI'}
+              ${state.analyzing ? '⏳ جاري استدعاء النموذج الطبي المتقدم...' : '✨ تحليل الحالة وإصدار التقرير الطبي'}
             </button>
 
             ${state.apiError ? `
@@ -134,7 +134,7 @@
 
             ${state.aiReport ? `
               <div class="bg-sky-950/40 border border-sky-800 p-4 rounded-xl space-y-3">
-                <h3 class="text-xs font-bold text-sky-400">📋 التقرير الطبي المولد بواسطة DeepSeek AI:</h3>
+                <h3 class="text-xs font-bold text-sky-400">📋 التقرير الطبي المولد بواسطة الذكاء الاصطناعي:</h3>
                 
                 ${state.aiReport.warnings && state.aiReport.warnings.length > 0 ? `
                   <div class="bg-red-950/50 border border-red-800 p-3 rounded-lg text-red-300 text-xs space-y-1">
@@ -235,18 +235,18 @@
       state.apiError = null;
       render();
 
-      const promptText = `أنت استشاري طبي وتعمل كمساعد إكلينيكي. قم بتحليل الملف الإكلينيكي التالي:
+      const promptText = `قم بتحليل الملف الإكلينيكي التالي بأسلوب استشاري طبي محترف:
 - السن: ${state.age || 'غير محدد'}
 - النوع: ${state.gender}
 - الأمراض المزمنة: ${state.chronicDiseases || 'لا يوجد'}
 - التاريخ العائلي: ${state.familyHistory || 'لا يوجد'}
 - الأدوية الحالية: ${state.currentMedications || 'لا يوجد'}
-- الأعراض: ${symptoms}
+- الأعراض والشكوى الحالية: ${symptoms}
 
 أجب بصيغة JSON فقط بهذا الشكل وبدون أي مقدمات أو أكواد ماركداون:
 {
   "diagnosis": "التشخيص الدقيق باللغة العربية",
-  "warnings": ["أي تحذيرات أو تعارضات دوائية"],
+  "warnings": ["أي تحذيرات إكلينيكية أو تعارضات دوائية باللغة العربية"],
   "medications": [
     {
       "name": "اسم الدواء",
@@ -265,9 +265,18 @@
           },
           body: JSON.stringify({
             model: "Qwen/Qwen2.5-7B-Instruct",
-            messages: [{ role: "user", content: promptText }],
-            max_tokens: 700,
-            temperature: 0.3
+            messages: [
+              {
+                role: "system",
+                content: "You are an expert AI clinical assistant. You MUST ALWAYS respond strictly in the ARABIC language only. Never output Chinese or English in the diagnosis or warnings text, except for drug trade names if needed. Return ONLY valid JSON."
+              },
+              { 
+                role: "user", 
+                content: promptText 
+              }
+            ],
+            max_tokens: 800,
+            temperature: 0.2
           })
         });
 
@@ -279,7 +288,7 @@
 
         let rawText = data.choices[0].message.content;
         
-        // استخراج محتوى الـ JSON بذكاء
+        // استخراج كائن الـ JSON بذكاء لتفادي النصوص الزائدة
         const jsonMatch = rawText.match(/\{[\s\S]*\}/);
         if (!jsonMatch) throw new Error("لم يتم استرجاع تنسيق JSON صحيح من النموذج.");
 
