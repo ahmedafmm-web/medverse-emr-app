@@ -162,7 +162,7 @@ const styles = StyleSheet.create({
   emptyContainer: { padding: 15, alignItems: 'center' },
   emptyText: { color: '#94A3B8', fontSize: 13 },
   fieldGroup: { marginBottom: 15 },
-  labelHeader: { flexDirection: 'row', justifySpaceBetween: 'space-between', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
+  labelHeader: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
   label: { fontSize: 13, fontWeight: 'bold', color: '#0F172A', textAlign: 'right' },
   removeText: { fontSize: 11, color: '#EF4444', fontWeight: 'bold' },
   input: {
@@ -194,3 +194,4 @@ const styles = StyleSheet.create({
   cancelFieldBtn: { padding: 10, borderRadius: 6, alignItems: 'center' },
   cancelFieldBtnText: { color: '#64748B', fontSize: 12 }
 });
+ 
