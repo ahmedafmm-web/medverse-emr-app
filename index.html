@@ -4,7 +4,6 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   
-  <!-- 🚫 منع التخزين المؤقت لضمان التحديث الفوري -->
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
@@ -21,7 +20,6 @@
   <div id="app"></div>
 
   <script>
-    // حالة الواجهة والبيانات الكاملة للمريض
     let state = {
       apiKey: localStorage.getItem('MEDVERSE_HF_KEY') || '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',
       patientName: '',
@@ -45,13 +43,11 @@
       app.innerHTML = `
         <div class="min-h-screen pb-12 max-w-2xl mx-auto p-4 space-y-5">
           
-          <!-- Header -->
           <header class="text-center py-4 border-b border-slate-800">
             <h1 class="text-2xl font-bold text-sky-400">MedVerse Smart EMR Suite</h1>
             <p class="text-xs text-sky-500 font-semibold mt-1">الاستشاري الإكلينيكي الذكي (Powered by DeepSeek AI)</p>
           </header>
 
-          <!-- ⚙️ إعدادات المفتاح (Hugging Face API Key) -->
           <section class="bg-slate-800/80 p-4 rounded-2xl border border-sky-900/50 space-y-2">
             <div class="flex justify-between items-center">
               <label class="text-xs font-bold text-sky-300 flex items-center gap-1">
@@ -73,7 +69,6 @@
             </div>
           </section>
 
-          <!-- 1. الملف الشخصي والتاريخ الطبي الكامل -->
           <section class="bg-slate-800 p-5 rounded-2xl border border-slate-700 space-y-4">
             <h2 class="font-bold text-sm text-slate-200 border-b border-slate-700 pb-2 flex items-center gap-2">
               <span>👤</span> الملف الإكلينيكي والتاريخ المرضي
@@ -118,7 +113,6 @@
             </div>
           </section>
 
-          <!-- 2. الأعراض والتحليل الذكي -->
           <section class="bg-slate-800 p-5 rounded-2xl border border-slate-700 space-y-4">
             <h2 class="font-bold text-sm text-slate-200 border-b border-slate-700 pb-2 flex items-center gap-2">
               <span>🩺</span> الأعراض والشكوى الحالية
@@ -127,13 +121,14 @@
             <textarea id="pSymptoms" rows="3" placeholder="صف الأعراض بالتفصيل ومدة بدايتها..." class="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-sky-500">${state.symptoms}</textarea>
 
             <button id="aiBtn" class="w-full bg-sky-600 hover:bg-sky-500 text-white font-bold py-3 px-4 rounded-xl transition-all shadow-lg shadow-sky-600/30 flex items-center justify-center gap-2">
-              ${state.analyzing ? '⏳ جاري تحليل الحالة بذكاء DeepSeek-R1 الطبي...' : '✨ تحليل الحالة وإصدار التقرير بـ DeepSeek AI'}
+              ${state.analyzing ? '⏳ جاري استدعاء نموذج DeepSeek الطبي (قد يستغرق بضع ثوانٍ للتحميل)...' : '✨ تحليل الحالة وإصدار التقرير بـ DeepSeek AI'}
             </button>
 
             ${state.apiError ? `
-              <div class="bg-red-950/60 border border-red-800 p-4 rounded-xl text-red-300 text-xs space-y-1">
+              <div class="bg-red-950/60 border border-red-800 p-4 rounded-xl text-red-300 text-xs space-y-2">
                 <strong>❌ خطأ في الاتصال بالسيرفر:</strong>
                 <div>${state.apiError}</div>
+                <div class="text-[10px] text-slate-400">💡 ملاحظة: إذا كان الخطأ 503، فهذا يعني أن النموذج قيد التحميل المبدئي على سيرفرات Hugging Face، يرجى المحاولة بعد قليل.</div>
               </div>
             ` : ''}
 
@@ -154,7 +149,6 @@
             ` : ''}
           </section>
 
-          <!-- 3. اعتماد القرارات والأدوية -->
           <section class="bg-slate-800 p-5 rounded-2xl border border-slate-700 space-y-4">
             <h2 class="font-bold text-sm text-slate-200 border-b border-slate-700 pb-2 flex items-center gap-2">
               <span>📝</span> اعتماد الخطة العلاجية بواسطة الطبيب
@@ -241,52 +235,51 @@
       state.apiError = null;
       render();
 
-      const promptText = `
-أنت استشاري طبي وتعمل كمساعد إكلينيكي في نظام EMR.
-قم بتحليل الملف الإكلينيكي الشامل للمريض بدقة طبية بالغة، مع مراعاة التعارضات الدوائية والتاريخ المرضي:
+      const promptText = `أنت استشاري طبي وتعمل كمساعد إكلينيكي. قم بتحليل الملف الإكلينيكي التالي:
 - السن: ${state.age || 'غير محدد'}
 - النوع: ${state.gender}
 - الأمراض المزمنة: ${state.chronicDiseases || 'لا يوجد'}
 - التاريخ العائلي: ${state.familyHistory || 'لا يوجد'}
 - الأدوية الحالية: ${state.currentMedications || 'لا يوجد'}
-- الشكوى والأعراض الحالية: ${symptoms}
+- الأعراض: ${symptoms}
 
-المطلوب: ارسل الإجابة فقط بتنسيق JSON صحيح تماماً بدون أي مقدمات أو أسطر إضافية:
+أجب بصيغة JSON فقط بهذا الشكل وبدون أي مقدمات أو أكواد ماركداون:
 {
-  "diagnosis": "التشخيص الدقيق باللغة العربية مع الاسم العلمي",
-  "warnings": ["قائمة بأي تعارضات دوائية مع الأدوية الحالية أو محاذير إن وجدت"],
+  "diagnosis": "التشخيص الدقيق باللغة العربية",
+  "warnings": ["أي تحذيرات أو تعارضات دوائية"],
   "medications": [
     {
-      "name": "اسم الدواء العلمي أو التجاري",
+      "name": "اسم الدواء",
       "dose": "الجرعة التفصيلية",
-      "reason": "السبب الطبي للملاحظة"
+      "reason": "السبب الطبي"
     }
   ]
-}
-`;
+}`;
 
       try {
-        const res = await fetch("https://api-inference.huggingface.co/models/deepseek-ai/DeepSeek-R1-Distill-Qwen-32B", {
+        const res = await fetch("https://router.huggingface.co/v1/chat/completions", {
           method: "POST",
           headers: {
             "Authorization": `Bearer ${state.apiKey}`,
             "Content-Type": "application/json"
           },
           body: JSON.stringify({
-            inputs: promptText,
-            parameters: { max_new_tokens: 700, return_full_text: false }
+            model: "deepseek-ai/DeepSeek-R1-Distill-Qwen-32B",
+            messages: [{ role: "user", content: promptText }],
+            max_tokens: 700,
+            temperature: 0.3
           })
         });
 
         const data = await res.json();
 
         if (!res.ok || data.error) {
-          throw new Error(data.error || `HTTP Error ${res.status}`);
+          throw new Error(data.error?.message || data.error || `HTTP Error ${res.status}`);
         }
 
-        let rawText = Array.isArray(data) ? data[0].generated_text : data.generated_text;
+        let rawText = data.choices[0].message.content;
         
-        // استخراج الـ JSON بدقة
+        // استخراج محتوى الـ JSON بذكاء
         const jsonMatch = rawText.match(/\{[\s\S]*\}/);
         if (!jsonMatch) throw new Error("لم يتم استرجاع تنسيق JSON صحيح من النموذج.");
 
@@ -305,19 +298,10 @@
 
     render();
 
-    // 🔄 Service Worker للتحديث الفوري
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
         navigator.serviceWorker.register('./sw.js').then(reg => {
           setInterval(() => { reg.update(); }, 30000);
-          reg.addEventListener('updatefound', () => {
-            const newWorker = reg.installing;
-            newWorker.addEventListener('statechange', () => {
-              if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                window.location.reload(true);
-              }
-            });
-          });
         });
       });
     }
