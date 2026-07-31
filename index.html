@@ -21,7 +21,7 @@
   <div id="app"></div>
 
   <script>
-    // 🔑 مفتاح Gemini API
+    // 🔑ضع مفتاح Gemini API الخاص بك هنا (يبدأ بـ AIzaSy...)
     const GEMINI_API_KEY = "AQ.Ab8RN6LIuoiJFa9xuw93wRdHRMOF3y89PeeyA7kItoZpriGgAA";
 
     // حالة الواجهة البياناتية
@@ -235,7 +235,8 @@
 `;
 
       try {
-        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
+        // الاستدعاء للنموذج الرسمي gemini-1.5-flash
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ contents: [{ parts: [{ text: promptText }] }] })
@@ -254,7 +255,7 @@
         state.finalDiagnosis = parsed.diagnosis || '';
         state.medications = parsed.medications || [];
       } catch (err) {
-        alert('حدثت مشكلة في مفتاح الذكاء الاصطناعي (API Key). يرجى التأكد من صلاحية المفتاح من Google AI Studio.');
+        alert('حدثت مشكلة في مفتاح الذكاء الاصطناعي (API Key). يرجى جلب مفتاح جديد من Google AI Studio (يبدأ بـ AIzaSy).');
       } finally {
         state.analyzing = false;
         render();
@@ -282,4 +283,3 @@
   </script>
 </body>
 </html>
- 
