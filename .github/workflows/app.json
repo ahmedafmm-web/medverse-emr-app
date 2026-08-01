@@ -3,10 +3,13 @@
     "name": "medverse-emr-app",
     "slug": "medverse-emr-app",
     "version": "1.0.0",
+    "experiments": {
+      "baseUrl": "/medverse-emr-app"
+    },
     "web": {
       "bundler": "metro",
       "output": "single",
-      "publicPath": "/"
+      "publicPath": "/medverse-emr-app/"
     }
   }
 }
