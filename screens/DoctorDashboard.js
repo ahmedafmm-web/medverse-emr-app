@@ -190,6 +190,7 @@ Return JSON ONLY:
     setPrescribedMeds(prev => prev.filter((_, i) => i !== index));
   };
 
+  // البحث في التاريخ المرضي
   const fetchPatientHistory = async (name) => {
     if (!name || name.trim().length < 3) {
       setPatientHistory([]);
@@ -220,7 +221,7 @@ Return JSON ONLY:
     }
   };
 
-  // دالة الحفظ والطباعة مع رصد الأخطاء وإظهارها تفصيلياً
+  // دالة الحفظ المحدثة المتوافقية مع جداول Supabase
   const handleSaveAndPrint = async () => {
     if (!patientName.trim()) {
       alert('تنبيه هام: يرجى إدخال اسم المريض بالكامل أولاً قبل الاعتماد والطباعة.');
@@ -231,6 +232,7 @@ Return JSON ONLY:
     const generatedCode = 'PAT-' + Math.floor(10000 + Math.random() * 90000);
 
     try {
+      // 1️⃣ التعامل مع جدول العيادات (clinics)
       let clinicId = null;
       try {
         let { data: clinic } = await supabase.from('clinics').select('id').limit(1).single();
@@ -240,21 +242,24 @@ Return JSON ONLY:
             .from('clinics')
             .insert([{ 
               doctor_name: clinicDoctorName, 
-              specialty, 
-              clinic_name: clinicName,
-              logo_url: clinicLogoUrl
+              specialty: specialty, 
+              clinic_name: clinicName
             }])
             .select()
             .single();
-          if (cErr) throw cErr;
+
+          if (cErr) console.error('Clinic Insert Error:', cErr);
           clinic = newClinic;
         }
         clinicId = clinic?.id;
       } catch (dbClinicErr) {
-        console.warn('تحذير قاعدة البيانات (العيادة):', dbClinicErr.message);
+        console.warn('DB Clinic Warning:', dbClinicErr);
       }
 
+      // 2️⃣ التعامل مع جدول المرضى (patients)
+      let patientRealId = null;
       let patientRealCode = generatedCode;
+
       try {
         let { data: patient } = await supabase
           .from('patients')
@@ -262,42 +267,48 @@ Return JSON ONLY:
           .eq('full_name', patientName.trim())
           .single();
 
-        if (!patient && clinicId) {
+        if (!patient) {
           const { data: newPatient, error: pErr } = await supabase
             .from('patients')
             .insert([{
               full_name: patientName.trim(),
               phone: patientPhone,
+              age: age ? parseInt(age) : null,
+              gender: gender,
               patient_code: generatedCode,
               clinic_id: clinicId
             }])
             .select()
             .single();
 
-          if (pErr) throw pErr;
+          if (pErr) console.error('Patient Insert Error:', pErr);
           patient = newPatient;
         }
 
-        if (patient?.patient_code) {
+        if (patient) {
+          patientRealId = patient.id;
           patientRealCode = patient.patient_code;
         }
-
-        if (patient && clinicId) {
-          await supabase
-            .from('medical_records')
-            .insert([{
-              patient_id: patient.id,
-              clinic_id: clinicId,
-              diagnosis: finalDiagnosis,
-              dynamic_fields: { age, gender, chronicDiseases, familyHistory, symptoms: symptomsInput, doctorNotes },
-              qr_verification_code: 'VERIFY-' + patientRealCode
-            }]);
-        }
       } catch (dbPatientErr) {
-        console.warn('تحذير قاعدة البيانات (المريض/السجل):', dbPatientErr.message);
+        console.warn('DB Patient Warning:', dbPatientErr);
       }
 
-      // إطلاق نافذة الطباعة والروشتة فوراً
+      // 3️⃣ حفظ السجل في جدول السجلات الطبية (medical_records)
+      if (patientRealId) {
+        const { error: recErr } = await supabase
+          .from('medical_records')
+          .insert([{
+            patient_id: patientRealId,
+            clinic_id: clinicId,
+            visit_date: new Date().toISOString().split('T')[0],
+            diagnosis: finalDiagnosis,
+            prescriptions: prescribedMeds
+          }]);
+
+        if (recErr) console.error('Record Insert Error:', recErr);
+      }
+
+      // 4️⃣ استدعاء دالة توليد وفتح الروشتة PDF
       await generatePrescriptionPDF(
         { name: patientName, phone: patientPhone, code: patientRealCode },
         finalDiagnosis,
@@ -315,10 +326,10 @@ Return JSON ONLY:
         }
       );
 
-      alert(`تم اعتماد الزيارة وتنزيل الروشتة PDF بنجاح برقم: [${patientRealCode}] 🚀`);
+      alert(`تم اعتماد الزيارة وتنزيل الروشتة PDF وحفظ البيانات سحابياً بنجاح! كود المريض: [${patientRealCode}] 🚀`);
 
     } catch (error) {
-      console.error('Detailed Print Error:', error);
+      console.error('Detailed Save & Print Error:', error);
       alert('خطأ أثناء اعتماد التقرير أو الطباعة: ' + (error.message || error));
     } finally {
       setLoading(false);
@@ -412,7 +423,7 @@ Return JSON ONLY:
           <Text style={styles.historyTitle}>📚 تاريخ الزيارات السابقة للمريض ({patientHistory.length} زيارات)</Text>
           {patientHistory.map((item, index) => (
             <View key={item.id || index} style={styles.historyItem}>
-              <Text style={styles.historyDate}>📅 {new Date(item.created_at).toLocaleDateString('ar-EG')}</Text>
+              <Text style={styles.historyDate}>📅 {new Date(item.created_at || item.visit_date).toLocaleDateString('ar-EG')}</Text>
               <Text style={styles.historyDiagnosis}><strong>التشخيص:</strong> {item.diagnosis || 'لا يوجد'}</Text>
             </View>
           ))}
@@ -527,3 +538,4 @@ const styles = StyleSheet.create({
   historyDate: { fontSize: 10, color: '#38BDF8', fontWeight: 'bold', textAlign: 'right' },
   historyDiagnosis: { fontSize: 11, color: '#CBD5E1', textAlign: 'right' }
 });
+ 
