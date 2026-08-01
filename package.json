@@ -2,14 +2,14 @@
   "name": "medverse-emr-app",
   "version": "1.0.0",
   "homepage": "https://ahmedafmm-web.github.io/medverse-emr-app",
-  "main": "index.js",
+  "main": "node_modules/expo/AppEntry.js",
   "scripts": {
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "build:web": "npx expo export && touch dist/.nojekyll",
-    "export": "npx expo export && touch dist/.nojekyll"
+    "build:web": "npx expo export -p web",
+    "export": "npx expo export -p web"
   },
   "dependencies": {
     "expo": "~51.0.0",
