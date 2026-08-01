@@ -28,13 +28,25 @@ export const generatePrescriptionPDF = async (patientData, diagnosis, dynamicDat
       <meta charset="utf-8">
       <title>روشتة طبية معتمدة - ${patientData.name || ''}</title>
       <style>
-        /* إخفاء روابط المتصفح ورقم الصفحات والتاريخ عند الطباعة */
+        /* إخفاء رابط الموقع والتاريخ ورقم الصفحات تماماً عند الطباعة */
         @page {
-          size: auto;
-          margin: 15mm 15mm 15mm 15mm;
+          size: A4 portrait;
+          margin: 0;
         }
 
-        body { font-family: 'Helvetica', 'Arial', sans-serif; padding: 10px 20px; color: #0F172A; background-color: #FFFFFF; }
+        @media print {
+          html, body {
+            margin: 0 !important;
+            padding: 15mm !important;
+            height: 100%;
+            background-color: #FFFFFF !important;
+          }
+          .print-bar {
+            display: none !important;
+          }
+        }
+
+        body { font-family: 'Helvetica', 'Arial', sans-serif; padding: 20px 30px; color: #0F172A; background-color: #FFFFFF; }
         .clinic-header { border-bottom: 3px solid #0F172A; padding-bottom: 15px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
         .clinic-brand { display: flex; align-items: center; gap: 15px; }
         .clinic-logo { width: 75px; height: 75px; object-fit: contain; border-radius: 8px; border: 1px solid #E2E8F0; padding: 2px; }
@@ -92,11 +104,6 @@ export const generatePrescriptionPDF = async (patientData, diagnosis, dynamicDat
           border-radius: 30px;
           font-size: 13px;
           cursor: pointer;
-        }
-
-        /* إخفاء أزرار التحكم تماماً أثناء الطباعة الفعلية */
-        @media print {
-          .print-bar { display: none !important; }
         }
       </style>
     </head>
@@ -197,3 +204,4 @@ export const generatePrescriptionPDF = async (patientData, diagnosis, dynamicDat
     console.error('خطأ في إنتاج ملف الـ PDF:', error);
   }
 };
+ 
