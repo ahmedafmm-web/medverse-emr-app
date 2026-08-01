@@ -3,17 +3,17 @@
   "name": "MedVerse EMR Platform",
   "icons": [
     {
-      "src": "icon.png",
+      "src": "/medverse-emr-app/icon.png",
       "type": "image/png",
       "sizes": "192x192"
     },
     {
-      "src": "icon.png",
+      "src": "/medverse-emr-app/icon.png",
       "type": "image/png",
       "sizes": "512x512"
     }
   ],
-  "start_url": "./index.html",
+  "start_url": "/medverse-emr-app/",
   "background_color": "#0f172a",
   "theme_color": "#0f172a",
   "display": "standalone",
