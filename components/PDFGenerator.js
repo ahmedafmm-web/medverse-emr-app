@@ -1,10 +1,10 @@
+import { Platform } from 'react-native';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 
-export const generatePrescriptionPDF = async (patient, diagnosis, details, medications, clinicInfo) => {
+export const generatePrescriptionPDF = async (patient = {}, diagnosis = '', details = {}, medications = [], clinicInfo = {}) => {
   const currentDate = new Date().toLocaleDateString('ar-EG');
 
-  // تجهيز صفوف جدول الأدوية بشكل مضبوط مع مراعاة النصوص الطويلة
   const medsRows = medications && medications.length > 0
     ? medications.map((med) => `
         <tr>
@@ -21,13 +21,14 @@ export const generatePrescriptionPDF = async (patient, diagnosis, details, medic
       `).join('')
     : `<tr><td colspan="3" style="text-align: center; padding: 15px; color: #64748B;">لا يوجد أدوية مسجلة</td></tr>`;
 
-  // تجهيز تفاصيل الفحوصات والتقرير المخصص
-  const detailsRows = Object.entries(details).map(([key, val]) => `
-    <div style="margin-bottom: 6px; font-size: 11px;">
-      <strong style="color: #0284C7;">${key}:</strong> 
-      <span style="color: #334155;">${val || 'لا يوجد'}</span>
-    </div>
-  `).join('');
+  const detailsRows = details && Object.keys(details).length > 0
+    ? Object.entries(details).map(([key, val]) => `
+        <div style="margin-bottom: 6px; font-size: 11px;">
+          <strong style="color: #0284C7;">${key}:</strong> 
+          <span style="color: #334155;">${val || 'لا يوجد'}</span>
+        </div>
+      `).join('')
+    : '<div style="font-size: 11px; color: #64748B;">لا توجد تفاصيل إضافية</div>';
 
   const htmlContent = `
     <!DOCTYPE html>
@@ -35,25 +36,15 @@ export const generatePrescriptionPDF = async (patient, diagnosis, details, medic
     <head>
       <meta charset="utf-8" />
       <style>
-        @page {
-          size: A4;
-          margin: 15mm;
-        }
+        @page { size: A4; margin: 15mm; }
         body {
           font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
-          margin: 0;
-          padding: 0;
-          color: #0F172A;
-          background-color: #FFFFFF;
+          margin: 0; padding: 0; color: #0F172A; background-color: #FFFFFF;
           -webkit-print-color-adjust: exact;
         }
         .header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          border-bottom: 2px solid #0284C7;
-          padding-bottom: 12px;
-          margin-bottom: 15px;
+          display: flex; justify-content: space-between; align-items: center;
+          border-bottom: 2px solid #0284C7; padding-bottom: 12px; margin-bottom: 15px;
         }
         .clinic-info { text-align: right; }
         .clinic-name { font-size: 18px; font-weight: bold; color: #0284C7; }
@@ -61,76 +52,35 @@ export const generatePrescriptionPDF = async (patient, diagnosis, details, medic
         .specialty { font-size: 11px; color: #64748B; }
         
         .patient-box {
-          background-color: #F8FAFC;
-          border: 1px solid #E2E8F0;
-          border-radius: 6px;
-          padding: 10px 12px;
-          margin-bottom: 15px;
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
+          background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 6px;
+          padding: 10px 12px; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center;
         }
         .patient-detail { font-size: 12px; color: #334155; }
         
         .section-title {
-          font-size: 13px;
-          font-weight: bold;
-          color: #0284C7;
-          border-right: 4px solid #0284C7;
-          padding-right: 8px;
-          margin-top: 12px;
-          margin-bottom: 8px;
+          font-size: 13px; font-weight: bold; color: #0284C7;
+          border-right: 4px solid #0284C7; padding-right: 8px; margin-top: 12px; margin-bottom: 8px;
         }
         
         .diagnosis-box {
-          background-color: #F0F9FF;
-          border: 1px solid #BAE6FD;
-          border-radius: 6px;
-          padding: 8px 12px;
-          font-size: 12px;
-          font-weight: bold;
-          color: #0369A1;
-          margin-bottom: 12px;
+          background-color: #F0F9FF; border: 1px solid #BAE6FD; border-radius: 6px;
+          padding: 8px 12px; font-size: 12px; font-weight: bold; color: #0369A1; margin-bottom: 12px;
         }
         
-        table {
-          width: 100%;
-          border-collapse: collapse;
-          margin-top: 6px;
-          margin-bottom: 20px;
-          table-layout: fixed;
-        }
-        th {
-          background-color: #F1F5F9;
-          color: #475569;
-          font-size: 11px;
-          padding: 8px;
-          text-align: right;
-          border-bottom: 2px solid #CBD5E1;
-        }
+        table { width: 100%; border-collapse: collapse; margin-top: 6px; margin-bottom: 20px; table-layout: fixed; }
+        th { background-color: #F1F5F9; color: #475569; font-size: 11px; padding: 8px; text-align: right; border-bottom: 2px solid #CBD5E1; }
         
         .footer {
-          margin-top: 30px;
-          padding-top: 12px;
-          border-top: 1px solid #E2E8F0;
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          font-size: 10px;
-          color: #94A3B8;
+          margin-top: 30px; padding-top: 12px; border-top: 1px solid #E2E8F0;
+          display: flex; justify-content: space-between; align-items: center; font-size: 10px; color: #94A3B8;
         }
         .qr-placeholder {
-          font-size: 10px;
-          color: #0284C7;
-          font-weight: bold;
-          border: 1px dashed #0284C7;
-          padding: 4px 8px;
-          border-radius: 4px;
+          font-size: 10px; color: #0284C7; font-weight: bold;
+          border: 1px dashed #0284C7; padding: 4px 8px; border-radius: 4px;
         }
       </style>
     </head>
     <body>
-      <!-- Header / بيانات العيادة واللوجو -->
       <div class="header">
         <div class="clinic-info">
           <div class="clinic-name">${clinicInfo.clinicName || 'عيادة MedVerse التخصصية'}</div>
@@ -140,7 +90,6 @@ export const generatePrescriptionPDF = async (patient, diagnosis, details, medic
         ${clinicInfo.logoUrl ? `<img src="${clinicInfo.logoUrl}" style="height: 50px; width: auto; max-width: 120px;" />` : ''}
       </div>
 
-      <!-- كارت بيانات المريض -->
       <div class="patient-box">
         <div>
           <span class="patient-detail"><strong>اسم المريض:</strong> ${patient.name || ''}</span>
@@ -152,19 +101,16 @@ export const generatePrescriptionPDF = async (patient, diagnosis, details, medic
         </div>
       </div>
 
-      <!-- تفاصيل الفحوصات والتقرير المخصص -->
       <div class="section-title">تفاصيل الفحوصات والتقرير المخصص</div>
       <div style="background-color: #FAF5FF; border: 1px solid #F3E8FF; padding: 10px; border-radius: 6px; margin-bottom: 12px;">
         ${detailsRows}
       </div>
 
-      <!-- التشخيص المعتمد -->
       <div class="section-title">التشخيص (Diagnosis)</div>
       <div class="diagnosis-box">
         🩺 ${diagnosis || 'لم يتم تحديد تشخيص'}
       </div>
 
-      <!-- الخطة العلاجية والروشتة -->
       <div class="section-title">الخطة العلاجية والروشتة (Rx)</div>
       <table>
         <thead>
@@ -179,14 +125,9 @@ export const generatePrescriptionPDF = async (patient, diagnosis, details, medic
         </tbody>
       </table>
 
-      <!-- Footer / التوقيع والاعتماد الإلكتروني -->
       <div class="footer">
-        <div>
-          <span>Powered by <strong>MedVerse Smart EMR Suite</strong></span>
-        </div>
-        <div class="qr-placeholder">
-          🔒 رمز تحقق إلكتروني معتمد: VERIFY-${patient.code || ''}
-        </div>
+        <div><span>Powered by <strong>MedVerse Smart EMR Suite</strong></span></div>
+        <div class="qr-placeholder">🔒 رمز تحقق إلكتروني معتمد: VERIFY-${patient.code || ''}</div>
         <div style="text-align: left;">
           <div style="font-size: 11px; font-weight: bold; color: #334155;">توقيع الطبيب</div>
           <div style="font-size: 10px; color: #64748B;">${clinicInfo.doctorName || ''}</div>
@@ -197,11 +138,26 @@ export const generatePrescriptionPDF = async (patient, diagnosis, details, medic
   `;
 
   try {
-    const { uri } = await Print.printToFileAsync({ html: htmlContent });
-    await Sharing.shareAsync(uri);
+    if (Platform.OS === 'web') {
+      const printWindow = window.open('', '_blank');
+      if (printWindow) {
+        printWindow.document.write(htmlContent);
+        printWindow.document.close();
+        printWindow.focus();
+        setTimeout(() => {
+          printWindow.print();
+        }, 500);
+      } else {
+        await Print.printAsync({ html: htmlContent });
+      }
+    } else {
+      const { uri } = await Print.printToFileAsync({ html: htmlContent });
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(uri);
+      }
+    }
   } catch (error) {
     console.error("PDF Generation Error:", error);
-    alert("حدث خطأ أثناء إنشاء الروشتة PDF: " + error.message);
   }
 };
  
