@@ -8,8 +8,8 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "build:web": "npx expo export -p web",
-    "export": "npx expo export -p web"
+    "build:web": "npx expo export && touch dist/.nojekyll",
+    "export": "npx expo export && touch dist/.nojekyll"
   },
   "dependencies": {
     "expo": "~51.0.0",
