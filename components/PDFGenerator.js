@@ -26,8 +26,15 @@ export const generatePrescriptionPDF = async (patientData, diagnosis, dynamicDat
     <html dir="rtl" lang="ar">
     <head>
       <meta charset="utf-8">
+      <title>روشتة طبية معتمدة - ${patientData.name || ''}</title>
       <style>
-        body { font-family: 'Helvetica', 'Arial', sans-serif; padding: 20px 40px; color: #0F172A; background-color: #FFFFFF; }
+        /* إخفاء روابط المتصفح ورقم الصفحات والتاريخ عند الطباعة */
+        @page {
+          size: auto;
+          margin: 15mm 15mm 15mm 15mm;
+        }
+
+        body { font-family: 'Helvetica', 'Arial', sans-serif; padding: 10px 20px; color: #0F172A; background-color: #FFFFFF; }
         .clinic-header { border-bottom: 3px solid #0F172A; padding-bottom: 15px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
         .clinic-brand { display: flex; align-items: center; gap: 15px; }
         .clinic-logo { width: 75px; height: 75px; object-fit: contain; border-radius: 8px; border: 1px solid #E2E8F0; padding: 2px; }
@@ -46,9 +53,61 @@ export const generatePrescriptionPDF = async (patientData, diagnosis, dynamicDat
         .qr-section p { font-size: 9px; color: #94A3B8; margin-top: 4px; }
         .signatures { display: flex; gap: 40px; text-align: center; }
         .sig-box { width: 140px; border-top: 1px dashed #94A3B8; padding-top: 5px; font-size: 12px; font-weight: bold; color: #334155; }
+
+        /* شريط زر الطباعة المباشر بداخل الشاشة */
+        .print-bar {
+          position: fixed;
+          bottom: 20px;
+          left: 50%;
+          transform: translateX(-50%);
+          background: #0F172A;
+          padding: 12px 24px;
+          border-radius: 50px;
+          box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+          display: flex;
+          gap: 15px;
+          align-items: center;
+          z-index: 9999;
+        }
+
+        .btn-print {
+          background: #059669;
+          color: white;
+          border: none;
+          padding: 10px 20px;
+          border-radius: 30px;
+          font-weight: bold;
+          font-size: 14px;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .btn-close {
+          background: #475569;
+          color: white;
+          border: none;
+          padding: 10px 18px;
+          border-radius: 30px;
+          font-size: 13px;
+          cursor: pointer;
+        }
+
+        /* إخفاء أزرار التحكم تماماً أثناء الطباعة الفعلية */
+        @media print {
+          .print-bar { display: none !important; }
+        }
       </style>
     </head>
     <body>
+
+      <!-- شريط الطباعة العائم بداخل النافذة -->
+      <div class="print-bar">
+        <button class="btn-print" onclick="window.print()">🖨️ طباعة الروشتة الآن / PDF</button>
+        <button class="btn-close" onclick="window.close()">إغلاق ✕</button>
+      </div>
+
       <div class="clinic-header">
         <div class="clinic-brand">
           ${clinicInfo.logoUrl ? `<img src="${clinicInfo.logoUrl}" class="clinic-logo" alt="Logo" />` : ''}
@@ -115,6 +174,7 @@ export const generatePrescriptionPDF = async (patientData, diagnosis, dynamicDat
           <div class="sig-box">ختم العيادة</div>
         </div>
       </div>
+
     </body>
     </html>
   `;
@@ -126,9 +186,6 @@ export const generatePrescriptionPDF = async (patientData, diagnosis, dynamicDat
         printWindow.document.write(htmlContent);
         printWindow.document.close();
         printWindow.focus();
-        setTimeout(() => {
-          printWindow.print();
-        }, 500);
       }
     } else {
       const Print = require('expo-print');
@@ -140,4 +197,3 @@ export const generatePrescriptionPDF = async (patientData, diagnosis, dynamicDat
     console.error('خطأ في إنتاج ملف الـ PDF:', error);
   }
 };
-
