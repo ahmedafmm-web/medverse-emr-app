@@ -1,207 +1,207 @@
-import { Platform } from 'react-native';
+import * as Print from 'expo-print';
+import * as Sharing from 'expo-sharing';
 
-export const generatePrescriptionPDF = async (patientData, diagnosis, dynamicData, medications = [], clinicInfo = {}) => {
+export const generatePrescriptionPDF = async (patient, diagnosis, details, medications, clinicInfo) => {
   const currentDate = new Date().toLocaleDateString('ar-EG');
-  
-  const qrVerificationCode = `VERIFY-${patientData.code || 'PAT'}-${Date.now().toString().slice(-4)}`;
-  const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=80x80&data=${encodeURIComponent(qrVerificationCode)}`;
 
-  const medsRows = medications.map(m => `
-    <tr>
-      <td style="padding: 10px; border: 1px solid #CBD5E1; font-weight: bold; font-family: monospace; text-align: left; direction: ltr;">${m.name}</td>
-      <td style="padding: 10px; border: 1px solid #CBD5E1;">${m.dose}</td>
-      <td style="padding: 10px; border: 1px solid #CBD5E1;">${m.reason || '---'}</td>
-    </tr>
-  `).join('');
+  // تجهيز صفوف جدول الأدوية بشكل مضبوط مع مراعاة النصوص الطويلة
+  const medsRows = medications && medications.length > 0
+    ? medications.map((med) => `
+        <tr>
+          <td style="width: 35%; text-align: right; padding: 10px 8px; border-bottom: 1px solid #E2E8F0; vertical-align: top;">
+            <strong style="color: #0F172A; font-size: 12px; display: block;">${med.name || ''}</strong>
+          </td>
+          <td style="width: 30%; text-align: right; padding: 10px 8px; border-bottom: 1px solid #E2E8F0; color: #334155; font-size: 11px; vertical-align: top;">
+            ${med.dose || 'حسب التوجيهات'}
+          </td>
+          <td style="width: 35%; text-align: right; padding: 10px 8px; border-bottom: 1px solid #E2E8F0; color: #475569; font-size: 11px; vertical-align: top;">
+            ${med.reason || 'لا يوجد'}
+          </td>
+        </tr>
+      `).join('')
+    : `<tr><td colspan="3" style="text-align: center; padding: 15px; color: #64748B;">لا يوجد أدوية مسجلة</td></tr>`;
 
-  const dynamicRows = Object.keys(dynamicData).map(key => `
-    <tr>
-      <td style="padding: 8px; border-bottom: 1px dashed #E2E8F0; font-weight: bold; width: 35%; color: #334155;">${key}:</td>
-      <td style="padding: 8px; border-bottom: 1px dashed #E2E8F0; color: #0F172A;">${dynamicData[key]}</td>
-    </tr>
+  // تجهيز تفاصيل الفحوصات والتقرير المخصص
+  const detailsRows = Object.entries(details).map(([key, val]) => `
+    <div style="margin-bottom: 6px; font-size: 11px;">
+      <strong style="color: #0284C7;">${key}:</strong> 
+      <span style="color: #334155;">${val || 'لا يوجد'}</span>
+    </div>
   `).join('');
 
   const htmlContent = `
     <!DOCTYPE html>
     <html dir="rtl" lang="ar">
     <head>
-      <meta charset="utf-8">
-      <title>روشتة طبية معتمدة - ${patientData.name || ''}</title>
+      <meta charset="utf-8" />
       <style>
-        /* إخفاء رابط الموقع والتاريخ ورقم الصفحات تماماً عند الطباعة */
         @page {
-          size: A4 portrait;
+          size: A4;
+          margin: 15mm;
+        }
+        body {
+          font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
           margin: 0;
+          padding: 0;
+          color: #0F172A;
+          background-color: #FFFFFF;
+          -webkit-print-color-adjust: exact;
         }
-
-        @media print {
-          html, body {
-            margin: 0 !important;
-            padding: 15mm !important;
-            height: 100%;
-            background-color: #FFFFFF !important;
-          }
-          .print-bar {
-            display: none !important;
-          }
-        }
-
-        body { font-family: 'Helvetica', 'Arial', sans-serif; padding: 20px 30px; color: #0F172A; background-color: #FFFFFF; }
-        .clinic-header { border-bottom: 3px solid #0F172A; padding-bottom: 15px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
-        .clinic-brand { display: flex; align-items: center; gap: 15px; }
-        .clinic-logo { width: 75px; height: 75px; object-fit: contain; border-radius: 8px; border: 1px solid #E2E8F0; padding: 2px; }
-        .clinic-info h1 { margin: 0; font-size: 24px; font-weight: 900; color: #0F172A; }
-        .clinic-info h2 { margin: 4px 0 0 0; font-size: 16px; font-weight: bold; color: #0284C7; }
-        .clinic-info p { margin: 4px 0 0 0; font-size: 13px; color: #64748B; }
-        .software-watermark { text-align: left; font-size: 10px; color: #94A3B8; display: flex; flex-direction: column; align-items: flex-end; }
-        .patient-box { background: #F8FAFC; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #E2E8F0; display: flex; justify-content: space-between; font-size: 13px; }
-        .patient-box div { margin-bottom: 4px; }
-        .section-title { font-size: 15px; font-weight: bold; color: #0F172A; margin-top: 22px; margin-bottom: 8px; border-right: 4px solid #0284C7; padding-right: 8px; }
-        .diagnosis-box { background: #FFFFFF; padding: 12px; border: 1px solid #CBD5E1; border-radius: 8px; font-size: 14px; font-weight: bold; min-height: 40px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 13px; }
-        th { background-color: #F1F5F9; color: #1E293B; border: 1px solid #CBD5E1; padding: 8px; text-align: right; }
-        .footer { margin-top: 45px; padding-top: 15px; display: flex; justify-content: space-between; align-items: flex-end; page-break-inside: avoid; }
-        .qr-section { text-align: center; }
-        .qr-section p { font-size: 9px; color: #94A3B8; margin-top: 4px; }
-        .signatures { display: flex; gap: 40px; text-align: center; }
-        .sig-box { width: 140px; border-top: 1px dashed #94A3B8; padding-top: 5px; font-size: 12px; font-weight: bold; color: #334155; }
-
-        /* شريط زر الطباعة المباشر بداخل الشاشة */
-        .print-bar {
-          position: fixed;
-          bottom: 20px;
-          left: 50%;
-          transform: translateX(-50%);
-          background: #0F172A;
-          padding: 12px 24px;
-          border-radius: 50px;
-          box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+        .header {
           display: flex;
-          gap: 15px;
+          justify-content: space-between;
           align-items: center;
-          z-index: 9999;
+          border-bottom: 2px solid #0284C7;
+          padding-bottom: 12px;
+          margin-bottom: 15px;
         }
-
-        .btn-print {
-          background: #059669;
-          color: white;
-          border: none;
-          padding: 10px 20px;
-          border-radius: 30px;
-          font-weight: bold;
-          font-size: 14px;
-          cursor: pointer;
+        .clinic-info { text-align: right; }
+        .clinic-name { font-size: 18px; font-weight: bold; color: #0284C7; }
+        .doctor-name { font-size: 14px; font-weight: bold; color: #1E293B; margin-top: 3px; }
+        .specialty { font-size: 11px; color: #64748B; }
+        
+        .patient-box {
+          background-color: #F8FAFC;
+          border: 1px solid #E2E8F0;
+          border-radius: 6px;
+          padding: 10px 12px;
+          margin-bottom: 15px;
           display: flex;
+          justify-content: space-between;
           align-items: center;
-          gap: 8px;
         }
-
-        .btn-close {
-          background: #475569;
-          color: white;
-          border: none;
-          padding: 10px 18px;
-          border-radius: 30px;
+        .patient-detail { font-size: 12px; color: #334155; }
+        
+        .section-title {
           font-size: 13px;
-          cursor: pointer;
+          font-weight: bold;
+          color: #0284C7;
+          border-right: 4px solid #0284C7;
+          padding-right: 8px;
+          margin-top: 12px;
+          margin-bottom: 8px;
+        }
+        
+        .diagnosis-box {
+          background-color: #F0F9FF;
+          border: 1px solid #BAE6FD;
+          border-radius: 6px;
+          padding: 8px 12px;
+          font-size: 12px;
+          font-weight: bold;
+          color: #0369A1;
+          margin-bottom: 12px;
+        }
+        
+        table {
+          width: 100%;
+          border-collapse: collapse;
+          margin-top: 6px;
+          margin-bottom: 20px;
+          table-layout: fixed;
+        }
+        th {
+          background-color: #F1F5F9;
+          color: #475569;
+          font-size: 11px;
+          padding: 8px;
+          text-align: right;
+          border-bottom: 2px solid #CBD5E1;
+        }
+        
+        .footer {
+          margin-top: 30px;
+          padding-top: 12px;
+          border-top: 1px solid #E2E8F0;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          font-size: 10px;
+          color: #94A3B8;
+        }
+        .qr-placeholder {
+          font-size: 10px;
+          color: #0284C7;
+          font-weight: bold;
+          border: 1px dashed #0284C7;
+          padding: 4px 8px;
+          border-radius: 4px;
         }
       </style>
     </head>
     <body>
-
-      <!-- شريط الطباعة العائم بداخل النافذة -->
-      <div class="print-bar">
-        <button class="btn-print" onclick="window.print()">🖨️ طباعة الروشتة الآن / PDF</button>
-        <button class="btn-close" onclick="window.close()">إغلاق ✕</button>
+      <!-- Header / بيانات العيادة واللوجو -->
+      <div class="header">
+        <div class="clinic-info">
+          <div class="clinic-name">${clinicInfo.clinicName || 'عيادة MedVerse التخصصية'}</div>
+          <div class="doctor-name">${clinicInfo.doctorName || 'د. أحمد محمد'}</div>
+          <div class="specialty">${clinicInfo.specialty || ''}</div>
+        </div>
+        ${clinicInfo.logoUrl ? `<img src="${clinicInfo.logoUrl}" style="height: 50px; width: auto; max-width: 120px;" />` : ''}
       </div>
 
-      <div class="clinic-header">
-        <div class="clinic-brand">
-          ${clinicInfo.logoUrl ? `<img src="${clinicInfo.logoUrl}" class="clinic-logo" alt="Logo" />` : ''}
-          <div class="clinic-info">
-            <h1>${clinicInfo.doctorName || 'د. أحمد محمد'}</h1>
-            <h2>${clinicInfo.clinicName || 'عيادة MedVerse التخصصية'}</h2>
-            <p>${clinicInfo.specialty || 'استشاري الطب الباطني والتشخيص الذكي'}</p>
-          </div>
-        </div>
-        <div class="software-watermark">
-          <span>Powered by</span>
-          <strong style="color: #0284C7;">MedVerse Smart EMR Suite</strong>
-        </div>
-      </div>
-
+      <!-- كارت بيانات المريض -->
       <div class="patient-box">
         <div>
-          <div><strong>اسم المريض:</strong> ${patientData.name || '---'}</div>
-          <div><strong>رقم الهاتف:</strong> ${patientData.phone || 'غير مسجل'}</div>
+          <span class="patient-detail"><strong>اسم المريض:</strong> ${patient.name || ''}</span>
+          ${patient.phone ? `<span class="patient-detail" style="margin-right: 12px;">| <strong>الهاتف:</strong> ${patient.phone}</span>` : ''}
         </div>
-        <div style="text-align: left;">
-          <div><strong>Patient ID:</strong> ${patientData.code || '---'}</div>
-          <div><strong>التاريخ:</strong> ${currentDate}</div>
+        <div>
+          <span class="patient-detail"><strong>Patient ID:</strong> ${patient.code || ''}</span>
+          <span class="patient-detail" style="margin-right: 12px;">| <strong>التاريخ:</strong> ${currentDate}</span>
         </div>
       </div>
 
+      <!-- تفاصيل الفحوصات والتقرير المخصص -->
+      <div class="section-title">تفاصيل الفحوصات والتقرير المخصص</div>
+      <div style="background-color: #FAF5FF; border: 1px solid #F3E8FF; padding: 10px; border-radius: 6px; margin-bottom: 12px;">
+        ${detailsRows}
+      </div>
+
+      <!-- التشخيص المعتمد -->
       <div class="section-title">التشخيص (Diagnosis)</div>
       <div class="diagnosis-box">
-        ${diagnosis || 'لم يتم تدوين تشخيص.'}
+        🩺 ${diagnosis || 'لم يتم تحديد تشخيص'}
       </div>
 
-      ${medications.length > 0 ? `
-        <div class="section-title">الخطة العلاجية والروشتة (Rx)</div>
-        <table>
-          <thead>
-            <tr>
-              <th style="width: 40%;">اسم الدواء (Drug Name)</th>
-              <th style="width: 30%;">الجرعة (Dose)</th>
-              <th style="width: 30%;">دواعي الاستعمال (Notes)</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${medsRows}
-          </tbody>
-        </table>
-      ` : ''}
+      <!-- الخطة العلاجية والروشتة -->
+      <div class="section-title">الخطة العلاجية والروشتة (Rx)</div>
+      <table>
+        <thead>
+          <tr>
+            <th style="width: 35%;">اسم الدواء (Drug Name)</th>
+            <th style="width: 30%;">الجرعة (Dose)</th>
+            <th style="width: 35%;">دواعي الاستعمال / ملاحظات</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${medsRows}
+        </tbody>
+      </table>
 
-      ${dynamicRows ? `
-        <div class="section-title">تفاصيل الفحوصات والتقرير المخصص</div>
-        <table style="border: none;">
-          <tbody>
-            ${dynamicRows}
-          </tbody>
-        </table>
-      ` : ''}
-
+      <!-- Footer / التوقيع والاعتماد الإلكتروني -->
       <div class="footer">
-        <div class="qr-section">
-          <img src="${qrCodeUrl}" alt="QR Code" />
-          <p>رمز تحقق إلكتروني معتمد</p>
+        <div>
+          <span>Powered by <strong>MedVerse Smart EMR Suite</strong></span>
         </div>
-        <div class="signatures">
-          <div class="sig-box">توقيع: ${clinicInfo.doctorName || 'الطبيب المعالج'}</div>
-          <div class="sig-box">ختم العيادة</div>
+        <div class="qr-placeholder">
+          🔒 رمز تحقق إلكتروني معتمد: VERIFY-${patient.code || ''}
+        </div>
+        <div style="text-align: left;">
+          <div style="font-size: 11px; font-weight: bold; color: #334155;">توقيع الطبيب</div>
+          <div style="font-size: 10px; color: #64748B;">${clinicInfo.doctorName || ''}</div>
         </div>
       </div>
-
     </body>
     </html>
   `;
 
   try {
-    if (Platform.OS === 'web') {
-      const printWindow = window.open('', '_blank');
-      if (printWindow) {
-        printWindow.document.write(htmlContent);
-        printWindow.document.close();
-        printWindow.focus();
-      }
-    } else {
-      const Print = require('expo-print');
-      const Sharing = require('expo-sharing');
-      const { uri } = await Print.printToFileAsync({ html: htmlContent });
-      await Sharing.shareAsync(uri);
-    }
+    const { uri } = await Print.printToFileAsync({ html: htmlContent });
+    await Sharing.shareAsync(uri);
   } catch (error) {
-    console.error('خطأ في إنتاج ملف الـ PDF:', error);
+    console.error("PDF Generation Error:", error);
+    alert("حدث خطأ أثناء إنشاء الروشتة PDF: " + error.message);
   }
 };
  
