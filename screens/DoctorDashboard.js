@@ -1,11 +1,10 @@
 import React, { useState } from 'react';
-import { StyleSheet, Text, View, TextInput, ScrollView, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
+import { StyleSheet, Text, View, TextInput, ScrollView, TouchableOpacity, Alert, ActivityIndicator, Platform } from 'react-native';
 import { generatePrescriptionPDF } from '../components/PDFGenerator';
 import { supabase } from '../supabaseClient';
 
-const GROQ_API_KEY = "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";
+const GROQ_API_KEY = process.env.EXPO_PUBLIC_GROQ_API_KEY || "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";
 
-// دالة لتنظيف النصوص من أي رموز غير معالجة
 const sanitizeText = (str) => {
   if (!str || typeof str !== 'string') return str;
   return str.replace(/[^\u0600-\u06FF a-zA-Z0-9.,()\-\:\/]/g, '').trim();
@@ -42,7 +41,14 @@ export default function DoctorDashboard() {
   const [patientHistory, setPatientHistory] = useState([]);
   const [searchingHistory, setSearchingHistory] = useState(false);
 
-  // دالة ملء البيانات التجريبية للاختبار السريع
+  const showAlert = (title, message) => {
+    if (Platform.OS === 'web') {
+      window.alert(`${title}\n${message}`);
+    } else {
+      Alert.alert(title, message);
+    }
+  };
+
   const handleFillDummyData = () => {
     const dummyName = 'أحمد محمود السيد';
     setPatientName(dummyName);
@@ -58,7 +64,7 @@ export default function DoctorDashboard() {
 
   const handleClinicalAnalysis = async () => {
     if (!symptomsInput.trim()) {
-      alert('يرجى كتابة الأعراض والشكوى الحالية للمريض أولاً.');
+      showAlert('تنبيه', 'يرجى كتابة الأعراض والشكوى الحالية للمريض أولاً.');
       return;
     }
 
@@ -131,7 +137,7 @@ JSON Structure Required:
 
     } catch (error) {
       console.error("Groq API Error:", error);
-      alert('خطأ الاتصال: ' + error.message);
+      showAlert('خطأ الاتصال', error.message);
     } finally {
       setAnalyzing(false);
     }
@@ -139,7 +145,7 @@ JSON Structure Required:
 
   const handleCheckAndAddManualMed = async () => {
     if (!newMedName.trim() || !newMedDose.trim()) {
-      alert('أدخل اسم الدواء والجرعة على الأقل.');
+      showAlert('تنبيه', 'أدخل اسم الدواء والجرعة على الأقل.');
       return;
     }
 
@@ -203,7 +209,6 @@ Return JSON ONLY:
     setPrescribedMeds(prev => prev.filter((_, i) => i !== index));
   };
 
-  // البحث في التاريخ المرضي
   const fetchPatientHistory = async (name) => {
     if (!name || name.trim().length < 3) {
       setPatientHistory([]);
@@ -234,7 +239,6 @@ Return JSON ONLY:
     }
   };
 
-  // دالة تنفيذ عملية الحفظ في السحابة وتوليد الـ PDF
   const executeSaveAndPrint = async () => {
     setLoading(true);
     const generatedCode = 'PAT-' + Math.floor(10000 + Math.random() * 90000);
@@ -319,51 +323,39 @@ Return JSON ONLY:
         if (recErr) throw new Error('خطأ في حفظ السجل الطبي: ' + recErr.message);
       }
 
-      Alert.alert(
-        "نجاح الحفظ السحابي ✅",
-        `تم حفظ التقرير والسجل الطبي بنجاح في السحابة!\nكود المريض: [${patientRealCode}]`,
-        [
-          {
-            text: "حسناً، الانتقال للطباعة 🖨️",
-            onPress: async () => {
-              await generatePrescriptionPDF(
-                { name: patientName, phone: patientPhone, code: patientRealCode },
-                finalDiagnosis,
-                {
-                  'السن والنوع': `${age || 'غير محدد'} سنة (${gender})`,
-                  'الأمراض المزمنة': chronicDiseases || 'لا يوجد',
-                  'ملاحظات الفحوصات والأشعة': doctorNotes || 'لا يوجد'
-                },
-                prescribedMeds,
-                {
-                  doctorName: clinicDoctorName,
-                  clinicName: clinicName,
-                  specialty: specialty,
-                  logoUrl: clinicLogoUrl
-                }
-              );
+      showAlert("نجاح الحفظ السحابي ✅", `تم حفظ التقرير والسجل الطبي بنجاح!\nكود المريض: [${patientRealCode}]`);
 
-              setPatientName('');
-              setPatientPhone('');
-              setAge('');
-              setChronicDiseases('');
-              setFamilyHistory('');
-              setSymptomsInput('');
-              setDoctorNotes('');
-              setFinalDiagnosis('');
-              setPrescribedMeds([]);
-              setAiReport(null);
-            }
-          }
-        ]
+      await generatePrescriptionPDF(
+        { name: patientName, phone: patientPhone, code: patientRealCode },
+        finalDiagnosis,
+        {
+          'السن والنوع': `${age || 'غير محدد'} سنة (${gender})`,
+          'الأمراض المزمنة': chronicDiseases || 'لا يوجد',
+          'ملاحظات الفحوصات والأشعة': doctorNotes || 'لا يوجد'
+        },
+        prescribedMeds,
+        {
+          doctorName: clinicDoctorName,
+          clinicName: clinicName,
+          specialty: specialty,
+          logoUrl: clinicLogoUrl
+        }
       );
+
+      setPatientName('');
+      setPatientPhone('');
+      setAge('');
+      setChronicDiseases('');
+      setFamilyHistory('');
+      setSymptomsInput('');
+      setDoctorNotes('');
+      setFinalDiagnosis('');
+      setPrescribedMeds([]);
+      setAiReport(null);
 
     } catch (error) {
       console.error('Detailed Save Error:', error);
-      Alert.alert(
-        "خطأ في الحفظ السحابي ❌",
-        `فشل حفظ التقرير في السحابة ولم يتم الانتقال للطباعة:\n${error.message || error}`
-      );
+      showAlert("خطأ في الحفظ السحابي ❌", `فشل حفظ التقرير في السحابة:\n${error.message || error}`);
     } finally {
       setLoading(false);
     }
@@ -371,30 +363,25 @@ Return JSON ONLY:
 
   const handleSaveAndPrint = () => {
     if (!patientName.trim()) {
-      alert('تنبيه هام: يرجى إدخال اسم المريض بالكامل أولاً قبل الاعتماد والطباعة.');
+      showAlert('تنبيه هام', 'يرجى إدخال اسم المريض بالكامل أولاً قبل الاعتماد والطباعة.');
       return;
     }
 
-    Alert.alert(
-      "تأكيد اعتماد التقرير",
-      "هل أنت متأكد من اعتماد هذا التقرير وحفظه في السحابة أولاً؟",
-      [
-        {
-          text: "إلغاء",
-          style: "cancel",
-          onPress: () => {
-            console.log("تم إلغاء عملية الاعتماد من الطبيب.");
-          }
-        },
-        {
-          text: "نعم، اعتمد واحفظ",
-          onPress: () => {
-            executeSaveAndPrint();
-          }
-        }
-      ],
-      { cancelable: true }
-    );
+    if (Platform.OS === 'web') {
+      if (window.confirm("هل أنت متأكد من اعتماد هذا التقرير وحفظه في السحابة أولاً؟")) {
+        executeSaveAndPrint();
+      }
+    } else {
+      Alert.alert(
+        "تأكيد اعتماد التقرير",
+        "هل أنت متأكد من اعتماد هذا التقرير وحفظه في السحابة أولاً؟",
+        [
+          { text: "إلغاء", style: "cancel" },
+          { text: "نعم، اعتمد واحفظ", onPress: () => executeSaveAndPrint() }
+        ],
+        { cancelable: true }
+      );
+    }
   };
 
   return (
@@ -607,3 +594,4 @@ const styles = StyleSheet.create({
   historyDate: { fontSize: 10, color: '#38BDF8', fontWeight: 'bold', textAlign: 'right' },
   historyDiagnosis: { fontSize: 11, color: '#CBD5E1', textAlign: 'right' }
 });
+ 
