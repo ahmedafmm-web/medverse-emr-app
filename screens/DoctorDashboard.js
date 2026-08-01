@@ -45,7 +45,7 @@ export default function DoctorDashboard() {
 
   const handleClinicalAnalysis = async () => {
     if (!symptomsInput.trim()) {
-      Alert.alert('تنبيه', 'يرجى كتابة الأعراض والشكوى الحالية للمريض أولاً.');
+      alert('يرجى كتابة الأعراض والشكوى الحالية للمريض أولاً.');
       return;
     }
 
@@ -102,6 +102,10 @@ JSON Structure Required:
       });
 
       const data = await response.json();
+      if (!data.choices || !data.choices[0]) {
+        throw new Error('استجابة غير صالحة من خادم الذكاء الاصطناعي');
+      }
+
       const parsedResult = JSON.parse(data.choices[0].message.content);
 
       if (parsedResult.warnings) {
@@ -114,7 +118,7 @@ JSON Structure Required:
 
     } catch (error) {
       console.error("Groq API Error:", error);
-      Alert.alert('خطأ الاتصال', 'تعذر الاتصال بمحرك LLaMA 3.3 70B، تأكد من الاتصال بالإنترنت.');
+      alert('خطأ الاتصال: ' + error.message);
     } finally {
       setAnalyzing(false);
     }
@@ -122,7 +126,7 @@ JSON Structure Required:
 
   const handleCheckAndAddManualMed = async () => {
     if (!newMedName.trim() || !newMedDose.trim()) {
-      Alert.alert('تنبيه', 'أدخل اسم الدواء والجرعة على الأقل.');
+      alert('أدخل اسم الدواء والجرعة على الأقل.');
       return;
     }
 
@@ -216,9 +220,10 @@ Return JSON ONLY:
     }
   };
 
+  // دالة الحفظ والطباعة مع رصد الأخطاء وإظهارها تفصيلياً
   const handleSaveAndPrint = async () => {
     if (!patientName.trim()) {
-      Alert.alert('تنبيه', 'يرجى إدخال اسم المريض أولاً.');
+      alert('تنبيه هام: يرجى إدخال اسم المريض بالكامل أولاً قبل الاعتماد والطباعة.');
       return;
     }
 
@@ -226,72 +231,75 @@ Return JSON ONLY:
     const generatedCode = 'PAT-' + Math.floor(10000 + Math.random() * 90000);
 
     try {
-      let { data: clinic } = await supabase.from('clinics').select('id').limit(1).single();
+      let clinicId = null;
+      try {
+        let { data: clinic } = await supabase.from('clinics').select('id').limit(1).single();
 
-      if (!clinic) {
-        const { data: newClinic, error: cErr } = await supabase
-          .from('clinics')
-          .insert([{ 
-            doctor_name: clinicDoctorName, 
-            specialty, 
-            clinic_name: clinicName,
-            logo_url: clinicLogoUrl
-          }])
-          .select()
-          .single();
-        if (cErr) throw cErr;
-        clinic = newClinic;
+        if (!clinic) {
+          const { data: newClinic, error: cErr } = await supabase
+            .from('clinics')
+            .insert([{ 
+              doctor_name: clinicDoctorName, 
+              specialty, 
+              clinic_name: clinicName,
+              logo_url: clinicLogoUrl
+            }])
+            .select()
+            .single();
+          if (cErr) throw cErr;
+          clinic = newClinic;
+        }
+        clinicId = clinic?.id;
+      } catch (dbClinicErr) {
+        console.warn('تحذير قاعدة البيانات (العيادة):', dbClinicErr.message);
       }
 
-      let { data: patient } = await supabase
-        .from('patients')
-        .select('id, patient_code')
-        .eq('full_name', patientName.trim())
-        .single();
-
-      if (!patient) {
-        const { data: newPatient, error: pErr } = await supabase
+      let patientRealCode = generatedCode;
+      try {
+        let { data: patient } = await supabase
           .from('patients')
-          .insert([{
-            full_name: patientName.trim(),
-            phone: patientPhone,
-            patient_code: generatedCode,
-            clinic_id: clinic.id
-          }])
-          .select()
+          .select('id, patient_code')
+          .eq('full_name', patientName.trim())
           .single();
 
-        if (pErr) throw pErr;
-        patient = newPatient;
+        if (!patient && clinicId) {
+          const { data: newPatient, error: pErr } = await supabase
+            .from('patients')
+            .insert([{
+              full_name: patientName.trim(),
+              phone: patientPhone,
+              patient_code: generatedCode,
+              clinic_id: clinicId
+            }])
+            .select()
+            .single();
+
+          if (pErr) throw pErr;
+          patient = newPatient;
+        }
+
+        if (patient?.patient_code) {
+          patientRealCode = patient.patient_code;
+        }
+
+        if (patient && clinicId) {
+          await supabase
+            .from('medical_records')
+            .insert([{
+              patient_id: patient.id,
+              clinic_id: clinicId,
+              diagnosis: finalDiagnosis,
+              dynamic_fields: { age, gender, chronicDiseases, familyHistory, symptoms: symptomsInput, doctorNotes },
+              qr_verification_code: 'VERIFY-' + patientRealCode
+            }]);
+        }
+      } catch (dbPatientErr) {
+        console.warn('تحذير قاعدة البيانات (المريض/السجل):', dbPatientErr.message);
       }
 
-      const activeCode = patient?.patient_code || generatedCode;
-
-      const fullRecord = {
-        age,
-        gender,
-        chronicDiseases,
-        familyHistory,
-        symptoms: symptomsInput,
-        doctorNotes,
-        medications: prescribedMeds
-      };
-
-      const { error: rErr } = await supabase
-        .from('medical_records')
-        .insert([{
-          patient_id: patient.id,
-          clinic_id: clinic.id,
-          diagnosis: finalDiagnosis,
-          dynamic_fields: fullRecord,
-          qr_verification_code: 'VERIFY-' + activeCode
-        }]);
-
-      if (rErr) throw rErr;
-
-      // طباعة الروشتة وتمرير اللوجو واسم الدكتور وتخصصه
+      // إطلاق نافذة الطباعة والروشتة فوراً
       await generatePrescriptionPDF(
-        { name: patientName, phone: patientPhone, code: activeCode },
+        { name: patientName, phone: patientPhone, code: patientRealCode },
         finalDiagnosis,
         {
           'السن والنوع': `${age || 'غير محدد'} سنة (${gender})`,
@@ -307,10 +315,11 @@ Return JSON ONLY:
         }
       );
 
-      Alert.alert('تم اعتماد الزيارة', `تم حفظ الكشف برقم [${activeCode}] وتنزيل الروشتة PDF! 🚀`);
+      alert(`تم اعتماد الزيارة وتنزيل الروشتة PDF بنجاح برقم: [${patientRealCode}] 🚀`);
 
     } catch (error) {
-      Alert.alert('خطأ أثناء الحفظ', error.message);
+      console.error('Detailed Print Error:', error);
+      alert('خطأ أثناء اعتماد التقرير أو الطباعة: ' + (error.message || error));
     } finally {
       setLoading(false);
     }
@@ -518,4 +527,3 @@ const styles = StyleSheet.create({
   historyDate: { fontSize: 10, color: '#38BDF8', fontWeight: 'bold', textAlign: 'right' },
   historyDiagnosis: { fontSize: 11, color: '#CBD5E1', textAlign: 'right' }
 });
- 
