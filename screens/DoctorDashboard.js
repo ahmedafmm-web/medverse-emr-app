@@ -221,7 +221,7 @@ Return JSON ONLY:
     }
   };
 
-  // دالة الحفظ المحدثة المتوافقية مع جداول Supabase
+  // دالة الحفظ والطباعة المعدلة لضمان التنفيذ وعدم المعالجة المعلقة
   const handleSaveAndPrint = async () => {
     if (!patientName.trim()) {
       alert('تنبيه هام: يرجى إدخال اسم المريض بالكامل أولاً قبل الاعتماد والطباعة.');
@@ -232,68 +232,65 @@ Return JSON ONLY:
     const generatedCode = 'PAT-' + Math.floor(10000 + Math.random() * 90000);
 
     try {
-      // 1️⃣ التعامل مع جدول العيادات (clinics)
+      // 1️⃣ إحضار أو إنشاء العيادة باستخدام maybeSingle لمنع توقف الكود
       let clinicId = null;
-      try {
-        let { data: clinic } = await supabase.from('clinics').select('id').limit(1).single();
+      const { data: existingClinic } = await supabase
+        .from('clinics')
+        .select('id')
+        .limit(1)
+        .maybeSingle();
 
-        if (!clinic) {
-          const { data: newClinic, error: cErr } = await supabase
-            .from('clinics')
-            .insert([{ 
-              doctor_name: clinicDoctorName, 
-              specialty: specialty, 
-              clinic_name: clinicName
-            }])
-            .select()
-            .single();
+      if (existingClinic) {
+        clinicId = existingClinic.id;
+      } else {
+        const { data: newClinic, error: cErr } = await supabase
+          .from('clinics')
+          .insert([{ 
+            doctor_name: clinicDoctorName, 
+            specialty: specialty, 
+            clinic_name: clinicName,
+            logo_url: clinicLogoUrl
+          }])
+          .select('id')
+          .single();
 
-          if (cErr) console.error('Clinic Insert Error:', cErr);
-          clinic = newClinic;
-        }
-        clinicId = clinic?.id;
-      } catch (dbClinicErr) {
-        console.warn('DB Clinic Warning:', dbClinicErr);
+        if (cErr) throw new Error('خطأ في حفظ بيانات العيادة: ' + cErr.message);
+        clinicId = newClinic?.id;
       }
 
-      // 2️⃣ التعامل مع جدول المرضى (patients)
+      // 2️⃣ إحضار أو إنشاء المريض باستخدام maybeSingle
       let patientRealId = null;
       let patientRealCode = generatedCode;
 
-      try {
-        let { data: patient } = await supabase
+      const { data: existingPatient } = await supabase
+        .from('patients')
+        .select('id, patient_code')
+        .eq('full_name', patientName.trim())
+        .maybeSingle();
+
+      if (existingPatient) {
+        patientRealId = existingPatient.id;
+        patientRealCode = existingPatient.patient_code;
+      } else {
+        const { data: newPatient, error: pErr } = await supabase
           .from('patients')
+          .insert([{
+            full_name: patientName.trim(),
+            phone: patientPhone || null,
+            age: age ? parseInt(age) : null,
+            gender: gender,
+            patient_code: generatedCode,
+            clinic_id: clinicId
+          }])
           .select('id, patient_code')
-          .eq('full_name', patientName.trim())
           .single();
 
-        if (!patient) {
-          const { data: newPatient, error: pErr } = await supabase
-            .from('patients')
-            .insert([{
-              full_name: patientName.trim(),
-              phone: patientPhone,
-              age: age ? parseInt(age) : null,
-              gender: gender,
-              patient_code: generatedCode,
-              clinic_id: clinicId
-            }])
-            .select()
-            .single();
-
-          if (pErr) console.error('Patient Insert Error:', pErr);
-          patient = newPatient;
-        }
-
-        if (patient) {
-          patientRealId = patient.id;
-          patientRealCode = patient.patient_code;
-        }
-      } catch (dbPatientErr) {
-        console.warn('DB Patient Warning:', dbPatientErr);
+        if (pErr) throw new Error('خطأ في حفظ بيانات المريض: ' + pErr.message);
+        patientRealId = newPatient?.id;
+        patientRealCode = newPatient?.patient_code || generatedCode;
       }
 
-      // 3️⃣ حفظ السجل في جدول السجلات الطبية (medical_records)
+      // 3️⃣ حفظ السجل الطبي في جدول medical_records
       if (patientRealId) {
         const { error: recErr } = await supabase
           .from('medical_records')
@@ -302,13 +299,21 @@ Return JSON ONLY:
             clinic_id: clinicId,
             visit_date: new Date().toISOString().split('T')[0],
             diagnosis: finalDiagnosis,
-            prescriptions: prescribedMeds
+            prescriptions: prescribedMeds,
+            dynamic_fields: { 
+              age, 
+              gender, 
+              chronicDiseases, 
+              familyHistory, 
+              symptoms: symptomsInput, 
+              doctorNotes 
+            }
           }]);
 
-        if (recErr) console.error('Record Insert Error:', recErr);
+        if (recErr) throw new Error('خطأ في حفظ السجل الطبي: ' + recErr.message);
       }
 
-      // 4️⃣ استدعاء دالة توليد وفتح الروشتة PDF
+      // 4️⃣ توليد وفتح الروشتة PDF
       await generatePrescriptionPDF(
         { name: patientName, phone: patientPhone, code: patientRealCode },
         finalDiagnosis,
@@ -326,11 +331,23 @@ Return JSON ONLY:
         }
       );
 
-      alert(`تم اعتماد الزيارة وتنزيل الروشتة PDF وحفظ البيانات سحابياً بنجاح! كود المريض: [${patientRealCode}] 🚀`);
+      // 5️⃣ إظهار رسالة النجاح وتنظيف المدخلات
+      alert(`✅ تم الحفظ سحابياً واعتمدت الزيارة بنجاح!\nكود المريض للطلب: [${patientRealCode}]`);
+
+      setPatientName('');
+      setPatientPhone('');
+      setAge('');
+      setChronicDiseases('');
+      setFamilyHistory('');
+      setSymptomsInput('');
+      setDoctorNotes('');
+      setFinalDiagnosis('');
+      setPrescribedMeds([]);
+      setAiReport(null);
 
     } catch (error) {
-      console.error('Detailed Save & Print Error:', error);
-      alert('خطأ أثناء اعتماد التقرير أو الطباعة: ' + (error.message || error));
+      console.error('Detailed Save Error:', error);
+      alert('❌ تعذر الحفظ: ' + (error.message || error));
     } finally {
       setLoading(false);
     }
