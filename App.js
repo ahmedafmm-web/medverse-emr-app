@@ -4,11 +4,9 @@ import DoctorDashboard from './screens/DoctorDashboard';
 import PatientPortal from './screens/PatientPortal';
 
 export default function App() {
-  // الحالات: 'landing' (المدخل) | 'specialty' (تخصص الطبيب) | 'doctor' (لوحة الطبيب) | 'patient' (بوابة المريض)
   const [currentStep, setCurrentStep] = useState('landing');
   const [selectedSpecialty, setSelectedSpecialty] = useState('');
 
-  // قائمة التخصصات الطبية
   const specialties = [
     { id: 'internal', name: '🩺 الطب الباطني والأمراض المزمنة' },
     { id: 'pediatrics', name: '👶 طب الأطفال وحديثي الولادة' },
@@ -19,7 +17,7 @@ export default function App() {
   ];
 
   const handleSpecialtySelect = (specialtyName) => {
-    setSelectedSpecialty(specialtyName);
+    setSelectedSpecialty(specialtyName || '');
     setCurrentStep('doctor');
   };
 
@@ -27,10 +25,15 @@ export default function App() {
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#0F172A" />
 
-      {/* شريط علوي صغير للرجوع للرئيسية */}
       {currentStep !== 'landing' && (
         <View style={styles.topBar}>
-          <TouchableOpacity style={styles.backButton} onPress={() => setCurrentStep('landing')}>
+          <TouchableOpacity 
+            style={styles.backButton} 
+            onPress={() => {
+              setSelectedSpecialty('');
+              setCurrentStep('landing');
+            }}
+          >
             <Text style={styles.backButtonText}>🏠 القائمة الرئيسية / تغيير البوابة</Text>
           </TouchableOpacity>
           {selectedSpecialty !== '' && currentStep === 'doctor' && (
@@ -39,7 +42,6 @@ export default function App() {
         </View>
       )}
 
-      {/* 1. شاشة الاختيار الرئيسية (Landing Page) */}
       {currentStep === 'landing' && (
         <ScrollView contentContainerStyle={styles.landingContainer}>
           <Text style={styles.mainTitle}>MedVerse EMR Suite</Text>
@@ -47,7 +49,6 @@ export default function App() {
           <Text style={styles.selectPrompt}>الرجاء اختيار البوابة لدخول النظام:</Text>
 
           <View style={styles.portalCardsContainer}>
-            {/* كارت بوابة الطبيب */}
             <TouchableOpacity 
               style={[styles.portalCard, styles.doctorCard]} 
               onPress={() => setCurrentStep('specialty')}
@@ -57,7 +58,6 @@ export default function App() {
               <Text style={styles.portalDesc}>إدارة المرضى، الاستشارات الإكلينيكية الذكية، وإصدار الروشتات</Text>
             </TouchableOpacity>
 
-            {/* كارت بوابة المريض */}
             <TouchableOpacity 
               style={[styles.portalCard, styles.patientCard]} 
               onPress={() => setCurrentStep('patient')}
@@ -70,7 +70,6 @@ export default function App() {
         </ScrollView>
       )}
 
-      {/* 2. شاشة اختيار التخصص للطبيب */}
       {currentStep === 'specialty' && (
         <ScrollView contentContainerStyle={styles.specialtyContainer}>
           <Text style={styles.sectionTitle}>اختر التخصص الطبي</Text>
@@ -90,14 +89,12 @@ export default function App() {
         </ScrollView>
       )}
 
-      {/* 3. شاشة لوحة الطبيب */}
       {currentStep === 'doctor' && (
         <View style={styles.body}>
           <DoctorDashboard specialty={selectedSpecialty} />
         </View>
       )}
 
-      {/* 4. شاشة بوابة المريض */}
       {currentStep === 'patient' && (
         <View style={styles.body}>
           <PatientPortal onBackToDashboard={() => setCurrentStep('landing')} />
@@ -108,20 +105,11 @@ export default function App() {
 }
 
 const styles = StyleSheet.create({
-  container: { 
-    flex: 1, 
-    backgroundColor: '#0F172A',
-    paddingTop: Platform.OS === 'web' ? 10 : 0 
-  },
+  container: { flex: 1, backgroundColor: '#0F172A', paddingTop: Platform.OS === 'web' ? 0 : 0 },
   topBar: {
-    flexDirection: 'row-reverse',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: '#1E293B',
-    paddingHorizontal: 15,
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#334155'
+    flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center',
+    backgroundColor: '#1E293B', paddingHorizontal: 15, paddingVertical: 10,
+    borderBottomWidth: 1, borderBottomColor: '#334155'
   },
   backButton: { backgroundColor: '#334155', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6 },
   backButtonText: { color: '#38BDF8', fontSize: 13, fontWeight: 'bold' },
@@ -145,3 +133,4 @@ const styles = StyleSheet.create({
   specialtyText: { color: '#F8FAFC', fontSize: 16, fontWeight: 'bold' },
   body: { flex: 1 }
 });
+ 
