@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { StyleSheet, Text, View, TextInput, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { StyleSheet, Text, View, TextInput, ScrollView, TouchableOpacity, ActivityIndicator, Platform } from 'react-native';
 import { supabase } from '../supabaseClient';
 import { generatePrescriptionPDF } from '../components/PDFGenerator';
 
@@ -9,16 +9,22 @@ export default function PatientPortal({ onBackToDashboard }) {
   const [patientData, setPatientData] = useState(null);
   const [medicalRecords, setMedicalRecords] = useState([]);
 
-  // 🔍 استعلام عن بيانات وسجلات المريض
+  const showAlert = (title, message) => {
+    if (Platform.OS === 'web') {
+      window.alert(`${title}\n${message}`);
+    } else {
+      alert(`${title}: ${message}`);
+    }
+  };
+
   const handleFetchRecords = async () => {
     if (!patientCode.trim()) {
-      alert('تنبيه: يرجى إدخال كود المريض الفريد (Patient ID).');
+      showAlert('تنبيه', 'يرجى إدخال كود المريض الفريد (Patient ID).');
       return;
     }
 
     setLoading(true);
     try {
-      // 1️⃣ البحث عن المريض بالـ Patient Code
       const { data: patient, error: pErr } = await supabase
         .from('patients')
         .select('*')
@@ -26,7 +32,7 @@ export default function PatientPortal({ onBackToDashboard }) {
         .single();
 
       if (pErr || !patient) {
-        alert('تنبيه: لم يتم العثور على مريض بهذا الرقم الفريد. تأكد من إدخال الكود بشكل صحيح.');
+        showAlert('تنبيه', 'لم يتم العثور على مريض بهذا الرقم الفريد. تأكد من إدخال الكود بشكل صحيح.');
         setPatientData(null);
         setMedicalRecords([]);
         return;
@@ -34,7 +40,6 @@ export default function PatientPortal({ onBackToDashboard }) {
 
       setPatientData(patient);
 
-      // 2️⃣ جلب السجلات الطبية مع بيانات العيادة المربوطة بها
       const { data: records, error: rErr } = await supabase
         .from('medical_records')
         .select(`
@@ -55,21 +60,17 @@ export default function PatientPortal({ onBackToDashboard }) {
 
     } catch (error) {
       console.error('Fetch Patient Records Error:', error);
-      alert('خطأ في التحميل: ' + (error.message || error));
+      showAlert('خطأ في التحميل', error.message || error);
     } finally {
       setLoading(false);
     }
   };
 
-  // 🖨️ طباعة وإعادة تنزيل الـ PDF للمريض
   const handleDownloadPDF = async (record) => {
     try {
       const fields = record.dynamic_fields || {};
-      
-      // استخراج قائمة الأدوية سواء كانت مسجلة في dynamic_fields أو مباشرة في السجل
-      const medsList = fields.medications || record.medications || [];
+      const medsList = fields.medications || record.prescriptions || record.medications || [];
 
-      // بيانات العيادة المجلوبة من قاعدة البيانات أو بيانات افتراضية
       const clinicInfo = {
         doctorName: record.clinics?.doctor_name || 'د. أحمد محمد',
         clinicName: record.clinics?.clinic_name || 'عيادة MedVerse التخصصية',
@@ -78,8 +79,8 @@ export default function PatientPortal({ onBackToDashboard }) {
       };
 
       await generatePrescriptionPDF(
-        { name: patientData.full_name, phone: patientData.phone, code: patientData.patient_code },
-        record.diagnosis,
+        { name: patientData?.full_name || '', phone: patientData?.phone || '', code: patientData?.patient_code || '' },
+        record.diagnosis || '',
         {
           'السن والنوع': `${fields.age || 'غير محدد'} سنة (${fields.gender || 'غير محدد'})`,
           'الأمراض المزمنة': fields.chronicDiseases || 'لا يوجد',
@@ -90,7 +91,7 @@ export default function PatientPortal({ onBackToDashboard }) {
       );
     } catch (err) {
       console.error('PDF Generation Error:', err);
-      alert('حدث خطأ أثناء إعداد الروشتة للطباعة.');
+      showAlert('خطأ', 'حدث خطأ أثناء إعداد الروشتة للطباعة.');
     }
   };
 
@@ -154,7 +155,7 @@ export default function PatientPortal({ onBackToDashboard }) {
               <View key={item.id || idx} style={styles.recordCard}>
                 <View style={styles.row}>
                   <Text style={styles.recordDate}>
-                    📅 زيارة بتاريخ: {new Date(item.created_at).toLocaleDateString('ar-EG')}
+                    📅 زيارة بتاريخ: {new Date(item.created_at || Date.now()).toLocaleDateString('ar-EG')}
                   </Text>
                   <Text style={styles.verifiedBadge}>✓ معتمد</Text>
                 </View>
