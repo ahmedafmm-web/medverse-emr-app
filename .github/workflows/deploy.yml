@@ -16,13 +16,13 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 20
 
       - name: Install Dependencies
-        run: npm install
+        run: npm install --legacy-peer-deps
 
       - name: Build Expo Web
-        run: npx expo export --platform web
+        run: npx expo export -p web
 
       - name: Add .nojekyll file
         run: touch ./dist/.nojekyll
@@ -32,4 +32,3 @@ jobs:
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./dist
- 
