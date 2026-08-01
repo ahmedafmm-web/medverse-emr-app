@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { StyleSheet, Text, View, TextInput, ScrollView, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
+import { StyleSheet, Text, View, TextInput, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { supabase } from '../supabaseClient';
 import { generatePrescriptionPDF } from '../components/PDFGenerator';
 
@@ -12,12 +12,13 @@ export default function PatientPortal({ onBackToDashboard }) {
   // 🔍 استعلام عن بيانات وسجلات المريض
   const handleFetchRecords = async () => {
     if (!patientCode.trim()) {
-      Alert.alert('تنبيه', 'يرجى إدخال كود المريض الفريد (Patient ID).');
+      alert('تنبيه: يرجى إدخال كود المريض الفريد (Patient ID).');
       return;
     }
 
     setLoading(true);
     try {
+      // 1️⃣ البحث عن المريض بالـ Patient Code
       const { data: patient, error: pErr } = await supabase
         .from('patients')
         .select('*')
@@ -25,7 +26,7 @@ export default function PatientPortal({ onBackToDashboard }) {
         .single();
 
       if (pErr || !patient) {
-        Alert.alert('خطأ', 'لم يتم العثور على مريض بهذا الرقم الفريد.');
+        alert('تنبيه: لم يتم العثور على مريض بهذا الرقم الفريد. تأكد من إدخال الكود بشكل صحيح.');
         setPatientData(null);
         setMedicalRecords([]);
         return;
@@ -33,9 +34,18 @@ export default function PatientPortal({ onBackToDashboard }) {
 
       setPatientData(patient);
 
+      // 2️⃣ جلب السجلات الطبية مع بيانات العيادة المربوطة بها
       const { data: records, error: rErr } = await supabase
         .from('medical_records')
-        .select('*')
+        .select(`
+          *,
+          clinics (
+            doctor_name,
+            clinic_name,
+            specialty,
+            logo_url
+          )
+        `)
         .eq('patient_id', patient.id)
         .order('created_at', { ascending: false });
 
@@ -44,25 +54,44 @@ export default function PatientPortal({ onBackToDashboard }) {
       setMedicalRecords(records || []);
 
     } catch (error) {
-      Alert.alert('خطأ في التحميل', error.message);
+      console.error('Fetch Patient Records Error:', error);
+      alert('خطأ في التحميل: ' + (error.message || error));
     } finally {
       setLoading(false);
     }
   };
 
-  // 🖨️ طباعة وإعادة تنزيل الـ PDF
+  // 🖨️ طباعة وإعادة تنزيل الـ PDF للمريض
   const handleDownloadPDF = async (record) => {
-    const fields = record.dynamic_fields || {};
-    await generatePrescriptionPDF(
-      { name: patientData.full_name, phone: patientData.phone, code: patientData.patient_code },
-      record.diagnosis,
-      {
-        'السن والنوع': `${fields.age || 'غير محدد'} سنة (${fields.gender || 'غير محدد'})`,
-        'الأمراض المزمنة': fields.chronicDiseases || 'لا يوجد',
-        'ملاحظات الفحوصات': fields.doctorNotes || 'لا يوجد'
-      },
-      fields.medications || []
-    );
+    try {
+      const fields = record.dynamic_fields || {};
+      
+      // استخراج قائمة الأدوية سواء كانت مسجلة في dynamic_fields أو مباشرة في السجل
+      const medsList = fields.medications || record.medications || [];
+
+      // بيانات العيادة المجلوبة من قاعدة البيانات أو بيانات افتراضية
+      const clinicInfo = {
+        doctorName: record.clinics?.doctor_name || 'د. أحمد محمد',
+        clinicName: record.clinics?.clinic_name || 'عيادة MedVerse التخصصية',
+        specialty: record.clinics?.specialty || 'استشاري أمراض القلب والباطنة',
+        logoUrl: record.clinics?.logo_url || ''
+      };
+
+      await generatePrescriptionPDF(
+        { name: patientData.full_name, phone: patientData.phone, code: patientData.patient_code },
+        record.diagnosis,
+        {
+          'السن والنوع': `${fields.age || 'غير محدد'} سنة (${fields.gender || 'غير محدد'})`,
+          'الأمراض المزمنة': fields.chronicDiseases || 'لا يوجد',
+          'ملاحظات الفحوصات والأشعة': fields.doctorNotes || 'لا يوجد'
+        },
+        medsList,
+        clinicInfo
+      );
+    } catch (err) {
+      console.error('PDF Generation Error:', err);
+      alert('حدث خطأ أثناء إعداد الروشتة للطباعة.');
+    }
   };
 
   return (
@@ -78,7 +107,7 @@ export default function PatientPortal({ onBackToDashboard }) {
           <Text style={styles.label}>أدخل كود المريض الخاص بك (Patient ID):</Text>
           <TextInput
             style={styles.input}
-            placeholder="مثال: PAT-89210"
+            placeholder="مثال: PAT-65630"
             placeholderTextColor="#94A3B8"
             value={patientCode}
             onChangeText={setPatientCode}
@@ -98,12 +127,12 @@ export default function PatientPortal({ onBackToDashboard }) {
 
           {onBackToDashboard && (
             <TouchableOpacity style={styles.backBtn} onPress={onBackToDashboard}>
-              <Text style={styles.backBtnText}>العودة للوحة التحكم الرئيسية</Text>
+              <Text style={styles.backBtnText}>← العودة للوحة التحكم الرئيسية</Text>
             </TouchableOpacity>
           )}
         </View>
       ) : (
-        <View>
+        <View style={{ marginBottom: 30 }}>
           <View style={styles.patientCard}>
             <View style={styles.row}>
               <Text style={styles.patientName}>👤 {patientData.full_name}</Text>
@@ -124,7 +153,9 @@ export default function PatientPortal({ onBackToDashboard }) {
             medicalRecords.map((item, idx) => (
               <View key={item.id || idx} style={styles.recordCard}>
                 <View style={styles.row}>
-                  <Text style={styles.recordDate}>📅 زيارة بتاريخ: {new Date(item.created_at).toLocaleDateString('ar-EG')}</Text>
+                  <Text style={styles.recordDate}>
+                    📅 زيارة بتاريخ: {new Date(item.created_at).toLocaleDateString('ar-EG')}
+                  </Text>
                   <Text style={styles.verifiedBadge}>✓ معتمد</Text>
                 </View>
 
@@ -137,7 +168,7 @@ export default function PatientPortal({ onBackToDashboard }) {
                   style={styles.downloadPdfBtn}
                   onPress={() => handleDownloadPDF(item)}
                 >
-                  <Text style={styles.downloadPdfBtnText}>🖨️ تنزيل الروشتة المعتمدة (PDF)</Text>
+                  <Text style={styles.downloadPdfBtnText}>🖨️ فتح وتنزيل الروشتة المعتمدة (PDF)</Text>
                 </TouchableOpacity>
               </View>
             ))
@@ -161,8 +192,8 @@ const styles = StyleSheet.create({
   btn: { backgroundColor: '#0284C7', padding: 14, borderRadius: 10, alignItems: 'center' },
   btnDisabled: { opacity: 0.6 },
   btnText: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 14 },
-  backBtn: { marginTop: 15, alignItems: 'center' },
-  backBtnText: { color: '#64748B', fontSize: 12 },
+  backBtn: { marginTop: 18, alignItems: 'center', padding: 6 },
+  backBtnText: { color: '#38BDF8', fontSize: 13, fontWeight: 'bold' },
   patientCard: { backgroundColor: '#1E293B', padding: 16, borderRadius: 12, borderRightWidth: 4, borderRightColor: '#38BDF8', marginBottom: 10 },
   row: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center' },
   patientName: { fontSize: 16, fontWeight: 'bold', color: '#FFFFFF' },
@@ -179,3 +210,4 @@ const styles = StyleSheet.create({
   emptyBox: { padding: 20, alignItems: 'center' },
   emptyText: { color: '#64748B', fontSize: 13 }
 });
+ 
