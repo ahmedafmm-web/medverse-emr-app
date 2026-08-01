@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { StyleSheet, Text, View, TextInput, ScrollView, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
-import DynamicFormBuilder from '../components/DynamicFormBuilder';
 import { generatePrescriptionPDF } from '../components/PDFGenerator';
 import { supabase } from '../supabaseClient';
 
@@ -241,7 +240,6 @@ Return JSON ONLY:
     const generatedCode = 'PAT-' + Math.floor(10000 + Math.random() * 90000);
 
     try {
-      // 1️⃣ إحضار أو إنشاء العيادة باستخدام maybeSingle لمنع توقف الكود
       let clinicId = null;
       const { data: existingClinic } = await supabase
         .from('clinics')
@@ -267,7 +265,6 @@ Return JSON ONLY:
         clinicId = newClinic?.id;
       }
 
-      // 2️⃣ إحضار أو إنشاء المريض باستخدام maybeSingle
       let patientRealId = null;
       let patientRealCode = generatedCode;
 
@@ -299,7 +296,6 @@ Return JSON ONLY:
         patientRealCode = newPatient?.patient_code || generatedCode;
       }
 
-      // 3️⃣ حفظ السجل الطبي في جدول medical_records مع رمز التحقق الإلكتروني
       if (patientRealId) {
         const { error: recErr } = await supabase
           .from('medical_records')
@@ -323,7 +319,6 @@ Return JSON ONLY:
         if (recErr) throw new Error('خطأ في حفظ السجل الطبي: ' + recErr.message);
       }
 
-      // 4️⃣ رسالة نجاح الحفظ السحابي
       Alert.alert(
         "نجاح الحفظ السحابي ✅",
         `تم حفظ التقرير والسجل الطبي بنجاح في السحابة!\nكود المريض: [${patientRealCode}]`,
@@ -331,7 +326,6 @@ Return JSON ONLY:
           {
             text: "حسناً، الانتقال للطباعة 🖨️",
             onPress: async () => {
-              // 5️⃣ توليد وفتح الرووشتة PDF فقط بعد نجاح الحفظ الضمني
               await generatePrescriptionPDF(
                 { name: patientName, phone: patientPhone, code: patientRealCode },
                 finalDiagnosis,
@@ -349,7 +343,6 @@ Return JSON ONLY:
                 }
               );
 
-              // تنظيف المدخلات بعد الطباعة
               setPatientName('');
               setPatientPhone('');
               setAge('');
@@ -376,7 +369,6 @@ Return JSON ONLY:
     }
   };
 
-  // دالة الحفظ والطباعة مع رسالة تأكيد مسبقة
   const handleSaveAndPrint = () => {
     if (!patientName.trim()) {
       alert('تنبيه هام: يرجى إدخال اسم المريض بالكامل أولاً قبل الاعتماد والطباعة.');
@@ -615,4 +607,3 @@ const styles = StyleSheet.create({
   historyDate: { fontSize: 10, color: '#38BDF8', fontWeight: 'bold', textAlign: 'right' },
   historyDiagnosis: { fontSize: 11, color: '#CBD5E1', textAlign: 'right' }
 });
- 
