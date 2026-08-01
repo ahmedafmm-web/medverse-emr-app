@@ -23,6 +23,8 @@ jobs:
 
       - name: Build Expo Web
         run: npx expo export --platform web
+        env:
+          NODE_ENV: production
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v4
