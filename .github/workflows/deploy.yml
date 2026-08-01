@@ -23,10 +23,7 @@ jobs:
 
       - name: Build Expo Web
         run: npx expo export --platform web
-        env:
-          NODE_ENV: production
 
-      # الخطوة السحرية لمنع Jekyll من حجب مجلدات _expo
       - name: Add .nojekyll file
         run: touch ./dist/.nojekyll
 
