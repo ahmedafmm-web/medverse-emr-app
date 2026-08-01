@@ -3,12 +3,13 @@
     "name": "medverse-emr-app",
     "slug": "medverse-emr-app",
     "version": "1.0.0",
+    "experiments": {
+      "tsconfigPaths": true
+    },
     "web": {
       "bundler": "metro",
-      "output": "single"
-    },
-    "experiments": {
-      "baseUrl": "/medverse-emr-app"
+      "output": "single",
+      "publicPath": "/medverse-emr-app"
     }
   }
 }
