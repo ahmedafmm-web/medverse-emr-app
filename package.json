@@ -1,28 +1,26 @@
 {
   "name": "medverse-emr-app",
   "version": "1.0.0",
-  "homepage": "https://ahmedafmm-web.github.io/medverse-emr-app",
   "main": "node_modules/expo/AppEntry.js",
   "scripts": {
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "web": "expo start --web",
-    "build:web": "npx expo export -p web --clear",
-    "deploy": "npx expo export -p web --clear && npx gh-pages -d dist"
+    "web": "expo start --web"
   },
   "dependencies": {
-    "@expo/metro-runtime": "~3.2.3",
-    "@opentelemetry/api": "^1.9.0",
-    "@supabase/supabase-js": "^2.39.0",
     "expo": "~51.0.0",
+    "expo-status-bar": "~1.12.1",
     "react": "18.2.0",
     "react-dom": "18.2.0",
     "react-native": "0.74.5",
-    "react-native-web": "~0.19.10"
+    "react-native-web": "~0.19.10",
+    "expo-print": "~13.0.1",
+    "expo-sharing": "~12.0.1",
+    "@supabase/supabase-js": "^2.39.0"
   },
   "devDependencies": {
-    "gh-pages": "^6.1.1"
+    "@babel/core": "^7.20.0"
   },
   "private": true
 }
