@@ -28,14 +28,16 @@ export const generatePrescriptionPDF = async (patientData, diagnosis, dynamicDat
       <meta charset="utf-8">
       <style>
         body { font-family: 'Helvetica', 'Arial', sans-serif; padding: 20px 40px; color: #0F172A; background-color: #FFFFFF; }
-        .clinic-header { border-bottom: 3px solid #0F172A; padding-bottom: 15px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: flex-start; }
-        .clinic-info h1 { margin: 0; font-size: 26px; font-weight: 900; color: #0F172A; }
-        .clinic-info h2 { margin: 5px 0 0 0; font-size: 17px; font-weight: bold; color: #334155; }
-        .clinic-info p { margin: 5px 0 0 0; font-size: 13px; color: #64748B; }
+        .clinic-header { border-bottom: 3px solid #0F172A; padding-bottom: 15px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
+        .clinic-brand { display: flex; align-items: center; gap: 15px; }
+        .clinic-logo { width: 75px; height: 75px; object-fit: contain; border-radius: 8px; border: 1px solid #E2E8F0; padding: 2px; }
+        .clinic-info h1 { margin: 0; font-size: 24px; font-weight: 900; color: #0F172A; }
+        .clinic-info h2 { margin: 4px 0 0 0; font-size: 16px; font-weight: bold; color: #0284C7; }
+        .clinic-info p { margin: 4px 0 0 0; font-size: 13px; color: #64748B; }
         .software-watermark { text-align: left; font-size: 10px; color: #94A3B8; display: flex; flex-direction: column; align-items: flex-end; }
         .patient-box { background: #F8FAFC; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #E2E8F0; display: flex; justify-content: space-between; font-size: 13px; }
         .patient-box div { margin-bottom: 4px; }
-        .section-title { font-size: 15px; font-weight: bold; color: #0F172A; margin-top: 22px; margin-bottom: 8px; border-right: 4px solid #0F172A; padding-right: 8px; }
+        .section-title { font-size: 15px; font-weight: bold; color: #0F172A; margin-top: 22px; margin-bottom: 8px; border-right: 4px solid #0284C7; padding-right: 8px; }
         .diagnosis-box { background: #FFFFFF; padding: 12px; border: 1px solid #CBD5E1; border-radius: 8px; font-size: 14px; font-weight: bold; min-height: 40px; }
         table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 13px; }
         th { background-color: #F1F5F9; color: #1E293B; border: 1px solid #CBD5E1; padding: 8px; text-align: right; }
@@ -48,10 +50,13 @@ export const generatePrescriptionPDF = async (patientData, diagnosis, dynamicDat
     </head>
     <body>
       <div class="clinic-header">
-        <div class="clinic-info">
-          <h1>${clinicInfo.doctorName || 'د. أحمد محمد'}</h1>
-          <h2>${clinicInfo.clinicName || 'عيادة MedVerse التخصصية'}</h2>
-          <p>${clinicInfo.specialty || 'استشاري الطب الباطني والتشخيص الذكي'}</p>
+        <div class="clinic-brand">
+          ${clinicInfo.logoUrl ? `<img src="${clinicInfo.logoUrl}" class="clinic-logo" alt="Logo" />` : ''}
+          <div class="clinic-info">
+            <h1>${clinicInfo.doctorName || 'د. أحمد محمد'}</h1>
+            <h2>${clinicInfo.clinicName || 'عيادة MedVerse التخصصية'}</h2>
+            <p>${clinicInfo.specialty || 'استشاري الطب الباطني والتشخيص الذكي'}</p>
+          </div>
         </div>
         <div class="software-watermark">
           <span>Powered by</span>
@@ -106,7 +111,7 @@ export const generatePrescriptionPDF = async (patientData, diagnosis, dynamicDat
           <p>رمز تحقق إلكتروني معتمد</p>
         </div>
         <div class="signatures">
-          <div class="sig-box">توقيع الطبيب المعالج</div>
+          <div class="sig-box">توقيع: ${clinicInfo.doctorName || 'الطبيب المعالج'}</div>
           <div class="sig-box">ختم العيادة</div>
         </div>
       </div>
@@ -135,4 +140,4 @@ export const generatePrescriptionPDF = async (patientData, diagnosis, dynamicDat
     console.error('خطأ في إنتاج ملف الـ PDF:', error);
   }
 };
- 
+
