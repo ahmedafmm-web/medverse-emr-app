@@ -23,7 +23,9 @@
     "web": {
       "favicon": "./assets/favicon.png",
       "bundler": "metro",
-      "output": "single",
+      "output": "single"
+    },
+    "experiments": {
       "baseUrl": "/medverse-emr-app"
     }
   }
