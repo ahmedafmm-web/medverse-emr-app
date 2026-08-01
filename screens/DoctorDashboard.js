@@ -6,10 +6,17 @@ import { supabase } from '../supabaseClient';
 
 const GROQ_API_KEY = "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";
 
+// دالة لتنظيف النصوص من أي رموز غير معالجة
+const sanitizeText = (str) => {
+  if (!str || typeof str !== 'string') return str;
+  return str.replace(/[^\u0600-\u06FF a-zA-Z0-9.,()\-\:\/]/g, '').trim();
+};
+
 export default function DoctorDashboard() {
   const [clinicDoctorName, setClinicDoctorName] = useState('د. أحمد محمد');
   const [clinicName, setClinicName] = useState('عيادة MedVerse التخصصية');
   const [specialty, setSpecialty] = useState('استشاري أمراض القلب والباطنة');
+  const [clinicLogoUrl, setClinicLogoUrl] = useState('https://cdn-icons-png.flaticon.com/512/387/387561.png');
 
   const [patientName, setPatientName] = useState('');
   const [patientPhone, setPatientPhone] = useState('');
@@ -97,6 +104,10 @@ JSON Structure Required:
       const data = await response.json();
       const parsedResult = JSON.parse(data.choices[0].message.content);
 
+      if (parsedResult.warnings) {
+        parsedResult.warnings = parsedResult.warnings.map(w => sanitizeText(w));
+      }
+
       setAiReport(parsedResult);
       setFinalDiagnosis(parsedResult.diagnosis || '');
       setPrescribedMeds(parsedResult.medications || []);
@@ -159,7 +170,7 @@ Return JSON ONLY:
         setNewMedDose('');
         setNewMedReason('');
       } else {
-        setMedCheckError(parsed.reason || 'قد يتعارض هذا الدواء مع الحالة الحالية.');
+        setMedCheckError(sanitizeText(parsed.reason) || 'قد يتعارض هذا الدواء مع الحالة الحالية.');
       }
     } catch (e) {
       setPrescribedMeds(prev => [...prev, { name: newMedName, dose: newMedDose, reason: newMedReason || 'إضافة مباشرة من الطبيب' }]);
@@ -220,7 +231,12 @@ Return JSON ONLY:
       if (!clinic) {
         const { data: newClinic, error: cErr } = await supabase
           .from('clinics')
-          .insert([{ doctor_name: clinicDoctorName, specialty, clinic_name: clinicName }])
+          .insert([{ 
+            doctor_name: clinicDoctorName, 
+            specialty, 
+            clinic_name: clinicName,
+            logo_url: clinicLogoUrl
+          }])
           .select()
           .single();
         if (cErr) throw cErr;
@@ -273,6 +289,7 @@ Return JSON ONLY:
 
       if (rErr) throw rErr;
 
+      // طباعة الروشتة وتمرير اللوجو واسم الدكتور وتخصصه
       await generatePrescriptionPDF(
         { name: patientName, phone: patientPhone, code: activeCode },
         finalDiagnosis,
@@ -285,7 +302,8 @@ Return JSON ONLY:
         {
           doctorName: clinicDoctorName,
           clinicName: clinicName,
-          specialty: specialty
+          specialty: specialty,
+          logoUrl: clinicLogoUrl
         }
       );
 
@@ -317,8 +335,18 @@ Return JSON ONLY:
             <TextInput style={styles.input} value={clinicName} onChangeText={setClinicName} />
           </View>
         </View>
+        
         <Text style={styles.label}>التخصص الطبي</Text>
         <TextInput style={styles.input} value={specialty} onChangeText={setSpecialty} />
+
+        <Text style={styles.label}>رابط شعار / لوجو العيادة (Image URL)</Text>
+        <TextInput 
+          style={styles.input} 
+          placeholder="https://example.com/logo.png" 
+          placeholderTextColor="#94A3B8" 
+          value={clinicLogoUrl} 
+          onChangeText={setClinicLogoUrl} 
+        />
       </View>
 
       <View style={styles.card}>
