@@ -4,7 +4,7 @@
     "slug": "medverse-emr-app",
     "version": "1.0.0",
     "experiments": {
-      "baseUrl": "/medverse-emr-app"
+      "baseUrl": "/medverse-emr-app/"
     },
     "web": {
       "bundler": "metro",
