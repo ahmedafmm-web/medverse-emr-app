@@ -8,8 +8,7 @@
     },
     "web": {
       "bundler": "metro",
-      "output": "single",
-      "publicPath": "/medverse-emr-app/"
+      "output": "single"
     }
   }
 }
