@@ -43,6 +43,20 @@ export default function DoctorDashboard() {
   const [patientHistory, setPatientHistory] = useState([]);
   const [searchingHistory, setSearchingHistory] = useState(false);
 
+  // دالة ملء البيانات التجريبية للاختبار السريع
+  const handleFillDummyData = () => {
+    const dummyName = 'أحمد محمود السيد';
+    setPatientName(dummyName);
+    setPatientPhone('01012345678');
+    setAge('54');
+    setGender('ذكر');
+    setChronicDiseases('ارتفاع ضغط الدم، السكري النوع الثاني');
+    setFamilyHistory('تاريخ عائلي لأمراض الشرايين التاجية');
+    setSymptomsInput('ألم ضاغط بوسط الصدر يمتد للكتف الأيسر مع ضيق في التنفس وتعرق، مستمر منذ ساعتين.');
+    setDoctorNotes('ضغط الدم 140/90، رسم القلب يظهر تغيرات بسيطة، الفحوصات الأولية مستقرة.');
+    fetchPatientHistory(dummyName);
+  };
+
   const handleClinicalAnalysis = async () => {
     if (!symptomsInput.trim()) {
       alert('يرجى كتابة الأعراض والشكوى الحالية للمريض أولاً.');
@@ -221,7 +235,7 @@ Return JSON ONLY:
     }
   };
 
-  // دالة الحفظ والطباعة المعدلة لضمان التنفيذ وعدم المعالجة المعلقة
+  // دالة الحفظ والطباعة المعدلة والمكتملة بحقل qr_verification_code
   const handleSaveAndPrint = async () => {
     if (!patientName.trim()) {
       alert('تنبيه هام: يرجى إدخال اسم المريض بالكامل أولاً قبل الاعتماد والطباعة.');
@@ -290,7 +304,7 @@ Return JSON ONLY:
         patientRealCode = newPatient?.patient_code || generatedCode;
       }
 
-      // 3️⃣ حفظ السجل الطبي في جدول medical_records
+      // 3️⃣ حفظ السجل الطبي في جدول medical_records مع رمز التحقق الإلكتروني
       if (patientRealId) {
         const { error: recErr } = await supabase
           .from('medical_records')
@@ -300,6 +314,7 @@ Return JSON ONLY:
             visit_date: new Date().toISOString().split('T')[0],
             diagnosis: finalDiagnosis,
             prescriptions: prescribedMeds,
+            qr_verification_code: 'VERIFY-' + patientRealCode,
             dynamic_fields: { 
               age, 
               gender, 
@@ -387,7 +402,12 @@ Return JSON ONLY:
       </View>
 
       <View style={styles.card}>
-        <Text style={styles.sectionTitle}>👤 البيانات الأساسية لكارت المريض</Text>
+        <View style={styles.cardHeaderRow}>
+          <Text style={styles.sectionTitle}>👤 البيانات الأساسية لكارت المريض</Text>
+          <TouchableOpacity style={styles.dummyBtn} onPress={handleFillDummyData}>
+            <Text style={styles.dummyBtnText}>🧪 ملء بيانات تجريبية</Text>
+          </TouchableOpacity>
+        </View>
         
         <Text style={styles.label}>اسم المريض بالكامل *</Text>
         <TextInput 
@@ -525,7 +545,10 @@ const styles = StyleSheet.create({
   title: { fontSize: 20, fontWeight: 'bold', color: '#38BDF8' },
   subtitle: { fontSize: 12, color: '#94A3B8', marginTop: 4, fontWeight: '600' },
   card: { backgroundColor: '#1E293B', padding: 16, borderRadius: 12, marginBottom: 15, borderWidth: 1, borderColor: '#334155' },
-  sectionTitle: { fontSize: 15, fontWeight: 'bold', color: '#F8FAFC', marginBottom: 10, textAlign: 'right' },
+  cardHeaderRow: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
+  dummyBtn: { backgroundColor: '#0284C7', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6 },
+  dummyBtnText: { color: '#FFFFFF', fontSize: 11, fontWeight: 'bold' },
+  sectionTitle: { fontSize: 15, fontWeight: 'bold', color: '#F8FAFC', marginBottom: 6, textAlign: 'right' },
   subSectionTitle: { fontSize: 13, fontWeight: 'bold', color: '#38BDF8', marginTop: 12, marginBottom: 8, textAlign: 'right' },
   label: { fontSize: 12, color: '#CBD5E1', marginBottom: 4, textAlign: 'right' },
   input: { borderWidth: 1, borderColor: '#475569', borderRadius: 8, padding: 10, backgroundColor: '#0F172A', marginBottom: 12, textAlign: 'right', color: '#FFFFFF', fontSize: 13 },
