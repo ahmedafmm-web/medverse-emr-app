@@ -235,13 +235,8 @@ Return JSON ONLY:
     }
   };
 
-  // دالة الحفظ والطباعة المعدلة والمكتملة بحقل qr_verification_code
-  const handleSaveAndPrint = async () => {
-    if (!patientName.trim()) {
-      alert('تنبيه هام: يرجى إدخال اسم المريض بالكامل أولاً قبل الاعتماد والطباعة.');
-      return;
-    }
-
+  // دالة تنفيذ عملية الحفظ في السحابة وتوليد الـ PDF
+  const executeSaveAndPrint = async () => {
     setLoading(true);
     const generatedCode = 'PAT-' + Math.floor(10000 + Math.random() * 90000);
 
@@ -328,44 +323,86 @@ Return JSON ONLY:
         if (recErr) throw new Error('خطأ في حفظ السجل الطبي: ' + recErr.message);
       }
 
-      // 4️⃣ توليد وفتح الروشتة PDF
-      await generatePrescriptionPDF(
-        { name: patientName, phone: patientPhone, code: patientRealCode },
-        finalDiagnosis,
-        {
-          'السن والنوع': `${age || 'غير محدد'} سنة (${gender})`,
-          'الأمراض المزمنة': chronicDiseases || 'لا يوجد',
-          'ملاحظات الفحوصات والأشعة': doctorNotes || 'لا يوجد'
-        },
-        prescribedMeds,
-        {
-          doctorName: clinicDoctorName,
-          clinicName: clinicName,
-          specialty: specialty,
-          logoUrl: clinicLogoUrl
-        }
+      // 4️⃣ رسالة نجاح الحفظ السحابي
+      Alert.alert(
+        "نجاح الحفظ السحابي ✅",
+        `تم حفظ التقرير والسجل الطبي بنجاح في السحابة!\nكود المريض: [${patientRealCode}]`,
+        [
+          {
+            text: "حسناً، الانتقال للطباعة 🖨️",
+            onPress: async () => {
+              // 5️⃣ توليد وفتح الرووشتة PDF فقط بعد نجاح الحفظ الضمني
+              await generatePrescriptionPDF(
+                { name: patientName, phone: patientPhone, code: patientRealCode },
+                finalDiagnosis,
+                {
+                  'السن والنوع': `${age || 'غير محدد'} سنة (${gender})`,
+                  'الأمراض المزمنة': chronicDiseases || 'لا يوجد',
+                  'ملاحظات الفحوصات والأشعة': doctorNotes || 'لا يوجد'
+                },
+                prescribedMeds,
+                {
+                  doctorName: clinicDoctorName,
+                  clinicName: clinicName,
+                  specialty: specialty,
+                  logoUrl: clinicLogoUrl
+                }
+              );
+
+              // تنظيف المدخلات بعد الطباعة
+              setPatientName('');
+              setPatientPhone('');
+              setAge('');
+              setChronicDiseases('');
+              setFamilyHistory('');
+              setSymptomsInput('');
+              setDoctorNotes('');
+              setFinalDiagnosis('');
+              setPrescribedMeds([]);
+              setAiReport(null);
+            }
+          }
+        ]
       );
-
-      // 5️⃣ إظهار رسالة النجاح وتنظيف المدخلات
-      alert(`✅ تم الحفظ سحابياً واعتمدت الزيارة بنجاح!\nكود المريض للطلب: [${patientRealCode}]`);
-
-      setPatientName('');
-      setPatientPhone('');
-      setAge('');
-      setChronicDiseases('');
-      setFamilyHistory('');
-      setSymptomsInput('');
-      setDoctorNotes('');
-      setFinalDiagnosis('');
-      setPrescribedMeds([]);
-      setAiReport(null);
 
     } catch (error) {
       console.error('Detailed Save Error:', error);
-      alert('❌ تعذر الحفظ: ' + (error.message || error));
+      Alert.alert(
+        "خطأ في الحفظ السحابي ❌",
+        `فشل حفظ التقرير في السحابة ولم يتم الانتقال للطباعة:\n${error.message || error}`
+      );
     } finally {
       setLoading(false);
     }
+  };
+
+  // دالة الحفظ والطباعة مع رسالة تأكيد مسبقة
+  const handleSaveAndPrint = () => {
+    if (!patientName.trim()) {
+      alert('تنبيه هام: يرجى إدخال اسم المريض بالكامل أولاً قبل الاعتماد والطباعة.');
+      return;
+    }
+
+    Alert.alert(
+      "تأكيد اعتماد التقرير",
+      "هل أنت متأكد من اعتماد هذا التقرير وحفظه في السحابة أولاً؟",
+      [
+        {
+          text: "إلغاء",
+          style: "cancel",
+          onPress: () => {
+            console.log("تم إلغاء عملية الاعتماد من الطبيب.");
+          }
+        },
+        {
+          text: "نعم، اعتمد واحفظ",
+          onPress: () => {
+            executeSaveAndPrint();
+          }
+        }
+      ],
+      { cancelable: true }
+    );
   };
 
   return (
