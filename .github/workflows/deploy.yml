@@ -26,6 +26,10 @@ jobs:
         env:
           NODE_ENV: production
 
+      # الخطوة السحرية لمنع Jekyll من حجب مجلدات _expo
+      - name: Add .nojekyll file
+        run: touch ./dist/.nojekyll
+
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v4
         with:
