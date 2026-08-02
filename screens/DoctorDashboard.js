@@ -14,6 +14,14 @@ const sanitizeText = (str) => {
 };
 
 export default function DoctorDashboard({ specialty: initialSpecialty }) {
+  // --- 0. Supabase Auth States ---
+  const [session, setSession] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [isSigningUp, setIsSigningUp] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [authSubmitting, setAuthSubmitting] = useState(false);
+
   // --- 1. Doctor Profile & Branding States ---
   const [activeTab, setActiveTab] = useState('prescription'); // 'prescription' | 'profile' | 'patients'
   const [clinicDoctorName, setClinicDoctorName] = useState('د. أحمد محمد');
@@ -67,17 +75,62 @@ export default function DoctorDashboard({ specialty: initialSpecialty }) {
   };
 
   useEffect(() => {
-    fetchDoctorProfile();
+    // Check initial auth session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setAuthLoading(false);
+      if (session) fetchDoctorProfile(session.user.id);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      if (session) fetchDoctorProfile(session.user.id);
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
-  // --- Supabase Data Retrieval Functions ---
-  const fetchDoctorProfile = async () => {
+  // --- Supabase Auth Functions ---
+  const handleAuth = async () => {
+    if (!email.trim() || !password.trim()) {
+      showAlert('تنبيه', 'يرجى إدخال البريد الإلكتروني وكلمة السر.');
+      return;
+    }
+    setAuthSubmitting(true);
     try {
-      const { data: clinic, error } = await supabase
-        .from('clinics')
-        .select('*')
-        .limit(1)
-        .maybeSingle();
+      if (isSigningUp) {
+        const { data, error } = await supabase.auth.signUp({
+          email: email.trim(),
+          password: password.trim(),
+        });
+        if (error) throw error;
+        showAlert('تم إنشاء الحساب 🎉', 'تم إنشاء الحساب بنجاح! يمكنك الآن استخدامه بالكامل.');
+      } else {
+        const { error } = await supabase.auth.signInWithPassword({
+          email: email.trim(),
+          password: password.trim(),
+        });
+        if (error) throw error;
+      }
+    } catch (err) {
+      showAlert('خطأ في الحساب', err.message || 'فشل عملية تسجيل الدخول.');
+    } finally {
+      setAuthSubmitting(false);
+    }
+  };
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    setSession(null);
+  };
+
+  // --- Supabase Data Retrieval Functions ---
+  const fetchDoctorProfile = async (userId) => {
+    try {
+      let query = supabase.from('clinics').select('*');
+      if (userId) query = query.eq('user_id', userId);
+      
+      const { data: clinic, error } = await query.limit(1).maybeSingle();
 
       if (clinic && !error) {
         if (clinic.doctor_name) setClinicDoctorName(clinic.doctor_name);
@@ -96,11 +149,12 @@ export default function DoctorDashboard({ specialty: initialSpecialty }) {
   const handleSaveProfile = async () => {
     setLoading(true);
     try {
-      const { data: existingClinic } = await supabase
-        .from('clinics')
-        .select('id')
-        .limit(1)
-        .maybeSingle();
+      const currentUserId = session?.user?.id;
+      
+      let query = supabase.from('clinics').select('id');
+      if (currentUserId) query = query.eq('user_id', currentUserId);
+
+      const { data: existingClinic } = await query.limit(1).maybeSingle();
 
       const profilePayload = {
         doctor_name: clinicDoctorName,
@@ -109,7 +163,8 @@ export default function DoctorDashboard({ specialty: initialSpecialty }) {
         logo_url: clinicLogoUrl,
         stamp_url: digitalStampUrl,
         phone: clinicPhone,
-        address: clinicAddress
+        address: clinicAddress,
+        user_id: currentUserId || null
       };
 
       if (existingClinic) {
@@ -350,11 +405,12 @@ Return JSON ONLY:
 
     try {
       let clinicId = null;
-      const { data: existingClinic } = await supabase
-        .from('clinics')
-        .select('id')
-        .limit(1)
-        .maybeSingle();
+      const currentUserId = session?.user?.id;
+
+      let cQuery = supabase.from('clinics').select('id');
+      if (currentUserId) cQuery = cQuery.eq('user_id', currentUserId);
+
+      const { data: existingClinic } = await cQuery.limit(1).maybeSingle();
 
       if (existingClinic) {
         clinicId = existingClinic.id;
@@ -368,7 +424,8 @@ Return JSON ONLY:
             logo_url: clinicLogoUrl,
             stamp_url: digitalStampUrl,
             phone: clinicPhone,
-            address: clinicAddress
+            address: clinicAddress,
+            user_id: currentUserId || null
           }])
           .select('id')
           .single();
@@ -497,9 +554,66 @@ Return JSON ONLY:
     }
   };
 
+  if (authLoading) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color="#38BDF8" />
+      </View>
+    );
+  }
+
+  // --- LOGIN / SIGNUP SCREEN IF NOT AUTHENTICATED ---
+  if (!session) {
+    return (
+      <ScrollView style={styles.container} contentContainerStyle={{ justifyContent: 'center', minHeight: '80%' }}>
+        <View style={styles.authCard}>
+          <Text style={styles.authTitle}>MedVerse Doctor Portal 🔒</Text>
+          <Text style={styles.authSub}>{isSigningUp ? 'إنشاء حساب طبيب جديد' : 'تسجيل دخول الطبيب'}</Text>
+
+          <Text style={styles.label}>البريد الإلكتروني</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="doctor@clinic.com"
+            placeholderTextColor="#94A3B8"
+            value={email}
+            onChangeText={setEmail}
+            keyboardType="email-address"
+            autoCapitalize="none"
+          />
+
+          <Text style={styles.label}>كلمة السر</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="••••••••"
+            placeholderTextColor="#94A3B8"
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry
+          />
+
+          <TouchableOpacity style={styles.authSubmitBtn} onPress={handleAuth} disabled={authSubmitting}>
+            {authSubmitting ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.authSubmitBtnText}>{isSigningUp ? 'إنشاء حساب جديد ✨' : 'تسجيل الدخول 🔐'}</Text>}
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.authToggleBtn} onPress={() => setIsSigningUp(!isSigningUp)}>
+            <Text style={styles.authToggleBtnText}>
+              {isSigningUp ? 'لديك حساب بالفعل؟ سجل دخولك' : 'ليس لديك حساب؟ أنشئ حساب جديد الآن'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+    );
+  }
+
   return (
     <ScrollView style={styles.container}>
       <View style={styles.header}>
+        <View style={styles.topUserRow}>
+          <Text style={styles.userEmailText}>👤 {session.user.email}</Text>
+          <TouchableOpacity onPress={handleSignOut} style={styles.signOutBtn}>
+            <Text style={styles.signOutText}>خروج ✕</Text>
+          </TouchableOpacity>
+        </View>
         <Text style={styles.title}>MedVerse Smart EMR Suite</Text>
         <Text style={styles.subtitle}>لوحة تحكم الطبيب السريرية (Powered by LLaMA 3.3 70B)</Text>
       </View>
@@ -744,6 +858,19 @@ const styles = StyleSheet.create({
   title: { fontSize: 20, fontWeight: 'bold', color: '#38BDF8' },
   subtitle: { fontSize: 12, color: '#94A3B8', marginTop: 4, fontWeight: '600' },
   
+  topUserRow: { flexDirection: 'row-reverse', justifyContent: 'space-between', width: '100%', paddingHorizontal: 10, marginBottom: 10, alignItems: 'center' },
+  userEmailText: { color: '#38BDF8', fontSize: 11, fontWeight: 'bold' },
+  signOutBtn: { backgroundColor: '#334155', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6 },
+  signOutText: { color: '#EF4444', fontSize: 11, fontWeight: 'bold' },
+
+  authCard: { backgroundColor: '#1E293B', padding: 20, borderRadius: 16, borderWidth: 1, borderColor: '#334155' },
+  authTitle: { fontSize: 20, fontWeight: 'bold', color: '#38BDF8', textAlign: 'center', marginBottom: 5 },
+  authSub: { fontSize: 13, color: '#94A3B8', textAlign: 'center', marginBottom: 20 },
+  authSubmitBtn: { backgroundColor: '#0284C7', padding: 14, borderRadius: 10, alignItems: 'center', marginTop: 10 },
+  authSubmitBtnText: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 14 },
+  authToggleBtn: { marginTop: 15, alignItems: 'center' },
+  authToggleBtnText: { color: '#38BDF8', fontSize: 12 },
+
   navBar: { flexDirection: 'row-reverse', backgroundColor: '#1E293B', borderRadius: 10, padding: 4, marginBottom: 15, borderWidth: 1, borderColor: '#334155' },
   navBtn: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 8 },
   navBtnActive: { backgroundColor: '#0284C7' },
