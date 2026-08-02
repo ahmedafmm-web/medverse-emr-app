@@ -1,5 +1,8 @@
-import React, { useState } from 'react';
-import { StyleSheet, Text, View, TextInput, ScrollView, TouchableOpacity, Alert, ActivityIndicator, Platform } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { 
+  StyleSheet, Text, View, TextInput, ScrollView, 
+  TouchableOpacity, Alert, ActivityIndicator, Platform, Image 
+} from 'react-native';
 import { generatePrescriptionPDF } from '../components/PDFGenerator';
 import { supabase } from '../supabaseClient';
 
@@ -10,12 +13,18 @@ const sanitizeText = (str) => {
   return str.replace(/[^\u0600-\u06FF a-zA-Z0-9.,()\-\:\/]/g, '').trim();
 };
 
-export default function DoctorDashboard() {
+export default function DoctorDashboard({ specialty: initialSpecialty }) {
+  // --- 1. Doctor Profile & Branding States ---
+  const [activeTab, setActiveTab] = useState('prescription'); // 'prescription' | 'profile' | 'patients'
   const [clinicDoctorName, setClinicDoctorName] = useState('د. أحمد محمد');
   const [clinicName, setClinicName] = useState('عيادة MedVerse التخصصية');
-  const [specialty, setSpecialty] = useState('استشاري أمراض القلب والباطنة');
+  const [specialty, setSpecialty] = useState(initialSpecialty || 'استشاري أمراض القلب والباطنة');
   const [clinicLogoUrl, setClinicLogoUrl] = useState('https://cdn-icons-png.flaticon.com/512/387/387561.png');
+  const [digitalStampUrl, setDigitalStampUrl] = useState('');
+  const [clinicPhone, setClinicPhone] = useState('');
+  const [clinicAddress, setClinicAddress] = useState('');
 
+  // --- 2. Active Patient & Consultation States ---
   const [patientName, setPatientName] = useState('');
   const [patientPhone, setPatientPhone] = useState('');
   const [age, setAge] = useState('');
@@ -26,6 +35,11 @@ export default function DoctorDashboard() {
   const [symptomsInput, setSymptomsInput] = useState('');
   const [doctorNotes, setDoctorNotes] = useState('');
 
+  // --- 3. Medical Imaging & Attachments ---
+  const [uploadedScanUrl, setUploadedScanUrl] = useState('');
+  const [scanTitle, setScanTitle] = useState('');
+
+  // --- 4. AI & Diagnosis States ---
   const [analyzing, setAnalyzing] = useState(false);
   const [checkingMed, setCheckingMed] = useState(false);
   const [aiReport, setAiReport] = useState(null);
@@ -37,9 +51,12 @@ export default function DoctorDashboard() {
   const [newMedDose, setNewMedDose] = useState('');
   const [newMedReason, setNewMedReason] = useState('');
 
+  // --- 5. Cloud Storage & Directory States ---
   const [loading, setLoading] = useState(false);
   const [patientHistory, setPatientHistory] = useState([]);
   const [searchingHistory, setSearchingHistory] = useState(false);
+  const [allDoctorPatients, setAllDoctorPatients] = useState([]);
+  const [loadingPatientsList, setLoadingPatientsList] = useState(false);
 
   const showAlert = (title, message) => {
     if (Platform.OS === 'web') {
@@ -49,6 +66,124 @@ export default function DoctorDashboard() {
     }
   };
 
+  useEffect(() => {
+    fetchDoctorProfile();
+  }, []);
+
+  // --- Supabase Data Retrieval Functions ---
+  const fetchDoctorProfile = async () => {
+    try {
+      const { data: clinic, error } = await supabase
+        .from('clinics')
+        .select('*')
+        .limit(1)
+        .maybeSingle();
+
+      if (clinic && !error) {
+        if (clinic.doctor_name) setClinicDoctorName(clinic.doctor_name);
+        if (clinic.clinic_name) setClinicName(clinic.clinic_name);
+        if (clinic.specialty) setSpecialty(clinic.specialty);
+        if (clinic.logo_url) setClinicLogoUrl(clinic.logo_url);
+        if (clinic.stamp_url) setDigitalStampUrl(clinic.stamp_url);
+        if (clinic.phone) setClinicPhone(clinic.phone);
+        if (clinic.address) setClinicAddress(clinic.address);
+      }
+    } catch (e) {
+      console.error('Error fetching doctor profile:', e);
+    }
+  };
+
+  const handleSaveProfile = async () => {
+    setLoading(true);
+    try {
+      const { data: existingClinic } = await supabase
+        .from('clinics')
+        .select('id')
+        .limit(1)
+        .maybeSingle();
+
+      const profilePayload = {
+        doctor_name: clinicDoctorName,
+        clinic_name: clinicName,
+        specialty: specialty,
+        logo_url: clinicLogoUrl,
+        stamp_url: digitalStampUrl,
+        phone: clinicPhone,
+        address: clinicAddress
+      };
+
+      if (existingClinic) {
+        await supabase.from('clinics').update(profilePayload).eq('id', existingClinic.id);
+      } else {
+        await supabase.from('clinics').insert([profilePayload]);
+      }
+
+      showAlert('تم الحفظ', 'تم حفظ بيانات الطبيب والختم الإلكتروني بنجاح!');
+    } catch (err) {
+      showAlert('خطأ', 'فشل حفظ بيانات البروفايل: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchAllPatients = async () => {
+    setLoadingPatientsList(true);
+    try {
+      const { data, error } = await supabase
+        .from('patients')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (!error && data) {
+        setAllDoctorPatients(data);
+      }
+    } catch (e) {
+      console.error('Fetch Patients Error:', e);
+    } finally {
+      setLoadingPatientsList(false);
+    }
+  };
+
+  const fetchPatientHistory = async (name) => {
+    if (!name || name.trim().length < 3) {
+      setPatientHistory([]);
+      return;
+    }
+    setSearchingHistory(true);
+    try {
+      const { data: patient } = await supabase
+        .from('patients')
+        .select('id, patient_code')
+        .ilike('full_name', `%${name.trim()}%`)
+        .limit(1)
+        .single();
+
+      if (patient) {
+        const { data: records } = await supabase
+          .from('medical_records')
+          .select('*')
+          .eq('patient_id', patient.id)
+          .order('created_at', { ascending: false });
+
+        setPatientHistory(records || []);
+      }
+    } catch (e) {
+      setPatientHistory([]);
+    } finally {
+      setSearchingHistory(false);
+    }
+  };
+
+  const selectPatientFromList = (patient) => {
+    setPatientName(patient.full_name || '');
+    setPatientPhone(patient.phone || '');
+    setAge(patient.age ? String(patient.age) : '');
+    setGender(patient.gender || 'ذكر');
+    setActiveTab('prescription');
+    fetchPatientHistory(patient.full_name);
+  };
+
+  // --- Handlers & Workflows ---
   const handleFillDummyData = () => {
     const dummyName = 'أحمد محمود السيد';
     setPatientName(dummyName);
@@ -209,36 +344,6 @@ Return JSON ONLY:
     setPrescribedMeds(prev => prev.filter((_, i) => i !== index));
   };
 
-  const fetchPatientHistory = async (name) => {
-    if (!name || name.trim().length < 3) {
-      setPatientHistory([]);
-      return;
-    }
-    setSearchingHistory(true);
-    try {
-      const { data: patient } = await supabase
-        .from('patients')
-        .select('id, patient_code')
-        .ilike('full_name', `%${name.trim()}%`)
-        .limit(1)
-        .single();
-
-      if (patient) {
-        const { data: records } = await supabase
-          .from('medical_records')
-          .select('*')
-          .eq('patient_id', patient.id)
-          .order('created_at', { ascending: false });
-
-        setPatientHistory(records || []);
-      }
-    } catch (e) {
-      setPatientHistory([]);
-    } finally {
-      setSearchingHistory(false);
-    }
-  };
-
   const executeSaveAndPrint = async () => {
     setLoading(true);
     const generatedCode = 'PAT-' + Math.floor(10000 + Math.random() * 90000);
@@ -260,7 +365,10 @@ Return JSON ONLY:
             doctor_name: clinicDoctorName, 
             specialty: specialty, 
             clinic_name: clinicName,
-            logo_url: clinicLogoUrl
+            logo_url: clinicLogoUrl,
+            stamp_url: digitalStampUrl,
+            phone: clinicPhone,
+            address: clinicAddress
           }])
           .select('id')
           .single();
@@ -316,7 +424,9 @@ Return JSON ONLY:
               chronicDiseases, 
               familyHistory, 
               symptoms: symptomsInput, 
-              doctorNotes 
+              doctorNotes,
+              scanUrl: uploadedScanUrl,
+              scanTitle: scanTitle
             }
           }]);
 
@@ -338,7 +448,8 @@ Return JSON ONLY:
           doctorName: clinicDoctorName,
           clinicName: clinicName,
           specialty: specialty,
-          logoUrl: clinicLogoUrl
+          logoUrl: clinicLogoUrl,
+          stampUrl: digitalStampUrl
         }
       );
 
@@ -350,6 +461,8 @@ Return JSON ONLY:
       setSymptomsInput('');
       setDoctorNotes('');
       setFinalDiagnosis('');
+      setUploadedScanUrl('');
+      setScanTitle('');
       setPrescribedMeds([]);
       setAiReport(null);
 
@@ -391,175 +504,252 @@ Return JSON ONLY:
         <Text style={styles.subtitle}>لوحة تحكم الطبيب السريرية (Powered by LLaMA 3.3 70B)</Text>
       </View>
 
-      <View style={styles.card}>
-        <Text style={styles.sectionTitle}>⚙️ بيانات الطبيب والعيادة (تطبع أعلى الروشتة)</Text>
-        <View style={styles.rowInputs}>
-          <View style={{ flex: 1, marginLeft: 8 }}>
-            <Text style={styles.label}>اسم الطبيب</Text>
-            <TextInput style={styles.input} value={clinicDoctorName} onChangeText={setClinicDoctorName} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.label}>اسم العيادة</Text>
-            <TextInput style={styles.input} value={clinicName} onChangeText={setClinicName} />
-          </View>
-        </View>
-        
-        <Text style={styles.label}>التخصص الطبي</Text>
-        <TextInput style={styles.input} value={specialty} onChangeText={setSpecialty} />
+      {/* --- Tab Navigation Bar --- */}
+      <View style={styles.navBar}>
+        <TouchableOpacity 
+          style={[styles.navBtn, activeTab === 'prescription' && styles.navBtnActive]} 
+          onPress={() => setActiveTab('prescription')}
+        >
+          <Text style={[styles.navBtnText, activeTab === 'prescription' && styles.navBtnTextActive]}>🩺 الروشتة والكشف</Text>
+        </TouchableOpacity>
 
-        <Text style={styles.label}>رابط شعار / لوجو العيادة (Image URL)</Text>
-        <TextInput 
-          style={styles.input} 
-          placeholder="https://example.com/logo.png" 
-          placeholderTextColor="#94A3B8" 
-          value={clinicLogoUrl} 
-          onChangeText={setClinicLogoUrl} 
-        />
-      </View>
-
-      <View style={styles.card}>
-        <View style={styles.cardHeaderRow}>
-          <Text style={styles.sectionTitle}>👤 البيانات الأساسية لكارت المريض</Text>
-          <TouchableOpacity style={styles.dummyBtn} onPress={handleFillDummyData}>
-            <Text style={styles.dummyBtnText}>🧪 ملء بيانات تجريبية</Text>
-          </TouchableOpacity>
-        </View>
-        
-        <Text style={styles.label}>اسم المريض بالكامل *</Text>
-        <TextInput 
-          style={styles.input} 
-          placeholder="أدخل اسم المريض..." 
-          placeholderTextColor="#94A3B8"
-          value={patientName}
-          onChangeText={(val) => {
-            setPatientName(val);
-            fetchPatientHistory(val);
+        <TouchableOpacity 
+          style={[styles.navBtn, activeTab === 'patients' && styles.navBtnActive]} 
+          onPress={() => {
+            setActiveTab('patients');
+            fetchAllPatients();
           }}
-        />
+        >
+          <Text style={[styles.navBtnText, activeTab === 'patients' && styles.navBtnTextActive]}>📂 قائمة مرضاي</Text>
+        </TouchableOpacity>
 
-        <View style={styles.rowInputs}>
-          <View style={{ flex: 1, marginLeft: 8 }}>
-            <Text style={styles.label}>السن</Text>
-            <TextInput 
-              style={styles.input} 
-              placeholder="مثال: 58" 
-              placeholderTextColor="#94A3B8"
-              keyboardType="numeric"
-              value={age}
-              onChangeText={setAge}
-            />
-          </View>
-
-          <View style={{ flex: 1 }}>
-            <Text style={styles.label}>رقم الهاتف</Text>
-            <TextInput 
-              style={styles.input} 
-              placeholder="01xxxxxxxxx" 
-              placeholderTextColor="#94A3B8"
-              keyboardType="phone-pad"
-              value={patientPhone}
-              onChangeText={setPatientPhone}
-            />
-          </View>
-        </View>
-
-        <Text style={styles.label}>الأمراض المزمنة</Text>
-        <TextInput style={styles.input} placeholder="مثال: ضغط، سكر نوع ثاني..." placeholderTextColor="#94A3B8" value={chronicDiseases} onChangeText={setChronicDiseases} />
-
-        <Text style={styles.label}>التاريخ المرضي العائلي</Text>
-        <TextInput style={styles.input} placeholder="مثال: أمراض قلب..." placeholderTextColor="#94A3B8" value={familyHistory} onChangeText={setFamilyHistory} />
+        <TouchableOpacity 
+          style={[styles.navBtn, activeTab === 'profile' && styles.navBtnActive]} 
+          onPress={() => setActiveTab('profile')}
+        >
+          <Text style={[styles.navBtnText, activeTab === 'profile' && styles.navBtnTextActive]}>⚙️ ملف العيادة والختم</Text>
+        </TouchableOpacity>
       </View>
 
-      {searchingHistory && <ActivityIndicator color="#0284C7" style={{ marginBottom: 15 }} />}
-      {patientHistory.length > 0 && (
-        <View style={styles.historyCard}>
-          <Text style={styles.historyTitle}>📚 تاريخ الزيارات السابقة للمريض ({patientHistory.length} زيارات)</Text>
-          {patientHistory.map((item, index) => (
-            <View key={item.id || index} style={styles.historyItem}>
-              <Text style={styles.historyDate}>📅 {new Date(item.created_at || item.visit_date).toLocaleDateString('ar-EG')}</Text>
-              <Text style={styles.historyDiagnosis}><strong>التشخيص:</strong> {item.diagnosis || 'لا يوجد'}</Text>
+      {/* --- TAB 1: DOCTOR PROFILE & BRANDING --- */}
+      {activeTab === 'profile' && (
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>⚙️ بيانات الطبيب، العيادة، والختم الإلكتروني</Text>
+          <Text style={styles.label}>اسم الطبيب بالكامل</Text>
+          <TextInput style={styles.input} value={clinicDoctorName} onChangeText={setClinicDoctorName} />
+
+          <Text style={styles.label}>اسم العيادة / المركز الطبي</Text>
+          <TextInput style={styles.input} value={clinicName} onChangeText={setClinicName} />
+
+          <Text style={styles.label}>التخصص والدرجة العلمية</Text>
+          <TextInput style={styles.input} value={specialty} onChangeText={setSpecialty} />
+
+          <Text style={styles.label}>رقم هاتف العيادة للتواصل</Text>
+          <TextInput style={styles.input} value={clinicPhone} onChangeText={setClinicPhone} placeholder="01xxxxxxxxx" placeholderTextColor="#94A3B8" />
+
+          <Text style={styles.label}>عنوان العيادة التفصيلي</Text>
+          <TextInput style={styles.input} value={clinicAddress} onChangeText={setClinicAddress} placeholder="المحافظة - الشارع - المبنى" placeholderTextColor="#94A3B8" />
+
+          <Text style={styles.label}>رابط شعار / لوجو العيادة (Logo URL)</Text>
+          <TextInput style={styles.input} value={clinicLogoUrl} onChangeText={setClinicLogoUrl} placeholder="https://..." placeholderTextColor="#94A3B8" />
+
+          <Text style={styles.label}>رابط صورة الختم / التوقيع الإلكتروني (Stamp URL)</Text>
+          <TextInput style={styles.input} value={digitalStampUrl} onChangeText={setDigitalStampUrl} placeholder="https://... (رابط صورة الختم الشفافة)" placeholderTextColor="#94A3B8" />
+
+          {digitalStampUrl ? (
+            <View style={styles.previewBox}>
+              <Text style={styles.label}>معاينة الختم الإلكتروني:</Text>
+              <Image source={{ uri: digitalStampUrl }} style={styles.stampImage} resizeMode="contain" />
             </View>
-          ))}
+          ) : null}
+
+          <TouchableOpacity style={styles.saveProfileBtn} onPress={handleSaveProfile} disabled={loading}>
+            {loading ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.saveProfileBtnText}>💾 حفظ وإعتماد بيانات الملف الشخصي</Text>}
+          </TouchableOpacity>
         </View>
       )}
 
-      <View style={styles.card}>
-        <Text style={styles.sectionTitle}>🩺 الشكوى الحالية وملاحظات الفحوصات</Text>
-        
-        <Text style={styles.label}>الأعراض والشكوى الحالية:</Text>
-        <TextInput style={[styles.input, styles.textArea]} placeholder="صف الأعراض بالتفصيل..." placeholderTextColor="#94A3B8" multiline numberOfLines={3} value={symptomsInput} onChangeText={setSymptomsInput} />
-
-        <Text style={styles.label}>ملاحظات الأشعة والتحاليل والمتابعة:</Text>
-        <TextInput style={[styles.input, styles.textArea]} placeholder="اكتب ملاحظات الفحوصات أو نتائج الأشعة..." placeholderTextColor="#94A3B8" multiline numberOfLines={2} value={doctorNotes} onChangeText={setDoctorNotes} />
-
-        <TouchableOpacity style={styles.aiButton} onPress={handleClinicalAnalysis} disabled={analyzing}>
-          {analyzing ? <ActivityIndicator color="#FFFFFF" size="small" /> : <Text style={styles.aiButtonText}>✨ تحليل الحالة بـ LLaMA 3.3 70B AI</Text>}
-        </TouchableOpacity>
-
-        {aiReport && (
-          <View style={styles.aiReportBox}>
-            <Text style={styles.aiReportHeader}>📋 التقرير الطبي المولد من الذكاء الاصطناعي:</Text>
-            {aiReport.warnings && aiReport.warnings.length > 0 && (
-              <View style={styles.warningBox}>
-                {aiReport.warnings.map((w, idx) => <Text key={idx} style={styles.warningText}>⚠️ {w}</Text>)}
-              </View>
-            )}
-            <Text style={styles.aiDiagText}><strong>التشخيص المقترح:</strong> {aiReport.diagnosis}</Text>
-          </View>
-        )}
-      </View>
-
-      <View style={styles.card}>
-        <Text style={styles.sectionTitle}>📝 اعتماد الخطة العلاجية والروشتة</Text>
-
-        <Text style={styles.label}>التشخيص المعتمد النهائي:</Text>
-        <TextInput style={[styles.input, styles.textArea]} multiline value={finalDiagnosis} onChangeText={setFinalDiagnosis} />
-
-        <Text style={styles.subSectionTitle}>💊 قائمة الأدوية المعتمدة للروشتة ({prescribedMeds.length}):</Text>
-
-        {prescribedMeds.map((med, index) => (
-          <View key={index} style={styles.medCard}>
-            <View style={styles.medHeader}>
-              <Text style={styles.medName}>💊 {med.name}</Text>
-              <TouchableOpacity onPress={() => handleRemoveMed(index)}>
-                <Text style={styles.deleteText}>إزالة ✕</Text>
+      {/* --- TAB 2: DOCTOR PATIENTS DIRECTORY --- */}
+      {activeTab === 'patients' && (
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>📂 قائمة مرضى العيادة والملفات الطبية</Text>
+          {loadingPatientsList ? (
+            <ActivityIndicator color="#38BDF8" style={{ marginVertical: 20 }} />
+          ) : allDoctorPatients.length === 0 ? (
+            <Text style={styles.emptyText}>لا يوجد مرضى مسجلين حتى الآن.</Text>
+          ) : (
+            allDoctorPatients.map((item) => (
+              <TouchableOpacity key={item.id} style={styles.patientListItem} onPress={() => selectPatientFromList(item)}>
+                <View style={styles.rowInputs}>
+                  <Text style={styles.patientItemName}>👤 {item.full_name}</Text>
+                  <Text style={styles.patientItemCode}>{item.patient_code}</Text>
+                </View>
+                <Text style={styles.patientItemSub}>السن: {item.age || 'غير محدد'} | الهاتف: {item.phone || 'لا يوجد'}</Text>
               </TouchableOpacity>
-            </View>
-            <Text style={styles.medDetail}><strong>الجرعة:</strong> {med.dose}</Text>
-            <Text style={styles.medDetail}><strong>دواعي الاستعمال:</strong> {med.reason}</Text>
-          </View>
-        ))}
-
-        <View style={styles.addMedBox}>
-          <Text style={styles.label}>إضافة دواء يدوي (مع فحص التفاعلات):</Text>
-          <TextInput style={styles.input} placeholder="اسم الدواء (إنجليزي)" placeholderTextColor="#94A3B8" value={newMedName} onChangeText={setNewMedName} />
-          <TextInput style={styles.input} placeholder="الجرعة والتوقيت" placeholderTextColor="#94A3B8" value={newMedDose} onChangeText={setNewMedDose} />
-          <TextInput style={styles.input} placeholder="دواعي الاستعمال" placeholderTextColor="#94A3B8" value={newMedReason} onChangeText={setNewMedReason} />
-          
-          <TouchableOpacity style={styles.addMedBtn} onPress={handleCheckAndAddManualMed} disabled={checkingMed}>
-            {checkingMed ? <ActivityIndicator color="#FFFFFF" size="small" /> : <Text style={styles.addMedBtnText}>🔍 فحص وإضافة الدواء للروشتة</Text>}
-          </TouchableOpacity>
-
-          {medCheckError && (
-            <View style={styles.warningBox}>
-              <Text style={styles.warningText}>🚨 تحذير تعارض: {medCheckError}</Text>
-            </View>
+            ))
           )}
         </View>
-      </View>
+      )}
 
-      <TouchableOpacity style={[styles.saveButton, loading && styles.saveButtonDisabled]} onPress={handleSaveAndPrint} disabled={loading}>
-        {loading ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.saveButtonText}>اعتماد التقرير وتنزيل الروشتة PDF 🖨️</Text>}
-      </TouchableOpacity>
+      {/* --- TAB 3: CLINICAL CONSULTATION & PRESCRIPTION --- */}
+      {activeTab === 'prescription' && (
+        <>
+          <View style={styles.card}>
+            <View style={styles.cardHeaderRow}>
+              <Text style={styles.sectionTitle}>👤 البيانات الأساسية لكارت المريض</Text>
+              <TouchableOpacity style={styles.dummyBtn} onPress={handleFillDummyData}>
+                <Text style={styles.dummyBtnText}>🧪 ملء بيانات تجريبية</Text>
+              </TouchableOpacity>
+            </View>
+            
+            <Text style={styles.label}>اسم المريض بالكامل *</Text>
+            <TextInput 
+              style={styles.input} 
+              placeholder="أدخل اسم المريض..." 
+              placeholderTextColor="#94A3B8"
+              value={patientName}
+              onChangeText={(val) => {
+                setPatientName(val);
+                fetchPatientHistory(val);
+              }}
+            />
+
+            <View style={styles.rowInputs}>
+              <View style={{ flex: 1, marginLeft: 8 }}>
+                <Text style={styles.label}>السن</Text>
+                <TextInput 
+                  style={styles.input} 
+                  placeholder="مثال: 58" 
+                  placeholderTextColor="#94A3B8"
+                  keyboardType="numeric"
+                  value={age}
+                  onChangeText={setAge}
+                />
+              </View>
+
+              <View style={{ flex: 1 }}>
+                <Text style={styles.label}>رقم الهاتف</Text>
+                <TextInput 
+                  style={styles.input} 
+                  placeholder="01xxxxxxxxx" 
+                  placeholderTextColor="#94A3B8"
+                  keyboardType="phone-pad"
+                  value={patientPhone}
+                  onChangeText={setPatientPhone}
+                />
+              </View>
+            </View>
+
+            <Text style={styles.label}>الأمراض المزمنة</Text>
+            <TextInput style={styles.input} placeholder="مثال: ضغط، سكر نوع ثاني..." placeholderTextColor="#94A3B8" value={chronicDiseases} onChangeText={setChronicDiseases} />
+
+            <Text style={styles.label}>التاريخ المرضي العائلي</Text>
+            <TextInput style={styles.input} placeholder="مثال: أمراض قلب..." placeholderTextColor="#94A3B8" value={familyHistory} onChangeText={setFamilyHistory} />
+          </View>
+
+          {searchingHistory && <ActivityIndicator color="#0284C7" style={{ marginBottom: 15 }} />}
+          {patientHistory.length > 0 && (
+            <View style={styles.historyCard}>
+              <Text style={styles.historyTitle}>📚 تاريخ الزيارات السابقة للمريض ({patientHistory.length} زيارات)</Text>
+              {patientHistory.map((item, index) => (
+                <View key={item.id || index} style={styles.historyItem}>
+                  <Text style={styles.historyDate}>📅 {new Date(item.created_at || item.visit_date).toLocaleDateString('ar-EG')}</Text>
+                  <Text style={styles.historyDiagnosis}><strong>التشخيص:</strong> {item.diagnosis || 'لا يوجد'}</Text>
+                </View>
+              ))}
+            </View>
+          )}
+
+          <View style={styles.card}>
+            <Text style={styles.sectionTitle}>🩺 الشكوى الحالية، الفحوصات، والأشعة</Text>
+            
+            <Text style={styles.label}>الأعراض والشكوى الحالية:</Text>
+            <TextInput style={[styles.input, styles.textArea]} placeholder="صف الأعراض بالتفصيل..." placeholderTextColor="#94A3B8" multiline numberOfLines={3} value={symptomsInput} onChangeText={setSymptomsInput} />
+
+            <Text style={styles.label}>ملاحظات الأشعة والتحاليل والمتابعة:</Text>
+            <TextInput style={[styles.input, styles.textArea]} placeholder="اكتب ملاحظات الفحوصات أو نتائج الأشعة..." placeholderTextColor="#94A3B8" multiline numberOfLines={2} value={doctorNotes} onChangeText={setDoctorNotes} />
+
+            <Text style={styles.subSectionTitle}>🖼️ المرفقات والأشعة عالية الدقة</Text>
+            <TextInput style={styles.input} placeholder="عنوان الأشعة / الفحص (مثال: أشعة سينية على الصدر)" placeholderTextColor="#94A3B8" value={scanTitle} onChangeText={setScanTitle} />
+            <TextInput style={styles.input} placeholder="رابط صورة الأشعة عالية الدقة (URL)" placeholderTextColor="#94A3B8" value={uploadedScanUrl} onChangeText={setUploadedScanUrl} />
+
+            <TouchableOpacity style={styles.aiButton} onPress={handleClinicalAnalysis} disabled={analyzing}>
+              {analyzing ? <ActivityIndicator color="#FFFFFF" size="small" /> : <Text style={styles.aiButtonText}>✨ تحليل الحالة بـ LLaMA 3.3 70B AI</Text>}
+            </TouchableOpacity>
+
+            {aiReport && (
+              <View style={styles.aiReportBox}>
+                <Text style={styles.aiReportHeader}>📋 التقرير الطبي المولد من الذكاء الاصطناعي:</Text>
+                {aiReport.warnings && aiReport.warnings.length > 0 && (
+                  <View style={styles.warningBox}>
+                    {aiReport.warnings.map((w, idx) => <Text key={idx} style={styles.warningText}>⚠️ {w}</Text>)}
+                  </View>
+                )}
+                <Text style={styles.aiDiagText}><strong>التشخيص المقترح:</strong> {aiReport.diagnosis}</Text>
+              </View>
+            )}
+          </View>
+
+          <View style={styles.card}>
+            <Text style={styles.sectionTitle}>📝 اعتماد الخطة العلاجية والروشتة</Text>
+
+            <Text style={styles.label}>التشخيص المعتمد النهائي:</Text>
+            <TextInput style={[styles.input, styles.textArea]} multiline value={finalDiagnosis} onChangeText={setFinalDiagnosis} />
+
+            <Text style={styles.subSectionTitle}>💊 قائمة الأدوية المعتمدة للروشتة ({prescribedMeds.length}):</Text>
+
+            {prescribedMeds.map((med, index) => (
+              <View key={index} style={styles.medCard}>
+                <View style={styles.medHeader}>
+                  <Text style={styles.medName}>💊 {med.name}</Text>
+                  <TouchableOpacity onPress={() => handleRemoveMed(index)}>
+                    <Text style={styles.deleteText}>إزالة ✕</Text>
+                  </TouchableOpacity>
+                </View>
+                <Text style={styles.medDetail}><strong>الجرعة:</strong> {med.dose}</Text>
+                <Text style={styles.medDetail}><strong>دواعي الاستعمال:</strong> {med.reason}</Text>
+              </View>
+            ))}
+
+            <View style={styles.addMedBox}>
+              <Text style={styles.label}>إضافة دواء يدوي (مع فحص التفاعلات):</Text>
+              <TextInput style={styles.input} placeholder="اسم الدواء (إنجليزي)" placeholderTextColor="#94A3B8" value={newMedName} onChangeText={setNewMedName} />
+              <TextInput style={styles.input} placeholder="الجرعة والتوقيت" placeholderTextColor="#94A3B8" value={newMedDose} onChangeText={setNewMedDose} />
+              <TextInput style={styles.input} placeholder="دواعي الاستعمال" placeholderTextColor="#94A3B8" value={newMedReason} onChangeText={setNewMedReason} />
+              
+              <TouchableOpacity style={styles.addMedBtn} onPress={handleCheckAndAddManualMed} disabled={checkingMed}>
+                {checkingMed ? <ActivityIndicator color="#FFFFFF" size="small" /> : <Text style={styles.addMedBtnText}>🔍 فحص وإضافة الدواء للروشتة</Text>}
+              </TouchableOpacity>
+
+              {medCheckError && (
+                <View style={styles.warningBox}>
+                  <Text style={styles.warningText}>🚨 تحذير تعارض: {medCheckError}</Text>
+                </View>
+              )}
+            </View>
+          </View>
+
+          <TouchableOpacity style={[styles.saveButton, loading && styles.saveButtonDisabled]} onPress={handleSaveAndPrint} disabled={loading}>
+            {loading ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.saveButtonText}>اعتماد التقرير وتنزيل الروشتة PDF 🖨️</Text>}
+          </TouchableOpacity>
+        </>
+      )}
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0F172A', padding: 15 },
-  header: { marginBottom: 20, alignItems: 'center', marginTop: 15 },
+  header: { marginBottom: 15, alignItems: 'center', marginTop: 15 },
   title: { fontSize: 20, fontWeight: 'bold', color: '#38BDF8' },
   subtitle: { fontSize: 12, color: '#94A3B8', marginTop: 4, fontWeight: '600' },
+  
+  navBar: { flexDirection: 'row-reverse', backgroundColor: '#1E293B', borderRadius: 10, padding: 4, marginBottom: 15, borderWidth: 1, borderColor: '#334155' },
+  navBtn: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 8 },
+  navBtnActive: { backgroundColor: '#0284C7' },
+  navBtnText: { color: '#94A3B8', fontSize: 11, fontWeight: 'bold' },
+  navBtnTextActive: { color: '#FFFFFF' },
+
   card: { backgroundColor: '#1E293B', padding: 16, borderRadius: 12, marginBottom: 15, borderWidth: 1, borderColor: '#334155' },
   cardHeaderRow: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
   dummyBtn: { backgroundColor: '#0284C7', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6 },
@@ -570,7 +760,19 @@ const styles = StyleSheet.create({
   input: { borderWidth: 1, borderColor: '#475569', borderRadius: 8, padding: 10, backgroundColor: '#0F172A', marginBottom: 12, textAlign: 'right', color: '#FFFFFF', fontSize: 13 },
   rowInputs: { flexDirection: 'row-reverse' },
   textArea: { height: 70, textAlignVertical: 'top' },
-  aiButton: { backgroundColor: '#0284C7', padding: 12, borderRadius: 8, alignItems: 'center', marginBottom: 12 },
+  
+  previewBox: { backgroundColor: '#0F172A', padding: 10, borderRadius: 8, alignItems: 'center', marginBottom: 12 },
+  stampImage: { width: 120, height: 80, marginTop: 5 },
+  saveProfileBtn: { backgroundColor: '#059669', padding: 12, borderRadius: 8, alignItems: 'center', marginTop: 5 },
+  saveProfileBtnText: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 13 },
+
+  patientListItem: { backgroundColor: '#0F172A', padding: 12, borderRadius: 8, marginBottom: 8, borderWidth: 1, borderColor: '#334155' },
+  patientItemName: { fontSize: 14, fontWeight: 'bold', color: '#FFFFFF' },
+  patientItemCode: { fontSize: 12, color: '#38BDF8', fontWeight: 'bold' },
+  patientItemSub: { fontSize: 11, color: '#94A3B8', textAlign: 'right', marginTop: 4 },
+  emptyText: { color: '#64748B', fontSize: 13, textAlign: 'center', marginVertical: 15 },
+
+  aiButton: { backgroundColor: '#0284C7', padding: 12, borderRadius: 8, alignItems: 'center', marginBottom: 12, marginTop: 5 },
   aiButtonText: { color: '#FFFFFF', fontSize: 13, fontWeight: 'bold' },
   aiReportBox: { backgroundColor: 'rgba(3, 105, 161, 0.3)', padding: 12, borderRadius: 10, borderWidth: 1, borderColor: '#0284C7' },
   aiReportHeader: { fontSize: 12, fontWeight: 'bold', color: '#38BDF8', marginBottom: 6, textAlign: 'right' },
