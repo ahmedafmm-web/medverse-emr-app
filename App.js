@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { StyleSheet, Text, View, TouchableOpacity, SafeAreaView, StatusBar, ScrollView, Platform } from 'react-native';
 import DoctorDashboard from './screens/DoctorDashboard';
 import PatientPortal from './screens/PatientPortal';
@@ -6,6 +6,7 @@ import PatientPortal from './screens/PatientPortal';
 export default function App() {
   const [currentStep, setCurrentStep] = useState('landing');
   const [selectedSpecialty, setSelectedSpecialty] = useState('');
+  const [encryptedClinicId, setEncryptedClinicId] = useState(null);
 
   const specialties = [
     { id: 'internal', name: '🩺 الطب الباطني والأمراض المزمنة' },
@@ -15,6 +16,18 @@ export default function App() {
     { id: 'orthopedics', name: '🦴 جراحة العظام والعضلات' },
     { id: 'dermatology', name: '✨ الجلدية والتجميل' },
   ];
+
+  useEffect(() => {
+    // Reading encrypted portal link parameters from URL on Web
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search);
+      const clinicParam = urlParams.get('clinic') || urlParams.get('c');
+      if (clinicParam) {
+        setEncryptedClinicId(clinicParam);
+        setCurrentStep('patient');
+      }
+    }
+  }, []);
 
   const handleSpecialtySelect = (specialtyName) => {
     setSelectedSpecialty(specialtyName || '');
@@ -97,7 +110,10 @@ export default function App() {
 
       {currentStep === 'patient' && (
         <View style={styles.body}>
-          <PatientPortal onBackToDashboard={() => setCurrentStep('landing')} />
+          <PatientPortal 
+            onBackToDashboard={() => setCurrentStep('landing')} 
+            doctorClinicId={encryptedClinicId} 
+          />
         </View>
       )}
     </SafeAreaView>
@@ -133,4 +149,3 @@ const styles = StyleSheet.create({
   specialtyText: { color: '#F8FAFC', fontSize: 16, fontWeight: 'bold' },
   body: { flex: 1 }
 });
- 
