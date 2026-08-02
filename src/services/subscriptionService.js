@@ -1,16 +1,15 @@
-import { supabase } from '../supabaseClient';
+import { supabase } from '../../supabaseClient';
 import { Platform } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const SUB_CACHE_KEY = 'MEDVERSE_SUB_STATUS';
 
-// حفظ حالة الاشتراك محلياً
 const saveLocalStatus = async (status) => {
   try {
     const data = JSON.stringify(status);
     if (Platform.OS === 'web' && typeof window !== 'undefined') {
       window.localStorage.setItem(SUB_CACHE_KEY, data);
     } else {
+      const AsyncStorage = require('@react-native-async-storage/async-storage').default;
       await AsyncStorage.setItem(SUB_CACHE_KEY, data);
     }
   } catch (e) {
@@ -18,13 +17,13 @@ const saveLocalStatus = async (status) => {
   }
 };
 
-// قراءة حالة الاشتراك المحفوظة محلياً
 export const getLocalSubStatus = async () => {
   try {
     let data = null;
     if (Platform.OS === 'web' && typeof window !== 'undefined') {
       data = window.localStorage.getItem(SUB_CACHE_KEY);
     } else {
+      const AsyncStorage = require('@react-native-async-storage/async-storage').default;
       data = await AsyncStorage.getItem(SUB_CACHE_KEY);
     }
     return data ? JSON.parse(data) : null;
@@ -47,7 +46,6 @@ export const verifyDoctorAccess = async (user) => {
 
     const now = new Date();
 
-    // 1. إيميل جديد أول مرة يسجل -> يمنح 3 أيام تجربة ويفعل مؤشر الاستخدام
     if (!data) {
       const { data: newSub, error: insertError } = await supabase
         .from('subscriptions')
@@ -69,7 +67,6 @@ export const verifyDoctorAccess = async (user) => {
       return result;
     }
 
-    // 2. الحساب معطل من الأدمن
     if (data.status === 'disabled') {
       const result = { allowed: false, isDisabled: true, message: 'تم تعطيل هذا الحساب، يرجى التواصل مع الدعم الفني.' };
       await saveLocalStatus(result);
@@ -78,7 +75,6 @@ export const verifyDoctorAccess = async (user) => {
 
     const expiryDate = new Date(data.ends_at);
 
-    // 3. الاشتراك انتهى أو استنفذ الفترة التجريبية
     if (expiryDate <= now || data.status === 'expired') {
       await supabase
         .from('subscriptions')
@@ -94,7 +90,6 @@ export const verifyDoctorAccess = async (user) => {
       return result;
     }
 
-    // 4. الاشتراك ساري (شهري / سنوي / تجريبي قائم)
     const daysLeft = Math.ceil((expiryDate - now) / (1000 * 60 * 60 * 24));
     const result = { 
       allowed: true, 
@@ -107,9 +102,9 @@ export const verifyDoctorAccess = async (user) => {
 
   } catch (err) {
     console.error('Subscription verification error:', err.message);
-    // في حالة بطء أو انقطاع الشبكة، يتم اعتماد التخزين المحلي فوراً
     const cached = await getLocalSubStatus();
     if (cached) return cached;
     return { allowed: false, message: 'حدث خطأ أثناء التحقق من حالة الاشتراك.' };
   }
 };
+ 
