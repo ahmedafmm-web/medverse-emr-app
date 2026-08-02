@@ -103,7 +103,7 @@ export default function DoctorDashboard({ specialty: initialSpecialty }) {
       setSession(session);
       setAuthLoading(false);
       if (session) {
-        fetchDoctorProfile(session.user.id);
+        fetchDoctorProfile(session.user);
         checkSubscription(session.user);
       }
     });
@@ -111,7 +111,7 @@ export default function DoctorDashboard({ specialty: initialSpecialty }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
       if (session) {
-        fetchDoctorProfile(session.user.id);
+        fetchDoctorProfile(session.user);
         checkSubscription(session.user);
       }
     });
@@ -124,7 +124,7 @@ export default function DoctorDashboard({ specialty: initialSpecialty }) {
     setSubscriptionAccess(subStatus);
   };
 
-  // --- Supabase Auth Functions (تعديل التسجيل الآلي والتسجيل المباشر) ---
+  // --- Supabase Auth Functions ---
   const handleAuth = async () => {
     if (!email.trim() || !password.trim()) {
       showAlert('تنبيه', 'يرجى إدخال البريد الإلكتروني وكلمة السر.');
@@ -133,13 +133,12 @@ export default function DoctorDashboard({ specialty: initialSpecialty }) {
     setAuthSubmitting(true);
     try {
       if (isSigningUp) {
-        const { data, error } = await supabase.auth.signUp({
+        const { error } = await supabase.auth.signUp({
           email: email.trim(),
           password: password.trim(),
         });
         if (error) throw error;
 
-        // محاولة تسجيل الدخول مباشرة بعد إنشاء الحساب لتجاوز القفل
         const { error: signInErr } = await supabase.auth.signInWithPassword({
           email: email.trim(),
           password: password.trim(),
@@ -189,11 +188,16 @@ export default function DoctorDashboard({ specialty: initialSpecialty }) {
     }
   };
 
-  // --- Supabase Data Retrieval Functions ---
-  const fetchDoctorProfile = async (userId) => {
+  // --- Supabase Data Retrieval Functions (المعدلة لعزل الأطباء) ---
+  const fetchDoctorProfile = async (user) => {
     try {
+      const userEmail = user?.email?.toLowerCase();
       let query = supabase.from('clinics').select('*');
-      if (userId) query = query.eq('user_id', userId);
+      if (userEmail) {
+        query = query.ilike('email', userEmail);
+      } else if (user?.id) {
+        query = query.eq('user_id', user.id);
+      }
       
       const { data: clinic, error } = await query.limit(1).maybeSingle();
 
@@ -215,9 +219,14 @@ export default function DoctorDashboard({ specialty: initialSpecialty }) {
     setLoading(true);
     try {
       const currentUserId = session?.user?.id;
+      const userEmail = session?.user?.email?.toLowerCase();
       
       let query = supabase.from('clinics').select('id');
-      if (currentUserId) query = query.eq('user_id', currentUserId);
+      if (userEmail) {
+        query = query.ilike('email', userEmail);
+      } else if (currentUserId) {
+        query = query.eq('user_id', currentUserId);
+      }
 
       const { data: existingClinic } = await query.limit(1).maybeSingle();
 
@@ -229,6 +238,7 @@ export default function DoctorDashboard({ specialty: initialSpecialty }) {
         stamp_url: digitalStampUrl,
         phone: clinicPhone,
         address: clinicAddress,
+        email: userEmail || null,
         user_id: currentUserId || null
       };
 
@@ -249,13 +259,18 @@ export default function DoctorDashboard({ specialty: initialSpecialty }) {
   const fetchAllPatients = async () => {
     setLoadingPatientsList(true);
     try {
+      const userEmail = session?.user?.email?.toLowerCase();
+      
       const { data, error } = await supabase
         .from('patients')
         .select('*')
+        .ilike('doctor_email', userEmail)
         .order('created_at', { ascending: false });
 
       if (!error && data) {
         setAllDoctorPatients(data);
+      } else {
+        setAllDoctorPatients([]);
       }
     } catch (e) {
       console.error('Fetch Patients Error:', e);
@@ -271,10 +286,13 @@ export default function DoctorDashboard({ specialty: initialSpecialty }) {
     }
     setSearchingHistory(true);
     try {
+      const userEmail = session?.user?.email?.toLowerCase();
+
       const { data: patient } = await supabase
         .from('patients')
         .select('id, patient_code')
         .ilike('full_name', `%${name.trim()}%`)
+        .ilike('doctor_email', userEmail)
         .limit(1)
         .single();
 
@@ -286,6 +304,8 @@ export default function DoctorDashboard({ specialty: initialSpecialty }) {
           .order('created_at', { ascending: false });
 
         setPatientHistory(records || []);
+      } else {
+        setPatientHistory([]);
       }
     } catch (e) {
       setPatientHistory([]);
@@ -471,9 +491,14 @@ Return JSON ONLY:
     try {
       let clinicId = null;
       const currentUserId = session?.user?.id;
+      const userEmail = session?.user?.email?.toLowerCase();
 
       let cQuery = supabase.from('clinics').select('id');
-      if (currentUserId) cQuery = cQuery.eq('user_id', currentUserId);
+      if (userEmail) {
+        cQuery = cQuery.ilike('email', userEmail);
+      } else if (currentUserId) {
+        cQuery = cQuery.eq('user_id', currentUserId);
+      }
 
       const { data: existingClinic } = await cQuery.limit(1).maybeSingle();
 
@@ -490,6 +515,7 @@ Return JSON ONLY:
             stamp_url: digitalStampUrl,
             phone: clinicPhone,
             address: clinicAddress,
+            email: userEmail || null,
             user_id: currentUserId || null
           }])
           .select('id')
@@ -506,6 +532,7 @@ Return JSON ONLY:
         .from('patients')
         .select('id, patient_code')
         .eq('full_name', patientName.trim())
+        .ilike('doctor_email', userEmail)
         .maybeSingle();
 
       if (existingPatient) {
@@ -520,7 +547,8 @@ Return JSON ONLY:
             age: age ? parseInt(age) : null,
             gender: gender,
             patient_code: generatedCode,
-            clinic_id: clinicId
+            clinic_id: clinicId,
+            doctor_email: userEmail || null
           }])
           .select('id, patient_code')
           .single();
@@ -536,6 +564,7 @@ Return JSON ONLY:
           .insert([{
             patient_id: patientRealId,
             clinic_id: clinicId,
+            doctor_email: userEmail || null,
             visit_date: new Date().toISOString().split('T')[0],
             diagnosis: finalDiagnosis,
             prescriptions: prescribedMeds,
