@@ -75,7 +75,6 @@ export default function DoctorDashboard({ specialty: initialSpecialty }) {
   };
 
   useEffect(() => {
-    // Check initial auth session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setAuthLoading(false);
@@ -122,6 +121,26 @@ export default function DoctorDashboard({ specialty: initialSpecialty }) {
   const handleSignOut = async () => {
     await supabase.auth.signOut();
     setSession(null);
+  };
+
+  // --- Copy Unique Portal Link ---
+  const handleCopyPortalLink = () => {
+    const currentUserId = session?.user?.id;
+    if (!currentUserId) {
+      showAlert('تنبيه', 'يرجى تسجيل الدخول أولاً لتوليد الرابط المخصص.');
+      return;
+    }
+
+    const portalUrl = Platform.OS === 'web' && typeof window !== 'undefined'
+      ? `${window.location.origin}/?c=${currentUserId}`
+      : `https://medverse-emr-suite.vercel.app/?c=${currentUserId}`;
+
+    if (Platform.OS === 'web' && navigator.clipboard) {
+      navigator.clipboard.writeText(portalUrl);
+      showAlert('تم النسخ! 📋', `تم نسخ رابط بوابتك المخصصة بنجاح:\n${portalUrl}`);
+    } else {
+      showAlert('رابط بوابتك المخصصة', portalUrl);
+    }
   };
 
   // --- Supabase Data Retrieval Functions ---
@@ -570,10 +589,10 @@ Return JSON ONLY:
           <Text style={styles.authTitle}>MedVerse Doctor Portal 🔒</Text>
           <Text style={styles.authSub}>{isSigningUp ? 'إنشاء حساب طبيب جديد' : 'تسجيل دخول الطبيب'}</Text>
 
-          <Text style={styles.label}>البريد الإلكتروني</Text>
+          <Text style={styles.label}>البريد الإلكتروني (Gmail)</Text>
           <TextInput
             style={styles.input}
-            placeholder="doctor@clinic.com"
+            placeholder="doctor@gmail.com"
             placeholderTextColor="#94A3B8"
             value={email}
             onChangeText={setEmail}
@@ -649,6 +668,15 @@ Return JSON ONLY:
       {activeTab === 'profile' && (
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>⚙️ بيانات الطبيب، العيادة، والختم الإلكتروني</Text>
+          
+          <View style={styles.linkCardBox}>
+            <Text style={styles.linkBoxTitle}>🔗 رابط بوابة المرضى الخاصة بك</Text>
+            <Text style={styles.linkBoxSub}>مربوط مع بريدك الإلكتروني الفريد: {session.user.email}</Text>
+            <TouchableOpacity style={styles.copyLinkBtn} onPress={handleCopyPortalLink}>
+              <Text style={styles.copyLinkBtnText}>📋 نسخ رابط العيادة المخصص للمرضى</Text>
+            </TouchableOpacity>
+          </View>
+
           <Text style={styles.label}>اسم الطبيب بالكامل</Text>
           <TextInput style={styles.input} value={clinicDoctorName} onChangeText={setClinicDoctorName} />
 
@@ -888,6 +916,12 @@ const styles = StyleSheet.create({
   rowInputs: { flexDirection: 'row-reverse' },
   textArea: { height: 70, textAlignVertical: 'top' },
   
+  linkCardBox: { backgroundColor: '#0F172A', padding: 12, borderRadius: 8, marginBottom: 15, borderWidth: 1, borderColor: '#0284C7' },
+  linkBoxTitle: { fontSize: 13, fontWeight: 'bold', color: '#38BDF8', textAlign: 'right' },
+  linkBoxSub: { fontSize: 11, color: '#94A3B8', textAlign: 'right', marginTop: 2, marginBottom: 8 },
+  copyLinkBtn: { backgroundColor: '#0284C7', padding: 10, borderRadius: 6, alignItems: 'center' },
+  copyLinkBtnText: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 12 },
+
   previewBox: { backgroundColor: '#0F172A', padding: 10, borderRadius: 8, alignItems: 'center', marginBottom: 12 },
   stampImage: { width: 120, height: 80, marginTop: 5 },
   saveProfileBtn: { backgroundColor: '#059669', padding: 12, borderRadius: 8, alignItems: 'center', marginTop: 5 },
