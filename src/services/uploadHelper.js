@@ -1,4 +1,4 @@
-import { supabase } from '../supabaseClient'; // تأكد من صحة مسار استيراد سوپابيز
+import { supabase } from '../../supabaseClient';
 
 export const uploadMediaFile = async (fileUri, fileName) => {
   try {
