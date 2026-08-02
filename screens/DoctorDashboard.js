@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { 
   StyleSheet, Text, View, TextInput, ScrollView, 
-  TouchableOpacity, Alert, ActivityIndicator, Platform, Image 
+  TouchableOpacity, Alert, ActivityIndicator, Platform, Image, Linked
 } from 'react-native';
 import { generatePrescriptionPDF } from '../components/PDFGenerator';
 import { supabase } from '../supabaseClient';
+import { verifyDoctorAccess } from '../src/services/subscriptionService';
 
 const GROQ_API_KEY = process.env.EXPO_PUBLIC_GROQ_API_KEY || "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";
 
@@ -14,13 +15,16 @@ const sanitizeText = (str) => {
 };
 
 export default function DoctorDashboard({ specialty: initialSpecialty }) {
-  // --- 0. Supabase Auth States ---
+  // --- 0. Supabase Auth & Subscription States ---
   const [session, setSession] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [isSigningUp, setIsSigningUp] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [authSubmitting, setAuthSubmitting] = useState(false);
+
+  // حالة الاشتراك والوصول
+  const [subscriptionAccess, setSubscriptionAccess] = useState({ allowed: true, daysLeft: null, message: '' });
 
   // --- 1. Doctor Profile & Branding States ---
   const [activeTab, setActiveTab] = useState('prescription'); // 'prescription' | 'profile' | 'patients'
@@ -74,20 +78,51 @@ export default function DoctorDashboard({ specialty: initialSpecialty }) {
     }
   };
 
+  const handleOpenWhatsApp = () => {
+    const userEmail = session?.user?.email || '';
+    const message = `مرحباً دكتور، أود تفعيل اشتراكي في تطبيق MedVerse.\nالإيميل المسجل: ${userEmail}`;
+    const url = `https://wa.me/201127834972?text=${encodeURIComponent(message)}`;
+    if (Platform.OS === 'web') {
+      window.open(url, '_blank');
+    } else {
+      Linking.openURL(url);
+    }
+  };
+
+  const handleOpenInstaPay = () => {
+    const url = 'https://ipn.eg/S/eg2400020548054885193/instapay/5xBjGv';
+    if (Platform.OS === 'web') {
+      window.open(url, '_blank');
+    } else {
+      Linking.openURL(url);
+    }
+  };
+
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setAuthLoading(false);
-      if (session) fetchDoctorProfile(session.user.id);
+      if (session) {
+        fetchDoctorProfile(session.user.id);
+        checkSubscription(session.user);
+      }
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
-      if (session) fetchDoctorProfile(session.user.id);
+      if (session) {
+        fetchDoctorProfile(session.user.id);
+        checkSubscription(session.user);
+      }
     });
 
     return () => subscription.unsubscribe();
   }, []);
+
+  const checkSubscription = async (user) => {
+    const subStatus = await verifyDoctorAccess(user);
+    setSubscriptionAccess(subStatus);
+  };
 
   // --- Supabase Auth Functions ---
   const handleAuth = async () => {
@@ -624,8 +659,56 @@ Return JSON ONLY:
     );
   }
 
+  // --- EXPIRED OR DISABLED SUBSCRIPTION PAYWALL SCREEN ---
+  if (!subscriptionAccess.allowed) {
+    return (
+      <ScrollView style={styles.container} contentContainerStyle={{ justifyContent: 'center', paddingVertical: 20 }}>
+        <View style={styles.paywallCard}>
+          <Text style={styles.paywallIcon}>🔒</Text>
+          <Text style={styles.paywallTitle}>تنبيه اشتراك التطبيق</Text>
+          <Text style={styles.paywallReason}>{subscriptionAccess.message}</Text>
+
+          <View style={styles.paywallInfoBox}>
+            <Text style={styles.paywallInfoTitle}>طرق الدفع وتجديد الاشتراك:</Text>
+            
+            <View style={styles.paymentMethodRow}>
+              <Text style={styles.paymentMethodText}>📱 المحفظة الإلكترونية (فودافون كاش / غيرها):</Text>
+              <Text style={styles.paymentDetail}>01127834972</Text>
+            </View>
+
+            <View style={styles.paymentMethodRow}>
+              <Text style={styles.paymentMethodText}>💸 الدفع عبر InstaPay:</Text>
+              <TouchableOpacity style={styles.instaPayBtn} onPress={handleOpenInstaPay}>
+                <Text style={styles.instaPayBtnText}>⚡ اضغط للدفع عبر InstaPay</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          <Text style={styles.paywallSubNote}>
+            بعد تحويل رسوم الاشتراك الشهري أو السنوي، يرجى الضغط على الزر أدناه لإرسال صورة التحويل عبر الواتساب لتفعيل حسابك فوراً.
+          </Text>
+
+          <TouchableOpacity style={styles.whatsappBtn} onPress={handleOpenWhatsApp}>
+            <Text style={styles.whatsappBtnText}>💬 التواصل مع الدعم عبر الواتساب لتفعيل الحساب</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity onPress={handleSignOut} style={styles.paywallSignOutBtn}>
+            <Text style={styles.signOutText}>تسجيل الخروج ✕</Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+    );
+  }
+
   return (
     <ScrollView style={styles.container}>
+      {/* --- WARNING BANNER FOR EXPIRING SUBSCRIPTION --- */}
+      {subscriptionAccess.showAlert && (
+        <View style={styles.subWarningBanner}>
+          <Text style={styles.subWarningText}>⚠️ {subscriptionAccess.message} - يرجى تجديد الاشتراك لتجنب إيقاف الخدمة.</Text>
+        </View>
+      )}
+
       <View style={styles.header}>
         <View style={styles.topUserRow}>
           <Text style={styles.userEmailText}>👤 {session.user.email}</Text>
@@ -891,6 +974,9 @@ const styles = StyleSheet.create({
   signOutBtn: { backgroundColor: '#334155', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6 },
   signOutText: { color: '#EF4444', fontSize: 11, fontWeight: 'bold' },
 
+  subWarningBanner: { backgroundColor: '#B45309', padding: 10, borderRadius: 8, marginBottom: 15, alignItems: 'center' },
+  subWarningText: { color: '#FFFFFF', fontSize: 12, fontWeight: 'bold', textAlign: 'center' },
+
   authCard: { backgroundColor: '#1E293B', padding: 20, borderRadius: 16, borderWidth: 1, borderColor: '#334155' },
   authTitle: { fontSize: 20, fontWeight: 'bold', color: '#38BDF8', textAlign: 'center', marginBottom: 5 },
   authSub: { fontSize: 13, color: '#94A3B8', textAlign: 'center', marginBottom: 20 },
@@ -898,6 +984,22 @@ const styles = StyleSheet.create({
   authSubmitBtnText: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 14 },
   authToggleBtn: { marginTop: 15, alignItems: 'center' },
   authToggleBtnText: { color: '#38BDF8', fontSize: 12 },
+
+  paywallCard: { backgroundColor: '#1E293B', padding: 20, borderRadius: 16, borderWidth: 1, borderColor: '#EF4444', alignItems: 'center' },
+  paywallIcon: { fontSize: 40, marginBottom: 10 },
+  paywallTitle: { fontSize: 20, fontWeight: 'bold', color: '#EF4444', marginBottom: 8 },
+  paywallReason: { fontSize: 13, color: '#FCA5A5', textAlign: 'center', marginBottom: 20, lineHeight: 20 },
+  paywallInfoBox: { backgroundColor: '#0F172A', padding: 15, borderRadius: 10, width: '100%', marginBottom: 15, borderWidth: 1, borderColor: '#334155' },
+  paywallInfoTitle: { fontSize: 13, fontWeight: 'bold', color: '#38BDF8', marginBottom: 10, textAlign: 'right' },
+  paymentMethodRow: { marginBottom: 12 },
+  paymentMethodText: { fontSize: 12, color: '#CBD5E1', textAlign: 'right', marginBottom: 4 },
+  paymentDetail: { fontSize: 14, fontWeight: 'bold', color: '#10B981', textAlign: 'right' },
+  instaPayBtn: { backgroundColor: '#0284C7', padding: 8, borderRadius: 6, alignItems: 'center', marginTop: 4 },
+  instaPayBtnText: { color: '#FFFFFF', fontSize: 12, fontWeight: 'bold' },
+  paywallSubNote: { fontSize: 11, color: '#94A3B8', textAlign: 'center', marginBottom: 15, lineHeight: 18 },
+  whatsappBtn: { backgroundColor: '#16A34A', padding: 14, borderRadius: 10, width: '100%', alignItems: 'center', marginBottom: 15 },
+  whatsappBtnText: { color: '#FFFFFF', fontSize: 13, fontWeight: 'bold' },
+  paywallSignOutBtn: { marginTop: 5 },
 
   navBar: { flexDirection: 'row-reverse', backgroundColor: '#1E293B', borderRadius: 10, padding: 4, marginBottom: 15, borderWidth: 1, borderColor: '#334155' },
   navBtn: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 8 },
