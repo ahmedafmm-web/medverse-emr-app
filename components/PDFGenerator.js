@@ -50,6 +50,7 @@ export const generatePrescriptionPDF = async (patient = {}, diagnosis = '', deta
         .clinic-name { font-size: 18px; font-weight: bold; color: #0284C7; }
         .doctor-name { font-size: 14px; font-weight: bold; color: #1E293B; margin-top: 3px; }
         .specialty { font-size: 11px; color: #64748B; }
+        .contact-info { font-size: 10px; color: #475569; margin-top: 4px; }
         
         .patient-box {
           background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 6px;
@@ -72,11 +73,17 @@ export const generatePrescriptionPDF = async (patient = {}, diagnosis = '', deta
         
         .footer {
           margin-top: 30px; padding-top: 12px; border-top: 1px solid #E2E8F0;
-          display: flex; justify-content: space-between; align-items: center; font-size: 10px; color: #94A3B8;
+          display: flex; justify-content: space-between; align-items: flex-end; font-size: 10px; color: #94A3B8;
         }
         .qr-placeholder {
           font-size: 10px; color: #0284C7; font-weight: bold;
           border: 1px dashed #0284C7; padding: 4px 8px; border-radius: 4px;
+        }
+        .stamp-box {
+          text-align: center; width: 140px;
+        }
+        .stamp-img {
+          max-height: 65px; width: auto; max-width: 130px; display: block; margin: 0 auto 4px auto;
         }
       </style>
     </head>
@@ -86,6 +93,12 @@ export const generatePrescriptionPDF = async (patient = {}, diagnosis = '', deta
           <div class="clinic-name">${clinicInfo.clinicName || 'عيادة MedVerse التخصصية'}</div>
           <div class="doctor-name">${clinicInfo.doctorName || 'د. أحمد محمد'}</div>
           <div class="specialty">${clinicInfo.specialty || ''}</div>
+          ${(clinicInfo.phone || clinicInfo.address) ? `
+            <div class="contact-info">
+              ${clinicInfo.phone ? `<span>📞 ${clinicInfo.phone}</span>` : ''} 
+              ${clinicInfo.address ? `<span style="margin-right: 10px;">📍 ${clinicInfo.address}</span>` : ''}
+            </div>
+          ` : ''}
         </div>
         ${clinicInfo.logoUrl ? `<img src="${clinicInfo.logoUrl}" style="height: 50px; width: auto; max-width: 120px;" />` : ''}
       </div>
@@ -128,8 +141,9 @@ export const generatePrescriptionPDF = async (patient = {}, diagnosis = '', deta
       <div class="footer">
         <div><span>Powered by <strong>MedVerse Smart EMR Suite</strong></span></div>
         <div class="qr-placeholder">🔒 رمز تحقق إلكتروني معتمد: VERIFY-${patient.code || ''}</div>
-        <div style="text-align: left;">
-          <div style="font-size: 11px; font-weight: bold; color: #334155;">توقيع الطبيب</div>
+        <div class="stamp-box">
+          ${clinicInfo.stampUrl ? `<img src="${clinicInfo.stampUrl}" class="stamp-img" />` : ''}
+          <div style="font-size: 11px; font-weight: bold; color: #334155;">توقيع وختم الطبيب</div>
           <div style="font-size: 10px; color: #64748B;">${clinicInfo.doctorName || ''}</div>
         </div>
       </div>
