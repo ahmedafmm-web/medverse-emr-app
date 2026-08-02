@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   StyleSheet, Text, View, TextInput, ScrollView, 
-  TouchableOpacity, Alert, ActivityIndicator, Platform, Image, Linked
+  TouchableOpacity, Alert, ActivityIndicator, Platform, Image, Linking
 } from 'react-native';
 import { generatePrescriptionPDF } from '../components/PDFGenerator';
 import { supabase } from '../supabaseClient';
@@ -124,7 +124,7 @@ export default function DoctorDashboard({ specialty: initialSpecialty }) {
     setSubscriptionAccess(subStatus);
   };
 
-  // --- Supabase Auth Functions ---
+  // --- Supabase Auth Functions (تعديل التسجيل الآلي والتسجيل المباشر) ---
   const handleAuth = async () => {
     if (!email.trim() || !password.trim()) {
       showAlert('تنبيه', 'يرجى إدخال البريد الإلكتروني وكلمة السر.');
@@ -138,7 +138,18 @@ export default function DoctorDashboard({ specialty: initialSpecialty }) {
           password: password.trim(),
         });
         if (error) throw error;
-        showAlert('تم إنشاء الحساب 🎉', 'تم إنشاء الحساب بنجاح! يمكنك الآن استخدامه بالكامل.');
+
+        // محاولة تسجيل الدخول مباشرة بعد إنشاء الحساب لتجاوز القفل
+        const { error: signInErr } = await supabase.auth.signInWithPassword({
+          email: email.trim(),
+          password: password.trim(),
+        });
+
+        if (!signInErr) {
+          showAlert('تم إنشاء الحساب 🎉', 'تم إنشاء الحساب وتسجيل الدخول بنجاح!');
+        } else {
+          showAlert('تم إنشاء الحساب 🎉', 'تم إنشاء الحساب بنجاح! إذا تطلب الأمر تفعيل الإيميل، يرجى مراجعة بريدك الإلكتروني.');
+        }
       } else {
         const { error } = await supabase.auth.signInWithPassword({
           email: email.trim(),
@@ -1059,4 +1070,3 @@ const styles = StyleSheet.create({
   historyDate: { fontSize: 10, color: '#38BDF8', fontWeight: 'bold', textAlign: 'right' },
   historyDiagnosis: { fontSize: 11, color: '#CBD5E1', textAlign: 'right' }
 });
- 
