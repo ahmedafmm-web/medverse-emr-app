@@ -113,7 +113,6 @@ export default function PatientPortal({ onBackToDashboard, doctorClinicId }) {
   const handleDownloadSingleScan = async (scanUrl, scanTitle) => {
     if (!scanUrl) return;
 
-    // البدء بشريط التقدم
     setDownloadProgressMap(prev => ({ ...prev, [scanUrl]: 15 }));
 
     try {
@@ -144,12 +143,11 @@ export default function PatientPortal({ onBackToDashboard, doctorClinicId }) {
     }
   };
 
-  // --- نسخ رابط المشاركة المؤقت للاستشاريين ---
+  // --- نسخ رابط المشاركة المؤقت للاستشاريين وإصلاح مسار 404 ---
   const handleCopyTemporaryShareLink = () => {
     if (!patientData?.patient_code) return;
-    const shareUrl = Platform.OS === 'web' && typeof window !== 'undefined'
-      ? `${window.location.origin}/?c=${patientData.patient_code}`
-      : `https://medverse-emr-suite.vercel.app/?c=${patientData.patient_code}`;
+    const baseUrl = Platform.OS === 'web' && typeof window !== 'undefined' ? window.location.origin.split('?')[0] : 'https://medverse-emr-suite.vercel.app';
+    const shareUrl = `${baseUrl}?c=${patientData.patient_code}`;
 
     if (Platform.OS === 'web' && navigator.clipboard) {
       navigator.clipboard.writeText(shareUrl);
@@ -211,7 +209,7 @@ export default function PatientPortal({ onBackToDashboard, doctorClinicId }) {
           <TextInput
             style={styles.input}
             placeholder="مثال: PAT-65630"
-            placeholderTextColor="#94A3B8"
+            placeholderTextColor="#64748B"
             value={patientCode}
             onChangeText={setPatientCode}
             autoCapitalize="characters"
@@ -325,47 +323,47 @@ export default function PatientPortal({ onBackToDashboard, doctorClinicId }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0F172A', padding: 15 },
+  container: { flex: 1, backgroundColor: '#090D16', padding: 14 },
   header: { marginBottom: 20, alignItems: 'center', marginTop: 15 },
   headerLogo: { width: 70, height: 70, marginBottom: 8 },
-  title: { fontSize: 20, fontWeight: 'bold', color: '#38BDF8', textAlign: 'center' },
+  title: { fontSize: 22, fontWeight: '900', color: '#00F2FE', textAlign: 'center', letterSpacing: 0.5 },
   doctorSub: { fontSize: 12, color: '#94A3B8', marginTop: 4, textAlign: 'center' },
-  card: { backgroundColor: '#1E293B', padding: 20, borderRadius: 16, borderWidth: 1, borderColor: '#334155' },
+  card: { backgroundColor: '#131C2E', padding: 20, borderRadius: 16, borderWidth: 1, borderColor: '#1E293B' },
   sectionTitle: { fontSize: 16, fontWeight: 'bold', color: '#F8FAFC', marginBottom: 15, textAlign: 'right' },
   sectionTitleHeader: { fontSize: 15, fontWeight: 'bold', color: '#F8FAFC', marginVertical: 15, textAlign: 'right' },
   label: { fontSize: 13, color: '#CBD5E1', marginBottom: 8, textAlign: 'right' },
-  input: { borderWidth: 1, borderColor: '#475569', borderRadius: 10, padding: 12, backgroundColor: '#0F172A', color: '#FFFFFF', fontSize: 15, textAlign: 'center', marginBottom: 15 },
+  input: { borderWidth: 1, borderColor: '#1E293B', borderRadius: 10, padding: 12, backgroundColor: '#090D16', color: '#FFFFFF', fontSize: 15, textAlign: 'center', marginBottom: 15 },
   btn: { backgroundColor: '#0284C7', padding: 14, borderRadius: 10, alignItems: 'center' },
   btnDisabled: { opacity: 0.6 },
   btnText: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 14 },
   backBtn: { marginTop: 18, alignItems: 'center', padding: 6 },
-  backBtnText: { color: '#38BDF8', fontSize: 13, fontWeight: 'bold' },
-  patientCard: { backgroundColor: '#1E293B', padding: 16, borderRadius: 12, borderRightWidth: 4, borderRightColor: '#38BDF8', marginBottom: 10 },
+  backBtnText: { color: '#00F2FE', fontSize: 13, fontWeight: 'bold' },
+  patientCard: { backgroundColor: '#131C2E', padding: 16, borderRadius: 12, borderRightWidth: 4, borderRightColor: '#00F2FE', marginBottom: 10, borderWidth: 1, borderColor: '#1E293B' },
   row: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center' },
   patientName: { fontSize: 16, fontWeight: 'bold', color: '#FFFFFF' },
   logoutText: { color: '#EF4444', fontSize: 12, fontWeight: 'bold' },
-  patientCodeText: { color: '#38BDF8', fontSize: 12, marginTop: 4, textAlign: 'right', fontFamily: 'monospace' },
+  patientCodeText: { color: '#00F2FE', fontSize: 12, marginTop: 4, textAlign: 'right', fontFamily: 'monospace' },
   
-  sharePassBtn: { backgroundColor: '#0369A1', padding: 8, borderRadius: 6, marginTop: 10, alignItems: 'center' },
+  sharePassBtn: { backgroundColor: '#0284C7', padding: 10, borderRadius: 8, marginTop: 10, alignItems: 'center' },
   sharePassBtnText: { color: '#FFFFFF', fontSize: 11, fontWeight: 'bold' },
 
-  recordCard: { backgroundColor: '#1E293B', padding: 16, borderRadius: 12, marginBottom: 15, borderWidth: 1, borderColor: '#334155' },
+  recordCard: { backgroundColor: '#131C2E', padding: 16, borderRadius: 12, marginBottom: 15, borderWidth: 1, borderColor: '#1E293B' },
   recordDate: { fontSize: 12, color: '#94A3B8' },
-  verifiedBadge: { backgroundColor: '#065F46', color: '#34D399', fontSize: 10, fontWeight: 'bold', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 12 },
-  divider: { height: 1, backgroundColor: '#334155', marginVertical: 10 },
+  verifiedBadge: { backgroundColor: 'rgba(16, 185, 129, 0.2)', color: '#10B981', fontSize: 10, fontWeight: 'bold', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 12, borderWidth: 1, borderColor: '#10B981' },
+  divider: { height: 1, backgroundColor: '#1E293B', marginVertical: 10 },
   recordLabel: { fontSize: 12, color: '#94A3B8', textAlign: 'right', marginBottom: 4 },
   recordValue: { fontSize: 14, color: '#F8FAFC', textAlign: 'right', marginBottom: 12 },
 
-  scansContainer: { backgroundColor: '#0F172A', padding: 12, borderRadius: 10, marginBottom: 15, borderWidth: 1, borderColor: '#334155' },
-  scansHeaderTitle: { fontSize: 12, fontWeight: 'bold', color: '#38BDF8', marginBottom: 10, textAlign: 'right' },
-  scanItemCard: { backgroundColor: '#1E293B', padding: 10, borderRadius: 8, marginBottom: 12, alignItems: 'center', borderWidth: 1, borderColor: '#475569' },
+  scansContainer: { backgroundColor: '#090D16', padding: 12, borderRadius: 10, marginBottom: 15, borderWidth: 1, borderColor: '#1E293B' },
+  scansHeaderTitle: { fontSize: 12, fontWeight: 'bold', color: '#00F2FE', marginBottom: 10, textAlign: 'right' },
+  scanItemCard: { backgroundColor: '#131C2E', padding: 10, borderRadius: 8, marginBottom: 12, alignItems: 'center', borderWidth: 1, borderColor: '#1E293B' },
   scanImage: { width: '100%', height: 220, borderRadius: 6, backgroundColor: '#000' },
   scanTitle: { fontSize: 12, fontWeight: 'bold', color: '#F8FAFC', marginTop: 6, textAlign: 'center' },
 
-  downloadScanBtn: { backgroundColor: '#059669', padding: 10, borderRadius: 6, width: '100%', alignItems: 'center', marginTop: 8 },
+  downloadScanBtn: { backgroundColor: '#10B981', padding: 10, borderRadius: 6, width: '100%', alignItems: 'center', marginTop: 8 },
   downloadScanBtnText: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 11 },
 
-  downloadProgressBarBox: { width: '100%', height: 16, backgroundColor: '#0F172A', borderRadius: 8, overflow: 'hidden', marginTop: 8, justifyContent: 'center' },
+  downloadProgressBarBox: { width: '100%', height: 16, backgroundColor: '#090D16', borderRadius: 8, overflow: 'hidden', marginTop: 8, justifyContent: 'center', borderWidth: 1, borderColor: '#1E293B' },
   downloadProgressBarFill: { height: '100%', backgroundColor: '#0284C7', position: 'absolute' },
   downloadProgressText: { color: '#FFFFFF', fontSize: 10, fontWeight: 'bold', textAlign: 'center', zIndex: 1 },
 
@@ -374,3 +372,4 @@ const styles = StyleSheet.create({
   emptyBox: { padding: 20, alignItems: 'center' },
   emptyText: { color: '#64748B', fontSize: 13 }
 });
+ 
