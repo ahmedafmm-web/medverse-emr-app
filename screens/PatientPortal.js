@@ -48,9 +48,7 @@ export default function PatientPortal({ onBackToDashboard, doctorClinicId }) {
       query = query.or(`id.eq.${identifier},user_id.eq.${identifier}`);
       const { data, error } = await query.limit(1).maybeSingle();
 
-      if (!error && data) {
-        setDoctorInfo(data);
-      }
+      if (!error && data) setDoctorInfo(data);
     } catch (err) {
       console.error('Fetch Clinic Header Error:', err);
     }
@@ -72,7 +70,7 @@ export default function PatientPortal({ onBackToDashboard, doctorClinicId }) {
         .maybeSingle();
 
       if (pErr || !patient) {
-        showAlert('تنبيه', 'لم يتم العثور على مريض بهذا الرقم الفريد في قاعدة بيانات هذه العيادة.');
+        showAlert('تنبيه', 'لم يتم العثور على مريض بهذا الرقم الفريد.');
         setPatientData(null);
         setMedicalRecords([]);
         return;
@@ -87,7 +85,6 @@ export default function PatientPortal({ onBackToDashboard, doctorClinicId }) {
         .order('created_at', { ascending: false });
 
       if (rErr) throw rErr;
-
       setMedicalRecords(records || []);
 
       if (!doctorInfo && patient.doctor_email) {
@@ -359,4 +356,3 @@ const styles = StyleSheet.create({
   emptyBox: { padding: 20, alignItems: 'center' },
   emptyText: { color: '#64748B', fontSize: 13 }
 });
- 
