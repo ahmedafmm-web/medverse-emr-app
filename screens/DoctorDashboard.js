@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   StyleSheet, Text, View, TextInput, ScrollView, 
-  TouchableOpacity, Alert, ActivityIndicator, Platform, Image, Linking
+  TouchableOpacity, Alert, ActivityIndicator, Platform, Image, Linking, Modal
 } from 'react-native';
 import { generatePrescriptionPDF } from '../components/PDFGenerator';
 import { supabase } from '../supabaseClient';
@@ -46,11 +46,15 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
   const [clinicPhone, setClinicPhone] = useState('');
   const [clinicAddress, setClinicAddress] = useState('');
 
-  // شريط تقدم الرفع وضغط الصور
+  // شريط تقدم الرفع وضغط اللوجو
   const [logoUploadProgress, setLogoUploadProgress] = useState(0);
   const [uploadingLogo, setUploadingLogo] = useState(false);
+
+  // رفع متعدد لصور الأشعة وتنبيه عدم تطابق التخصص
+  const [showMismatchModal, setShowMismatchModal] = useState(false);
+  const [selectedScanFiles, setSelectedScanFiles] = useState([]); // [{ id, file, previewUrl, title }]
   const [scanUploadProgress, setScanUploadProgress] = useState(0);
-  const [uploadingScan, setUploadingScan] = useState(false);
+  const [uploadingScans, setUploadingScans] = useState(false);
 
   // --- 2. Active Patient & Consultation States ---
   const [patientName, setPatientName] = useState('');
@@ -63,10 +67,7 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
 
   const [symptomsInput, setSymptomsInput] = useState('');
   const [doctorNotes, setDoctorNotes] = useState('');
-
-  // --- 3. Medical Imaging & Attachments ---
-  const [uploadedScanUrl, setUploadedScanUrl] = useState('');
-  const [scanTitle, setScanTitle] = useState('');
+  const [scanGroupTitle, setScanGroupTitle] = useState('');
 
   // --- 4. AI & Diagnosis States ---
   const [analyzing, setAnalyzing] = useState(false);
@@ -142,7 +143,7 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
   };
 
   // --- دالة ضغط الصور فائقة السرعة والموافقة للموبايل والويب ---
-  const compressImage = (file, maxWidth = 1000, quality = 0.8) => {
+  const compressImage = (file, maxWidth = 1400, quality = 0.85) => {
     return new Promise((resolve) => {
       try {
         if (!file || !file.type.includes('image')) return resolve(file);
@@ -168,9 +169,7 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
           ctx.drawImage(img, 0, 0, width, height);
 
           canvas.toBlob(
-            (blob) => {
-              resolve(blob || file);
-            },
+            (blob) => resolve(blob || file),
             'image/jpeg',
             quality
           );
@@ -186,7 +185,124 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
     });
   };
 
-  // --- دالة رفع اللوجو المحدثة بالكامل ---
+  // --- دالة اختيار صور أشعة متعددة ومعاينتها ---
+  const handleSelectMultipleScans = (event) => {
+    const files = Array.from(event.target.files);
+    if (!files || files.length === 0) return;
+
+    const newFiles = files.map((file, idx) => ({
+      id: Date.now() + '_' + idx,
+      file: file,
+      previewUrl: URL.createObjectURL(file),
+      title: scanGroupTitle || file.name,
+    }));
+
+    setSelectedScanFiles(prev => [...prev, ...newFiles]);
+  };
+
+  const handleRemoveSingleScan = (id) => {
+    setSelectedScanFiles(prev => prev.filter(item => item.id !== id));
+  };
+
+  // --- دالة حفظ الصور المتعددة في ملف المريض المنفصل ---
+  const handleSaveScansToPatientFile = async () => {
+    if (!patientName.trim()) {
+      showAlert('تنبيه', 'يرجى إدخال اسم المريض أو اختياره أولاً لحفظ الأشعة بملفه.');
+      return;
+    }
+    if (selectedScanFiles.length === 0) {
+      showAlert('تنبيه', 'يرجى اختيار صور الأشعة أولاً.');
+      return;
+    }
+
+    setUploadingScans(true);
+    setScanUploadProgress(10);
+
+    try {
+      const userEmail = session?.user?.email?.toLowerCase();
+      let patientCode = selectedPatientCode;
+      let patientId = null;
+
+      const { data: existingPatient } = await supabase
+        .from('patients')
+        .select('id, patient_code')
+        .eq('full_name', patientName.trim())
+        .ilike('doctor_email', userEmail)
+        .maybeSingle();
+
+      if (existingPatient) {
+        patientId = existingPatient.id;
+        patientCode = existingPatient.patient_code;
+      } else {
+        const generatedCode = 'PAT-' + Math.floor(10000 + Math.random() * 90000);
+        const { data: newPatient, error: pErr } = await supabase
+          .from('patients')
+          .insert([{
+            full_name: patientName.trim(),
+            phone: patientPhone || null,
+            age: age ? parseInt(age) : null,
+            gender: gender,
+            patient_code: generatedCode,
+            doctor_email: userEmail || null
+          }])
+          .select('id, patient_code')
+          .single();
+
+        if (pErr) throw pErr;
+        patientId = newPatient.id;
+        patientCode = newPatient.patient_code;
+        setSelectedPatientCode(patientCode);
+      }
+
+      const uploadedList = [];
+      const total = selectedScanFiles.length;
+
+      for (let i = 0; i < total; i++) {
+        const item = selectedScanFiles[i];
+        const compressed = await compressImage(item.file, 1600, 0.9);
+        const filePath = `patient_scans/${patientCode}/${Date.now()}_${i}.jpg`;
+
+        const { error: uploadErr } = await supabase.storage
+          .from('clinic-assets')
+          .upload(filePath, compressed, { upsert: true });
+
+        let publicUrl = '';
+        if (!uploadErr) {
+          const { data: urlData } = supabase.storage.from('clinic-assets').getPublicUrl(filePath);
+          publicUrl = urlData.publicUrl;
+        } else {
+          publicUrl = item.previewUrl;
+        }
+
+        uploadedList.push({
+          title: item.title || scanGroupTitle || 'أشعة وفحص طبي',
+          url: publicUrl,
+          created_at: new Date().toISOString()
+        });
+
+        setScanUploadProgress(Math.round(((i + 1) / total) * 100));
+      }
+
+      await supabase.from('medical_records').insert([{
+        patient_id: patientId,
+        doctor_email: userEmail,
+        visit_date: new Date().toISOString().split('T')[0],
+        diagnosis: 'مرفقات وأشعة طبية جديدة',
+        dynamic_fields: { scans_list: uploadedList }
+      }]);
+
+      showAlert('تم الحفظ بنجاح ✅', `تم حفظ (${uploadedList.length}) أشعة منفصلة في ملف المريض [${patientCode}].`);
+      setSelectedScanFiles([]);
+      fetchPatientHistory(patientName);
+
+    } catch (err) {
+      showAlert('خطأ', 'فشل حفظ الأشعات: ' + err.message);
+    } finally {
+      setUploadingScans(false);
+    }
+  };
+
+  // --- دالة رفع اللوجو المحدثة ---
   const handleUploadLogoFile = async (event) => {
     const file = event.target.files[0];
     if (!file) return;
@@ -222,45 +338,6 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
     } catch (err) {
       showAlert('خطأ في الرفع', err.message || 'تعذر رفع وتصغير الصورة');
       setUploadingLogo(false);
-    }
-  };
-
-  // --- دالة رفع صورة الأشعة المحدثة بالكامل ---
-  const handleUploadScanFile = async (event) => {
-    const file = event.target.files[0];
-    if (!file) return;
-
-    setUploadingScan(true);
-    setScanUploadProgress(10);
-
-    try {
-      const compressedBlob = await compressImage(file, 1200, 0.85);
-      setScanUploadProgress(50);
-
-      const filePath = `scans/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
-      const { data, error } = await supabase.storage
-        .from('clinic-assets')
-        .upload(filePath, compressedBlob, { upsert: true });
-
-      setScanUploadProgress(85);
-
-      if (error) {
-        const reader = new FileReader();
-        reader.onload = () => {
-          setUploadedScanUrl(reader.result);
-          setScanUploadProgress(100);
-          setUploadingScan(false);
-        };
-        reader.readAsDataURL(compressedBlob);
-      } else {
-        const { data: publicUrlData } = supabase.storage.from('clinic-assets').getPublicUrl(filePath);
-        setUploadedScanUrl(publicUrlData.publicUrl);
-        setScanUploadProgress(100);
-        setUploadingScan(false);
-      }
-    } catch (err) {
-      showAlert('خطأ في الرفع', err.message || 'تعذر رفع صورة الأشعة');
-      setUploadingScan(false);
     }
   };
 
@@ -343,8 +420,12 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
         if (clinic.doctor_name) setClinicDoctorName(clinic.doctor_name);
         if (clinic.clinic_name) setClinicName(clinic.clinic_name);
         if (clinic.specialty) {
-          setSpecialty(clinic.specialty);
           setRegisteredSpecialty(clinic.specialty);
+          if (!initialSpecialty) {
+            setSpecialty(clinic.specialty);
+          } else if (initialSpecialty !== clinic.specialty) {
+            setShowMismatchModal(true);
+          }
         }
         if (clinic.logo_url) setClinicLogoUrl(clinic.logo_url);
         if (clinic.stamp_url) setDigitalStampUrl(clinic.stamp_url);
@@ -422,7 +503,7 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
   };
 
   const fetchPatientHistory = async (name) => {
-    if (!name || name.trim().length < 3) {
+    if (!name || name.trim().length < 2) {
       setPatientHistory([]);
       return;
     }
@@ -436,7 +517,7 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
         .ilike('full_name', `%${name.trim()}%`)
         .ilike('doctor_email', userEmail)
         .limit(1)
-        .single();
+        .maybeSingle();
 
       if (patient) {
         setSelectedPatientCode(patient.patient_code);
@@ -722,9 +803,7 @@ Return JSON ONLY:
               chronicDiseases, 
               familyHistory, 
               symptoms: symptomsInput, 
-              doctorNotes,
-              scanUrl: uploadedScanUrl,
-              scanTitle: scanTitle
+              doctorNotes
             }
           }]);
 
@@ -759,8 +838,6 @@ Return JSON ONLY:
       setSymptomsInput('');
       setDoctorNotes('');
       setFinalDiagnosis('');
-      setUploadedScanUrl('');
-      setScanTitle('');
       setSelectedPatientCode('');
       setPrescribedMeds([]);
       setAiReport(null);
@@ -888,10 +965,38 @@ Return JSON ONLY:
     );
   }
 
-  const isSpecialtyMismatch = registeredSpecialty && specialty && registeredSpecialty !== specialty;
-
   return (
     <ScrollView style={styles.container}>
+      {/* --- MODAL ALERT FOR SPECIALTY MISMATCH --- */}
+      <Modal visible={showMismatchModal} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>⚠️ تنبيه عدم تطابق التخصص</Text>
+            <Text style={styles.modalSub}>
+              البوابة الحالية هي [{specialty}]، بينما تخصصك الطبي المسجل في الملف هو [{registeredSpecialty}].
+            </Text>
+            <View style={styles.modalButtonsRow}>
+              <TouchableOpacity 
+                style={styles.modalStayBtn} 
+                onPress={() => setShowMismatchModal(false)}
+              >
+                <Text style={styles.modalStayBtnText}>نعم، أعرف وأود البقاء</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={styles.modalGoBtn} 
+                onPress={() => {
+                  setShowMismatchModal(false);
+                  setSpecialty(registeredSpecialty);
+                }}
+              >
+                <Text style={styles.modalGoBtnText}>مغادرة إلى تخصّصي المسجل ➔</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       {/* --- WARNING BANNER FOR EXPIRING SUBSCRIPTION --- */}
       {subscriptionAccess.showAlert && (
         <View style={styles.subWarningBanner}>
@@ -899,20 +1004,10 @@ Return JSON ONLY:
         </View>
       )}
 
-      {/* --- BANNER FOR SPECIALTY MISMATCH / ALERT --- */}
-      {isSpecialtyMismatch && (
-        <View style={styles.mismatchBanner}>
-          <Text style={styles.mismatchBannerText}>
-            ⚠️ تنبيه: أنت تعمل الآن ببوابة [{specialty}] بينما تخصصك المسجل هو [{registeredSpecialty}]. يرجى تحديث بيانات التخصص من قسم بيانات العيادة قبل الطباعة لضمان دقة التقرير.
-          </Text>
-        </View>
-      )}
-
       <View style={styles.header}>
         <View style={styles.topUserRow}>
           <Text style={styles.userEmailText}>👤 {session.user.email}</Text>
 
-          {/* زر تغيير البوابة الأصلي دون إزالة */}
           {onSwitchPortal && (
             <TouchableOpacity onPress={onSwitchPortal} style={styles.switchPortalBtn}>
               <Text style={styles.switchPortalBtnText}>🔄 تغيير البوابة</Text>
@@ -933,7 +1028,7 @@ Return JSON ONLY:
           style={[styles.navBtn, activeTab === 'prescription' && styles.navBtnActive]} 
           onPress={() => setActiveTab('prescription')}
         >
-          <Text style={[styles.navBtnText, activeTab === 'prescription' && styles.navBtnTextActive]}>🩺 الروشتة والكشف</Text>
+          <Text style={[styles.navBtnText, activeTab === 'prescription' && styles.navBtnTextActive]}>🩺 الروشتة والأشعة</Text>
         </TouchableOpacity>
 
         <TouchableOpacity 
@@ -1143,57 +1238,110 @@ Return JSON ONLY:
             <TextInput style={styles.input} placeholder="مثال: أمراض مناعية..." placeholderTextColor="#94A3B8" value={familyHistory} onChangeText={setFamilyHistory} />
           </View>
 
+          {/* قسم رفع الأشعة المتعددة المستقل */}
+          <View style={styles.card}>
+            <Text style={styles.sectionTitle}>🖼️ مرفقات وأشعات المريض (رفع متعدد)</Text>
+            
+            <Text style={styles.label}>عنوان فحص الأشعة (مثال: أشعة سينية / تحاليل مناعية):</Text>
+            <TextInput 
+              style={styles.input} 
+              placeholder="مثال: أشعة ركبة وبوصلة مفصلية" 
+              placeholderTextColor="#94A3B8" 
+              value={scanGroupTitle} 
+              onChangeText={setScanGroupTitle} 
+            />
+
+            <Text style={styles.label}>اختيار صور متعددة من الجهاز (تحديد أكثر من صورة):</Text>
+            {Platform.OS === 'web' ? (
+              <input 
+                type="file" 
+                accept="image/*" 
+                multiple
+                onChange={handleSelectMultipleScans}
+                style={{ marginBottom: 12, color: '#FFFFFF' }}
+              />
+            ) : null}
+
+            {/* عرض المعاينات المتعددة */}
+            {selectedScanFiles.length > 0 && (
+              <View style={{ marginBottom: 15 }}>
+                <Text style={styles.label}>معاينة الصور المختارة للرفع ({selectedScanFiles.length} صورة):</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                  {selectedScanFiles.map((item) => (
+                    <View key={item.id} style={styles.scanPreviewCard}>
+                      <Image source={{ uri: item.previewUrl }} style={styles.scanPreviewImg} />
+                      <TouchableOpacity 
+                        style={styles.deleteScanBtn}
+                        onPress={() => handleRemoveSingleScan(item.id)}
+                      >
+                        <Text style={styles.deleteScanBtnText}>إزالة ✕</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                </ScrollView>
+              </View>
+            )}
+
+            {uploadingScans && (
+              <View style={styles.progressBarContainer}>
+                <View style={[styles.progressBarFill, { width: `${scanUploadProgress}%` }]} />
+                <Text style={styles.progressText}>جاري رفع ومعالجة الصور... {scanUploadProgress}%</Text>
+              </View>
+            )}
+
+            <TouchableOpacity 
+              style={styles.saveScansBtn} 
+              onPress={handleSaveScansToPatientFile}
+              disabled={uploadingScans}
+            >
+              {uploadingScans ? (
+                <ActivityIndicator color="#FFFFFF" />
+              ) : (
+                <Text style={styles.saveScansBtnText}>💾 حفظ الأشاعات في ملف المريض المنفصل</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+
           {searchingHistory && <ActivityIndicator color="#0284C7" style={{ marginBottom: 15 }} />}
           {patientHistory.length > 0 && (
             <View style={styles.historyCard}>
-              <Text style={styles.historyTitle}>📚 تاريخ الزيارات السابقة للمريض ({patientHistory.length} زيارات)</Text>
+              <Text style={styles.historyTitle}>📚 تاريخ الزيارات والأشعات المسجلة للمريض ({patientHistory.length})</Text>
               {patientHistory.map((item, index) => (
                 <View key={item.id || index} style={styles.historyItem}>
                   <Text style={styles.historyDate}>📅 {new Date(item.created_at || item.visit_date).toLocaleDateString('ar-EG')}</Text>
                   <Text style={styles.historyDiagnosis}><strong>التشخيص:</strong> {item.diagnosis || 'لا يوجد'}</Text>
+
+                  {/* عرض الأشعات السابقة المحفوظة للمريض */}
+                  {item.dynamic_fields?.scans_list && (
+                    <View style={{ marginTop: 6 }}>
+                      <Text style={{ color: '#38BDF8', fontSize: 11, fontWeight: 'bold', marginBottom: 4 }}>الأشعات المرفقة:</Text>
+                      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                        {item.dynamic_fields.scans_list.map((sc, sIdx) => (
+                          <TouchableOpacity 
+                            key={sIdx} 
+                            onPress={() => Linking.openURL(sc.url)}
+                            style={styles.historyScanThumbBox}
+                          >
+                            <Image source={{ uri: sc.url }} style={styles.historyScanThumb} />
+                            <Text style={styles.historyScanTitle} numberOfLines={1}>{sc.title}</Text>
+                          </TouchableOpacity>
+                        ))}
+                      </ScrollView>
+                    </View>
+                  )}
                 </View>
               ))}
             </View>
           )}
 
           <View style={styles.card}>
-            <Text style={styles.sectionTitle}>🩺 الشكوى الحالية، الفحوصات، والأشعة</Text>
+            <Text style={styles.sectionTitle}>🩺 الشكوى الحالية والفحوصات الإكلينيكية</Text>
             
             <Text style={styles.label}>الأعراض والشكوى الحالية:</Text>
             <TextInput style={[styles.input, styles.textArea]} placeholder="صف الأعراض بالتفصيل..." placeholderTextColor="#94A3B8" multiline numberOfLines={3} value={symptomsInput} onChangeText={setSymptomsInput} />
 
             <Text style={styles.label}>ملاحظات الفحوصات والتحاليل والمتابعة:</Text>
             <TextInput style={[styles.input, styles.textArea]} placeholder="اكتب نتائج تحاليل RF, Anti-CCP أو الأشعة..." placeholderTextColor="#94A3B8" multiline numberOfLines={2} value={doctorNotes} onChangeText={setDoctorNotes} />
-
-            <Text style={styles.subSectionTitle}>🖼️ المرفقات والأشعة عالية الدقة (ترفع لمكود المريض)</Text>
-            <TextInput style={styles.input} placeholder="عنوان الأشعة / الفحص (مثال: أشعة على المفاصل)" placeholderTextColor="#94A3B8" value={scanTitle} onChangeText={setScanTitle} />
-            
-            <Text style={styles.label}>رفع صورة الأشعة كملف مباشر:</Text>
-            {Platform.OS === 'web' ? (
-              <input 
-                type="file" 
-                accept="image/*" 
-                onChange={handleUploadScanFile}
-                style={{ marginBottom: 10, color: '#FFFFFF' }}
-              />
-            ) : null}
-
-            {uploadingScan && (
-              <View style={styles.progressBarContainer}>
-                <View style={[styles.progressBarFill, { width: `${scanUploadProgress}%` }]} />
-                <Text style={styles.progressText}>جاري رفع وضغط الأشعة... {scanUploadProgress}%</Text>
-              </View>
-            )}
-
-            {uploadedScanUrl ? (
-              <View style={styles.previewBox}>
-                <Text style={styles.label}>معاينة الأشعة المرفقة للمريض:</Text>
-                <Image source={{ uri: uploadedScanUrl }} style={{ width: '100%', height: 160, borderRadius: 8 }} resizeMode="contain" />
-                <TouchableOpacity onPress={() => setUploadedScanUrl('')} style={styles.deleteImgBtn}>
-                  <Text style={styles.deleteImgBtnText}>🗑️ حذف صورة الأشعة</Text>
-                </TouchableOpacity>
-              </View>
-            ) : null}
 
             <TouchableOpacity style={styles.aiButton} onPress={handleClinicalAnalysis} disabled={analyzing}>
               {analyzing ? <ActivityIndicator color="#FFFFFF" size="small" /> : <Text style={styles.aiButtonText}>✨ تحليل الحالة بـ LLaMA 3.3 70B AI ({specialty})</Text>}
@@ -1277,9 +1425,6 @@ const styles = StyleSheet.create({
   subWarningBanner: { backgroundColor: '#B45309', padding: 10, borderRadius: 8, marginBottom: 15, alignItems: 'center' },
   subWarningText: { color: '#FFFFFF', fontSize: 12, fontWeight: 'bold', textAlign: 'center' },
 
-  mismatchBanner: { backgroundColor: '#854D0E', padding: 10, borderRadius: 8, marginBottom: 15, borderWidth: 1, borderColor: '#FACC15' },
-  mismatchBannerText: { color: '#FEF08A', fontSize: 11, fontWeight: 'bold', textAlign: 'right', lineHeight: 16 },
-
   authCard: { backgroundColor: '#1E293B', padding: 20, borderRadius: 16, borderWidth: 1, borderColor: '#334155' },
   authTitle: { fontSize: 20, fontWeight: 'bold', color: '#38BDF8', textAlign: 'center', marginBottom: 5 },
   authSub: { fontSize: 13, color: '#94A3B8', textAlign: 'center', marginBottom: 20 },
@@ -1332,9 +1477,17 @@ const styles = StyleSheet.create({
   patientChipTextActive: { color: '#FFFFFF', fontWeight: 'bold' },
   selectedCodeBadge: { color: '#34D399', fontSize: 11, fontWeight: 'bold', textAlign: 'right', marginBottom: 10 },
 
-  progressBarContainer: { height: 18, backgroundColor: '#0F172A', borderRadius: 9, overflow: 'hidden', marginBottom: 10, justifyContent: 'center', borderWidth: 1, borderColor: '#334155' },
+  scanPreviewCard: { marginRight: 10, backgroundColor: '#0F172A', padding: 6, borderRadius: 8, alignItems: 'center', borderWidth: 1, borderColor: '#334155' },
+  scanPreviewImg: { width: 100, height: 100, borderRadius: 6 },
+  deleteScanBtn: { backgroundColor: '#991B1B', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4, marginTop: 4 },
+  deleteScanBtnText: { color: '#FFFFFF', fontSize: 10, fontWeight: 'bold' },
+
+  progressBarContainer: { height: 18, backgroundColor: '#0F172A', borderRadius: 9, overflow: 'hidden', marginBottom: 12, justifyContent: 'center', borderWidth: 1, borderColor: '#334155' },
   progressBarFill: { height: '100%', backgroundColor: '#059669', position: 'absolute' },
   progressText: { color: '#FFFFFF', fontSize: 10, fontWeight: 'bold', textAlign: 'center', zIndex: 1 },
+
+  saveScansBtn: { backgroundColor: '#059669', padding: 14, borderRadius: 8, alignItems: 'center' },
+  saveScansBtnText: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 13 },
 
   deleteImgBtn: { backgroundColor: '#991B1B', padding: 6, borderRadius: 6, marginTop: 6, alignItems: 'center' },
   deleteImgBtnText: { color: '#FFFFFF', fontSize: 11, fontWeight: 'bold' },
@@ -1376,8 +1529,20 @@ const styles = StyleSheet.create({
   saveButtonText: { color: '#FFFFFF', fontSize: 15, fontWeight: 'bold' },
   historyCard: { backgroundColor: '#1E293B', padding: 12, borderRadius: 12, marginBottom: 15, borderWidth: 1, borderColor: '#0284C7' },
   historyTitle: { fontSize: 12, fontWeight: 'bold', color: '#38BDF8', marginBottom: 6, textAlign: 'right' },
-  historyItem: { backgroundColor: '#0F172A', padding: 8, borderRadius: 6, marginBottom: 6 },
+  historyItem: { backgroundColor: '#0F172A', padding: 10, borderRadius: 8, marginBottom: 8 },
   historyDate: { fontSize: 10, color: '#38BDF8', fontWeight: 'bold', textAlign: 'right' },
-  historyDiagnosis: { fontSize: 11, color: '#CBD5E1', textAlign: 'right' }
+  historyDiagnosis: { fontSize: 11, color: '#CBD5E1', textAlign: 'right' },
+  historyScanThumbBox: { marginRight: 8, alignItems: 'center', width: 70 },
+  historyScanThumb: { width: 60, height: 60, borderRadius: 6, borderWidth: 1, borderColor: '#38BDF8' },
+  historyScanTitle: { color: '#94A3B8', fontSize: 9, marginTop: 2, textAlign: 'center' },
+
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', alignItems: 'center', padding: 20 },
+  modalContent: { backgroundColor: '#1E293B', padding: 20, borderRadius: 16, width: '100%', maxWidth: 450, borderWidth: 1, borderColor: '#EF4444' },
+  modalTitle: { fontSize: 16, fontWeight: 'bold', color: '#EF4444', marginBottom: 8, textAlign: 'right' },
+  modalSub: { fontSize: 13, color: '#CBD5E1', marginBottom: 20, textAlign: 'right', lineHeight: 20 },
+  modalButtonsRow: { flexDirection: 'row-reverse', justifyContent: 'space-between', gap: 10 },
+  modalStayBtn: { flex: 1, backgroundColor: '#334155', padding: 10, borderRadius: 8, alignItems: 'center' },
+  modalStayBtnText: { color: '#94A3B8', fontSize: 11, fontWeight: 'bold' },
+  modalGoBtn: { flex: 1.2, backgroundColor: '#0284C7', padding: 10, borderRadius: 8, alignItems: 'center' },
+  modalGoBtnText: { color: '#FFFFFF', fontSize: 11, fontWeight: 'bold' }
 });
- 
