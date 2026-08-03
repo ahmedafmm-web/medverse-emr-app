@@ -19,18 +19,29 @@ export default function PatientPortal({ onBackToDashboard, doctorClinicId }) {
   };
 
   useEffect(() => {
-    if (doctorClinicId) {
-      fetchClinicHeader(doctorClinicId);
+    // 1. محاولة قراءة معرف الدكتور من الـ Props أو من URL Query Parameter (?c=USER_ID)
+    let cId = doctorClinicId;
+    if (!cId && Platform.OS === 'web' && typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search);
+      cId = urlParams.get('c');
+    }
+
+    if (cId) {
+      fetchClinicHeader(cId);
     }
   }, [doctorClinicId]);
 
-  const fetchClinicHeader = async (clinicId) => {
+  const fetchClinicHeader = async (identifier) => {
     try {
-      const { data, error } = await supabase
+      // البحث عن العيادة بواسطة id أو user_id
+      let query = supabase
         .from('clinics')
-        .select('doctor_name, clinic_name, specialty, logo_url, phone, address')
-        .eq('id', clinicId)
-        .single();
+        .select('doctor_name, clinic_name, specialty, logo_url, phone, address, email');
+
+      // إذا كان الإدخال UUID يخص user_id أو id
+      query = query.or(`id.eq.${identifier},user_id.eq.${identifier}`);
+
+      const { data, error } = await query.limit(1).maybeSingle();
 
       if (!error && data) {
         setDoctorInfo(data);
@@ -48,16 +59,14 @@ export default function PatientPortal({ onBackToDashboard, doctorClinicId }) {
 
     setLoading(true);
     try {
-      let query = supabase
+      const cleanCode = patientCode.trim().toUpperCase();
+
+      // 1. الاستعلام عن المريض بكود المريض الفريد
+      let { data: patient, error: pErr } = await supabase
         .from('patients')
         .select('*')
-        .eq('patient_code', patientCode.trim().toUpperCase());
-
-      if (doctorClinicId) {
-        query = query.eq('clinic_id', doctorClinicId);
-      }
-
-      const { data: patient, error: pErr } = await query.single();
+        .eq('patient_code', cleanCode)
+        .maybeSingle();
 
       if (pErr || !patient) {
         showAlert('تنبيه', 'لم يتم العثور على مريض بهذا الرقم الفريد في قاعدة بيانات هذه العيادة.');
@@ -68,20 +77,10 @@ export default function PatientPortal({ onBackToDashboard, doctorClinicId }) {
 
       setPatientData(patient);
 
+      // 2. جلب السجلات الطبية الخاصة بالمريض
       const { data: records, error: rErr } = await supabase
         .from('medical_records')
-        .select(`
-          *,
-          clinics (
-            doctor_name,
-            clinic_name,
-            specialty,
-            logo_url,
-            stamp_url,
-            phone,
-            address
-          )
-        `)
+        .select('*')
         .eq('patient_id', patient.id)
         .order('created_at', { ascending: false });
 
@@ -89,8 +88,18 @@ export default function PatientPortal({ onBackToDashboard, doctorClinicId }) {
 
       setMedicalRecords(records || []);
 
-      if (records && records.length > 0 && records[0].clinics) {
-        setDoctorInfo(records[0].clinics);
+      // 3. جلب بيانات العيادة/الطبيب المقترنة إذا لم تكن محملة
+      if (!doctorInfo && patient.doctor_email) {
+        const { data: cData } = await supabase
+          .from('clinics')
+          .select('doctor_name, clinic_name, specialty, logo_url, stamp_url, phone, address')
+          .ilike('email', patient.doctor_email)
+          .limit(1)
+          .maybeSingle();
+
+        if (cData) {
+          setDoctorInfo(cData);
+        }
       }
 
     } catch (error) {
@@ -107,13 +116,13 @@ export default function PatientPortal({ onBackToDashboard, doctorClinicId }) {
       const medsList = fields.medications || record.prescriptions || record.medications || [];
 
       const clinicInfo = {
-        doctorName: record.clinics?.doctor_name || doctorInfo?.doctor_name || 'د. أحمد محمد',
-        clinicName: record.clinics?.clinic_name || doctorInfo?.clinic_name || 'عيادة MedVerse التخصصية',
-        specialty: record.clinics?.specialty || doctorInfo?.specialty || 'استشاري أمراض القلب والباطنة',
-        logoUrl: record.clinics?.logo_url || doctorInfo?.logo_url || '',
-        stampUrl: record.clinics?.stamp_url || '',
-        phone: record.clinics?.phone || doctorInfo?.phone || '',
-        address: record.clinics?.address || doctorInfo?.address || ''
+        doctorName: doctorInfo?.doctor_name || 'د. أحمد محمد',
+        clinicName: doctorInfo?.clinic_name || 'عيادة MedVerse التخصصية',
+        specialty: doctorInfo?.specialty || 'استشاري أمراض القلب والباطنة',
+        logoUrl: doctorInfo?.logo_url || '',
+        stampUrl: doctorInfo?.stamp_url || '',
+        phone: doctorInfo?.phone || '',
+        address: doctorInfo?.address || ''
       };
 
       await generatePrescriptionPDF(
