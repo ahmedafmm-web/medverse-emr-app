@@ -46,25 +46,21 @@ const getExactTimeLeftMessage = (expiryDateString) => {
   const expiry = new Date(expiryDateString);
   const diffMs = expiry - now;
 
-  if (diffMs <= 0) {
-    return 'منتهي الآن';
-  }
+  if (diffMs <= 0) return 'منتهي الآن';
 
-  const totalHours = Math.floor(diffMs / (1000 * 60 * 60));
+  const totalMinutes = Math.floor(diffMs / (1000 * 60));
+  const totalHours = Math.floor(totalMinutes / 60);
   const days = Math.floor(totalHours / 24);
   const hours = totalHours % 24;
-  const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+  const minutes = totalMinutes % 60;
 
-  if (days >= 3) {
-    return `باقي ${days} أيام على انتهاء الاشتراك`;
-  }
   if (days > 0) {
-    return `باقي ${days} يوم و ${hours} ساعة و ${minutes} دقيقة على انتهاء الاشتراك`;
+    return `باقي ${days} يوم و ${hours} ساعة و ${minutes} دقيقة`;
+  } else if (hours > 0) {
+    return `متبقي ${hours} ساعة و ${minutes} دقيقة فقط!`;
+  } else {
+    return `متبقي ${minutes} دقيقة فقط!`;
   }
-  if (hours > 0) {
-    return `متبقي ${hours} ساعة و ${minutes} دقيقة فقط على إيقاف الخدمة!`;
-  }
-  return `متبقي ${minutes} دقيقة فقط على إيقاف الخدمة!`;
 };
 
 export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchPortal }) {
@@ -141,11 +137,8 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
     const userEmail = session?.user?.email || '';
     const message = `مرحباً دكتور، أود تفعيل اشتراكي في تطبيق MedVerse.\nالإيميل المسجل: ${userEmail}`;
     const url = `https://wa.me/201127834972?text=${encodeURIComponent(message)}`;
-    if (Platform.OS === 'web') {
-      window.open(url, '_blank');
-    } else {
-      Linking.openURL(url);
-    }
+    if (Platform.OS === 'web') window.open(url, '_blank');
+    else Linking.openURL(url);
   };
 
   const handleSendWhatsAppPrescription = () => {
@@ -158,20 +151,14 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
     const baseUrl = Platform.OS === 'web' && typeof window !== 'undefined' ? window.location.origin.split('?')[0] : 'https://medverse-emr-suite.vercel.app';
     const message = `مرحباً ${patientName}،\nإليك رابط سجلـك الطبي وتقرير الأشعة الخاص بك لدى ${clinicDoctorName}:\n${baseUrl}?c=${selectedPatientCode}`;
     const url = `https://wa.me/${phoneWithCountry}?text=${encodeURIComponent(message)}`;
-    if (Platform.OS === 'web') {
-      window.open(url, '_blank');
-    } else {
-      Linking.openURL(url);
-    }
+    if (Platform.OS === 'web') window.open(url, '_blank');
+    else Linking.openURL(url);
   };
 
   const handleOpenInstaPay = () => {
     const url = 'https://ipn.eg/S/eg2400020548054885193/instapay/5xBjGv';
-    if (Platform.OS === 'web') {
-      window.open(url, '_blank');
-    } else {
-      Linking.openURL(url);
-    }
+    if (Platform.OS === 'web') window.open(url, '_blank');
+    else Linking.openURL(url);
   };
 
   useEffect(() => {
@@ -216,55 +203,38 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
     return new Promise((resolve) => {
       try {
         if (!file || !file.type.includes('image')) return resolve(file);
-
         const objectUrl = URL.createObjectURL(file);
         const img = new Image();
         img.src = objectUrl;
-
         img.onload = () => {
           URL.revokeObjectURL(objectUrl);
           const canvas = document.createElement('canvas');
           let width = img.width;
           let height = img.height;
-
           if (width > maxWidth) {
             height = Math.round((height * maxWidth) / width);
             width = maxWidth;
           }
-
           canvas.width = width;
           canvas.height = height;
           const ctx = canvas.getContext('2d');
           ctx.drawImage(img, 0, 0, width, height);
-
-          canvas.toBlob(
-            (blob) => resolve(blob || file),
-            'image/jpeg',
-            quality
-          );
+          canvas.toBlob((blob) => resolve(blob || file), 'image/jpeg', quality);
         };
-
-        img.onerror = () => {
-          URL.revokeObjectURL(objectUrl);
-          resolve(file);
-        };
-      } catch (e) {
-        resolve(file);
-      }
+        img.onerror = () => { URL.revokeObjectURL(objectUrl); resolve(file); };
+      } catch (e) { resolve(file); }
     });
   };
 
   const handleSelectMultipleScans = (event) => {
     const files = Array.from(event.target.files);
     if (!files || files.length === 0) return;
-
     const newFiles = files.map((file, idx) => ({
       id: Date.now() + '_' + idx,
       file: file,
       previewUrl: URL.createObjectURL(file),
       title: scanGroupTitle || file.name,
     }));
-
     setSelectedScanFiles(prev => [...prev, ...newFiles]);
   };
 
@@ -362,7 +332,7 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
 
       showAlert('تم الحفظ بنجاح ✅', `تم حفظ (${uploadedList.length}) أشعة منفصلة في ملف المريض [${patientCode}].`);
       setSelectedScanFiles([]);
-      fetchPatientHistory(patientName);
+      fetchPatientScansByPatientId(patientId);
 
     } catch (err) {
       showAlert('خطأ', 'فشل حفظ الأشعات: ' + err.message);
@@ -477,19 +447,12 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
 
   const handleCopyPortalLink = () => {
     const currentUserId = session?.user?.id;
-    if (!currentUserId) {
-      showAlert('تنبيه', 'يرجى تسجيل الدخول أولاً لتوليد الرابط المخصص.');
-      return;
-    }
-
+    if (!currentUserId) return;
     const baseUrl = Platform.OS === 'web' && typeof window !== 'undefined' ? window.location.origin.split('?')[0] : 'https://medverse-emr-suite.vercel.app';
     const portalUrl = `${baseUrl}?c=${currentUserId}`;
-
     if (Platform.OS === 'web' && navigator.clipboard) {
       navigator.clipboard.writeText(portalUrl);
-      showAlert('تم النسخ! 📋', `تم نسخ رابط بوابتك المخصصة بنجاح:\n${portalUrl}`);
-    } else {
-      showAlert('رابط بوابتك المخصصة', portalUrl);
+      showAlert('تم النسخ! 📋', portalUrl);
     }
   };
 
@@ -497,11 +460,8 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
     try {
       const userEmail = user?.email?.toLowerCase();
       let query = supabase.from('clinics').select('*');
-      if (userEmail) {
-        query = query.ilike('email', userEmail);
-      } else if (user?.id) {
-        query = query.eq('user_id', user.id);
-      }
+      if (userEmail) query = query.ilike('email', userEmail);
+      else if (user?.id) query = query.eq('user_id', user.id);
       
       const { data: clinic, error } = await query.limit(1).maybeSingle();
 
@@ -510,20 +470,15 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
         if (clinic.clinic_name) setClinicName(clinic.clinic_name);
         if (clinic.specialty) {
           setRegisteredSpecialty(clinic.specialty);
-          if (!initialSpecialty) {
-            setSpecialty(clinic.specialty);
-          } else if (!isSpecialtyMatching(initialSpecialty, clinic.specialty)) {
-            setShowMismatchModal(true);
-          }
+          if (!initialSpecialty) setSpecialty(clinic.specialty);
+          else if (!isSpecialtyMatching(initialSpecialty, clinic.specialty)) setShowMismatchModal(true);
         }
         if (clinic.logo_url) setClinicLogoUrl(clinic.logo_url);
         if (clinic.stamp_url) setDigitalStampUrl(clinic.stamp_url);
         if (clinic.phone) setClinicPhone(clinic.phone);
         if (clinic.address) setClinicAddress(clinic.address);
       }
-    } catch (e) {
-      console.error('Error fetching doctor profile:', e);
-    }
+    } catch (e) { console.error(e); }
   };
 
   const handleSaveProfile = async () => {
@@ -531,13 +486,9 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
     try {
       const currentUserId = session?.user?.id;
       const userEmail = session?.user?.email?.toLowerCase();
-      
       let query = supabase.from('clinics').select('id');
-      if (userEmail) {
-        query = query.ilike('email', userEmail);
-      } else if (currentUserId) {
-        query = query.eq('user_id', currentUserId);
-      }
+      if (userEmail) query = query.ilike('email', userEmail);
+      else if (currentUserId) query = query.eq('user_id', currentUserId);
 
       const { data: existingClinic } = await query.limit(1).maybeSingle();
 
@@ -553,42 +504,43 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
         user_id: currentUserId || null
       };
 
-      if (existingClinic) {
-        await supabase.from('clinics').update(profilePayload).eq('id', existingClinic.id);
-      } else {
-        await supabase.from('clinics').insert([profilePayload]);
-      }
+      if (existingClinic) await supabase.from('clinics').update(profilePayload).eq('id', existingClinic.id);
+      else await supabase.from('clinics').insert([profilePayload]);
 
       setRegisteredSpecialty(specialty);
       setSpecialty(specialty);
-      showAlert('تم الحفظ', 'تم حفظ بيانات الطبيب والتخصص المعتمد بنجاح!');
+      showAlert('تم الحفظ', 'تم حفظ التخصص والتحديث فوراً!');
     } catch (err) {
-      showAlert('خطأ', 'فشل حفظ بيانات البروفايل: ' + err.message);
+      showAlert('خطأ', 'فشل الحفظ: ' + err.message);
     } finally {
       setLoading(false);
     }
   };
 
-  const fetchAllPatients = async () => {
-    setLoadingPatientsList(true);
+  const fetchPatientScansByPatientId = async (pId) => {
+    if (!pId) return;
     try {
-      const userEmail = session?.user?.email?.toLowerCase();
-      
-      const { data, error } = await supabase
-        .from('patients')
+      const { data: records } = await supabase
+        .from('medical_records')
         .select('*')
-        .ilike('doctor_email', userEmail)
+        .eq('patient_id', pId)
         .order('created_at', { ascending: false });
 
-      if (!error && data) {
-        setAllDoctorPatients(data);
-      } else {
-        setAllDoctorPatients([]);
-      }
+      setPatientHistory(records || []);
+
+      let allScans = [];
+      (records || []).forEach(r => {
+        if (r.dynamic_fields?.scans_list && Array.isArray(r.dynamic_fields.scans_list)) {
+          r.dynamic_fields.scans_list.forEach(sc => {
+            allScans.push({ ...sc, recordId: r.id });
+          });
+        } else if (r.dynamic_fields?.scanUrl) {
+          allScans.push({ url: r.dynamic_fields.scanUrl, title: r.dynamic_fields.scanTitle || 'أشعة طبية', recordId: r.id });
+        }
+      });
+      setPatientScansGrid(allScans);
     } catch (e) {
-      console.error('Fetch Patients Error:', e);
-    } finally {
-      setLoadingPatientsList(false);
+      console.error(e);
     }
   };
 
@@ -612,23 +564,7 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
 
       if (patient) {
         setSelectedPatientCode(patient.patient_code);
-        const { data: records } = await supabase
-          .from('medical_records')
-          .select('*')
-          .eq('patient_id', patient.id)
-          .order('created_at', { ascending: false });
-
-        setPatientHistory(records || []);
-
-        let allScans = [];
-        (records || []).forEach(r => {
-          if (r.dynamic_fields?.scans_list && Array.isArray(r.dynamic_fields.scans_list)) {
-            r.dynamic_fields.scans_list.forEach(sc => {
-              allScans.push({ ...sc, recordId: r.id });
-            });
-          }
-        });
-        setPatientScansGrid(allScans);
+        await fetchPatientScansByPatientId(patient.id);
       } else {
         setPatientHistory([]);
         setPatientScansGrid([]);
@@ -641,6 +577,21 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
     }
   };
 
+  const fetchAllPatients = async () => {
+    setLoadingPatientsList(true);
+    try {
+      const userEmail = session?.user?.email?.toLowerCase();
+      const { data, error } = await supabase
+        .from('patients')
+        .select('*')
+        .ilike('doctor_email', userEmail)
+        .order('created_at', { ascending: false });
+
+      if (!error && data) setAllDoctorPatients(data);
+    } catch (e) { console.error(e); } 
+    finally { setLoadingPatientsList(false); }
+  };
+
   const selectPatientFromList = (patient) => {
     setPatientName(patient.full_name || '');
     setPatientPhone(patient.phone || '');
@@ -648,7 +599,7 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
     setGender(patient.gender || 'ذكر');
     setSelectedPatientCode(patient.patient_code || '');
     setActiveTab('prescription');
-    fetchPatientHistory(patient.full_name);
+    fetchPatientScansByPatientId(patient.id);
   };
 
   const handleFillDummyData = () => {
@@ -671,7 +622,6 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
     }
 
     setAnalyzing(true);
-
     const isRheumatology = specialty.includes('روماتيزم') || specialty.includes('روماتويد');
 
     const systemPrompt = `You are a Senior Consultant Specialist in: ${specialty}.
@@ -727,12 +677,9 @@ JSON Structure Required:
       });
 
       const data = await response.json();
-      if (!data.choices || !data.choices[0]) {
-        throw new Error('استجابة غير صالحة من خادم الذكاء الاصطناعي');
-      }
+      if (!data.choices || !data.choices[0]) throw new Error('استجابة غير صالحة من خادم الذكاء الاصطناعي');
 
       const parsedResult = JSON.parse(data.choices[0].message.content);
-
       if (parsedResult.warnings) {
         parsedResult.warnings = parsedResult.warnings.map(w => sanitizeText(w));
       }
@@ -825,17 +772,13 @@ Return JSON ONLY:
       const userEmail = session?.user?.email?.toLowerCase();
 
       let cQuery = supabase.from('clinics').select('id');
-      if (userEmail) {
-        cQuery = cQuery.ilike('email', userEmail);
-      } else if (currentUserId) {
-        cQuery = cQuery.eq('user_id', currentUserId);
-      }
+      if (userEmail) cQuery = cQuery.ilike('email', userEmail);
+      else if (currentUserId) cQuery = cQuery.eq('user_id', currentUserId);
 
       const { data: existingClinic } = await cQuery.limit(1).maybeSingle();
 
-      if (existingClinic) {
-        clinicId = existingClinic.id;
-      } else {
+      if (existingClinic) clinicId = existingClinic.id;
+      else {
         const { data: newClinic, error: cErr } = await supabase
           .from('clinics')
           .insert([{ 
@@ -1068,13 +1011,12 @@ Return JSON ONLY:
 
   return (
     <ScrollView style={styles.container}>
-      {/* Lightbox Modal لمعاينة وتكبير صورة الأشعة للطبيب */}
+      {/* Lightbox Modal */}
       <Modal visible={!!viewingImageModal} transparent animationType="fade">
         <View style={styles.lightboxOverlay}>
           <TouchableOpacity style={styles.lightboxCloseBtn} onPress={() => { setViewingImageModal(null); setZoomScale(1); }}>
             <Text style={styles.lightboxCloseText}>إغلاق ✕</Text>
           </TouchableOpacity>
-
           <View style={styles.lightboxControls}>
             <TouchableOpacity style={styles.zoomBtn} onPress={() => setZoomScale(z => Math.min(z + 0.5, 3))}>
               <Text style={styles.zoomBtnText}>🔍 تكبير (+)</Text>
@@ -1086,54 +1028,16 @@ Return JSON ONLY:
               <Text style={styles.zoomBtnText}>🔍 تصغير (-)</Text>
             </TouchableOpacity>
           </View>
-
           {viewingImageModal && (
             <ScrollView contentContainerStyle={{ alignItems: 'center', justifyContent: 'center', flexGrow: 1 }}>
-              <Image 
-                source={{ uri: viewingImageModal.url }} 
-                style={{ 
-                  width: 340 * zoomScale, 
-                  height: 340 * zoomScale, 
-                  borderRadius: 8,
-                  resizeMode: 'contain'
-                }} 
-              />
+              <Image source={{ uri: viewingImageModal.url }} style={{ width: 340 * zoomScale, height: 340 * zoomScale, borderRadius: 8, resizeMode: 'contain' }} />
               <Text style={styles.lightboxTitle}>{viewingImageModal.title}</Text>
             </ScrollView>
           )}
         </View>
       </Modal>
 
-      {/* MODAL ALERT FOR SPECIALTY MISMATCH */}
-      <Modal visible={showMismatchModal} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>⚠️ تنبيه عدم تطابق التخصص</Text>
-            <Text style={styles.modalSub}>
-              البوابة الحالية هي [{specialty}]، بينما تخصصك الطبي المسجل في الملف هو [{registeredSpecialty}].
-            </Text>
-            <View style={styles.modalButtonsRow}>
-              <TouchableOpacity 
-                style={styles.modalStayBtn} 
-                onPress={() => setShowMismatchModal(false)}
-              >
-                <Text style={styles.modalStayBtnText}>نعم، أعرف وأود البقاء</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity 
-                style={styles.modalGoBtn} 
-                onPress={() => {
-                  setShowMismatchModal(false);
-                  setSpecialty(registeredSpecialty);
-                }}
-              >
-                <Text style={styles.modalGoBtnText}>مغادرة إلى تخصّصي المسجل ➔</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
-
+      {/* Warning Banner */}
       {subscriptionAccess.showAlert && (
         <View style={styles.subWarningBanner}>
           <Text style={styles.subWarningIcon}>⏳</Text>
@@ -1146,16 +1050,15 @@ Return JSON ONLY:
         </View>
       )}
 
+      {/* App Header */}
       <View style={styles.header}>
         <View style={styles.topUserRow}>
           <Text style={styles.userEmailText}>⚡ {clinicDoctorName} ({session?.user?.email})</Text>
-
           {onSwitchPortal && (
             <TouchableOpacity onPress={onSwitchPortal} style={styles.switchPortalBtn}>
               <Text style={styles.switchPortalBtnText}>🔄 تغيير البوابة</Text>
             </TouchableOpacity>
           )}
-
           <TouchableOpacity onPress={handleSignOut} style={styles.signOutBtn}>
             <Text style={styles.signOutText}>خروج ✕</Text>
           </TouchableOpacity>
@@ -1164,28 +1067,15 @@ Return JSON ONLY:
         <Text style={styles.subtitle}>منظومة إدارة العيادات والأشعة الذكية ({specialty})</Text>
       </View>
 
+      {/* Navigation Bar */}
       <View style={styles.navBar}>
-        <TouchableOpacity 
-          style={[styles.navBtn, activeTab === 'prescription' && styles.navBtnActive]} 
-          onPress={() => setActiveTab('prescription')}
-        >
+        <TouchableOpacity style={[styles.navBtn, activeTab === 'prescription' && styles.navBtnActive]} onPress={() => setActiveTab('prescription')}>
           <Text style={[styles.navBtnText, activeTab === 'prescription' && styles.navBtnTextActive]}>🩺 الكشف والأشعة</Text>
         </TouchableOpacity>
-
-        <TouchableOpacity 
-          style={[styles.navBtn, activeTab === 'patients' && styles.navBtnActive]} 
-          onPress={() => {
-            setActiveTab('patients');
-            fetchAllPatients();
-          }}
-        >
+        <TouchableOpacity style={[styles.navBtn, activeTab === 'patients' && styles.navBtnActive]} onPress={() => { setActiveTab('patients'); fetchAllPatients(); }}>
           <Text style={[styles.navBtnText, activeTab === 'patients' && styles.navBtnTextActive]}>📂 قائمة المرضى</Text>
         </TouchableOpacity>
-
-        <TouchableOpacity 
-          style={[styles.navBtn, activeTab === 'profile' && styles.navBtnActive]} 
-          onPress={() => setActiveTab('profile')}
-        >
+        <TouchableOpacity style={[styles.navBtn, activeTab === 'profile' && styles.navBtnActive]} onPress={() => setActiveTab('profile')}>
           <Text style={[styles.navBtnText, activeTab === 'profile' && styles.navBtnTextActive]}>⚙️ بروفايل العيادة</Text>
         </TouchableOpacity>
       </View>
