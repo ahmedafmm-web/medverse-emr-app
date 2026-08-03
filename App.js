@@ -10,10 +10,11 @@ export default function App() {
 
   const specialties = [
     { id: 'internal', name: '🩺 الطب الباطني والأمراض المزمنة' },
+    { id: 'rheumatology', name: '🩺 أمراض الروماتيزم والروماتويد والأمراض المناعية' },
     { id: 'pediatrics', name: '👶 طب الأطفال وحديثي الولادة' },
     { id: 'cardiology', name: '❤️ أمراض القلب والأوعية الدموية' },
     { id: 'surgery', name: '🔪 الجراحة العامة' },
-    { id: 'orthopedics', name: '🦴 جراحة العظام والعضلات' },
+    { id: 'orthopedics', name: '🦴 جراحة العظام والمفاصل' },
     { id: 'dermatology', name: '✨ الجلدية والتجميل' },
   ];
 
@@ -34,6 +35,11 @@ export default function App() {
     setCurrentStep('doctor');
   };
 
+  const handleResetToLanding = () => {
+    setSelectedSpecialty('');
+    setCurrentStep('landing');
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#0F172A" />
@@ -42,10 +48,7 @@ export default function App() {
         <View style={styles.topBar}>
           <TouchableOpacity 
             style={styles.backButton} 
-            onPress={() => {
-              setSelectedSpecialty('');
-              setCurrentStep('landing');
-            }}
+            onPress={handleResetToLanding}
           >
             <Text style={styles.backButtonText}>🏠 القائمة الرئيسية / تغيير البوابة</Text>
           </TouchableOpacity>
@@ -104,14 +107,17 @@ export default function App() {
 
       {currentStep === 'doctor' && (
         <View style={styles.body}>
-          <DoctorDashboard specialty={selectedSpecialty} />
+          <DoctorDashboard 
+            specialty={selectedSpecialty} 
+            onSwitchPortal={handleResetToLanding}
+          />
         </View>
       )}
 
       {currentStep === 'patient' && (
         <View style={styles.body}>
           <PatientPortal 
-            onBackToDashboard={() => setCurrentStep('landing')} 
+            onBackToDashboard={handleResetToLanding} 
             doctorClinicId={encryptedClinicId} 
           />
         </View>
@@ -149,3 +155,4 @@ const styles = StyleSheet.create({
   specialtyText: { color: '#F8FAFC', fontSize: 16, fontWeight: 'bold' },
   body: { flex: 1 }
 });
+ 
