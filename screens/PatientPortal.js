@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, Text, View, TextInput, ScrollView, TouchableOpacity, ActivityIndicator, Platform, Image } from 'react-native';
+import { 
+  StyleSheet, Text, View, TextInput, ScrollView, 
+  TouchableOpacity, ActivityIndicator, Platform, Image, Linking 
+} from 'react-native';
 import { supabase } from '../supabaseClient';
 import { generatePrescriptionPDF } from '../components/PDFGenerator';
 
@@ -10,6 +13,9 @@ export default function PatientPortal({ onBackToDashboard, doctorClinicId }) {
   const [medicalRecords, setMedicalRecords] = useState([]);
   const [doctorInfo, setDoctorInfo] = useState(null);
 
+  // حالة شريط تقدم تنزيل كل صورة أشعة على حدة
+  const [downloadProgressMap, setDownloadProgressMap] = useState({});
+
   const showAlert = (title, message) => {
     if (Platform.OS === 'web') {
       window.alert(`${title}\n${message}`);
@@ -19,7 +25,6 @@ export default function PatientPortal({ onBackToDashboard, doctorClinicId }) {
   };
 
   useEffect(() => {
-    // 1. محاولة قراءة معرف الدكتور من الـ Props أو من URL Query Parameter (?c=USER_ID)
     let cId = doctorClinicId;
     if (!cId && Platform.OS === 'web' && typeof window !== 'undefined') {
       const urlParams = new URLSearchParams(window.location.search);
@@ -33,12 +38,10 @@ export default function PatientPortal({ onBackToDashboard, doctorClinicId }) {
 
   const fetchClinicHeader = async (identifier) => {
     try {
-      // البحث عن العيادة بواسطة id أو user_id
       let query = supabase
         .from('clinics')
-        .select('doctor_name, clinic_name, specialty, logo_url, phone, address, email');
+        .select('doctor_name, clinic_name, specialty, logo_url, stamp_url, phone, address, email');
 
-      // إذا كان الإدخال UUID يخص user_id أو id
       query = query.or(`id.eq.${identifier},user_id.eq.${identifier}`);
 
       const { data, error } = await query.limit(1).maybeSingle();
@@ -51,21 +54,19 @@ export default function PatientPortal({ onBackToDashboard, doctorClinicId }) {
     }
   };
 
-  const handleFetchRecords = async () => {
-    if (!patientCode.trim()) {
+  const handleFetchRecords = async (codeToSearch = null) => {
+    const targetCode = (codeToSearch || patientCode).trim().toUpperCase();
+    if (!targetCode) {
       showAlert('تنبيه', 'يرجى إدخال كود المريض الفريد (Patient ID).');
       return;
     }
 
     setLoading(true);
     try {
-      const cleanCode = patientCode.trim().toUpperCase();
-
-      // 1. الاستعلام عن المريض بكود المريض الفريد
       let { data: patient, error: pErr } = await supabase
         .from('patients')
         .select('*')
-        .eq('patient_code', cleanCode)
+        .eq('patient_code', targetCode)
         .maybeSingle();
 
       if (pErr || !patient) {
@@ -77,7 +78,6 @@ export default function PatientPortal({ onBackToDashboard, doctorClinicId }) {
 
       setPatientData(patient);
 
-      // 2. جلب السجلات الطبية الخاصة بالمريض
       const { data: records, error: rErr } = await supabase
         .from('medical_records')
         .select('*')
@@ -88,7 +88,6 @@ export default function PatientPortal({ onBackToDashboard, doctorClinicId }) {
 
       setMedicalRecords(records || []);
 
-      // 3. جلب بيانات العيادة/الطبيب المقترنة إذا لم تكن محملة
       if (!doctorInfo && patient.doctor_email) {
         const { data: cData } = await supabase
           .from('clinics')
@@ -107,6 +106,56 @@ export default function PatientPortal({ onBackToDashboard, doctorClinicId }) {
       showAlert('خطأ في التحميل', error.message || error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // --- دالة تنزيل صورة الأشعة المنفصلة عالية الدقة مع شريط التقدم ---
+  const handleDownloadSingleScan = async (scanUrl, scanTitle) => {
+    if (!scanUrl) return;
+
+    // البدء بشريط التقدم
+    setDownloadProgressMap(prev => ({ ...prev, [scanUrl]: 15 }));
+
+    try {
+      setDownloadProgressMap(prev => ({ ...prev, [scanUrl]: 45 }));
+      const response = await fetch(scanUrl);
+      const blob = await response.blob();
+      setDownloadProgressMap(prev => ({ ...prev, [scanUrl]: 85 }));
+
+      if (Platform.OS === 'web' && typeof window !== 'undefined') {
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `${scanTitle || 'Medical_Scan'}_${Date.now()}.jpg`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      } else {
+        Linking.openURL(scanUrl);
+      }
+
+      setDownloadProgressMap(prev => ({ ...prev, [scanUrl]: 100 }));
+      setTimeout(() => {
+        setDownloadProgressMap(prev => ({ ...prev, [scanUrl]: null }));
+      }, 1500);
+
+    } catch (err) {
+      showAlert('خطأ التنزيل', 'تعذر تنزيل الصورة مباشرة: ' + err.message);
+      setDownloadProgressMap(prev => ({ ...prev, [scanUrl]: null }));
+    }
+  };
+
+  // --- نسخ رابط المشاركة المؤقت للاستشاريين ---
+  const handleCopyTemporaryShareLink = () => {
+    if (!patientData?.patient_code) return;
+    const shareUrl = Platform.OS === 'web' && typeof window !== 'undefined'
+      ? `${window.location.origin}/?c=${patientData.patient_code}`
+      : `https://medverse-emr-suite.vercel.app/?c=${patientData.patient_code}`;
+
+    if (Platform.OS === 'web' && navigator.clipboard) {
+      navigator.clipboard.writeText(shareUrl);
+      showAlert('تم نسخ رابط المشاركة 📋', `يمكنك إرسال هذا الرابط للأطباء أو المعامل لمعاينة ملفك:\n${shareUrl}`);
+    } else {
+      showAlert('رابط ملفك الطبي', shareUrl);
     }
   };
 
@@ -150,7 +199,9 @@ export default function PatientPortal({ onBackToDashboard, doctorClinicId }) {
           <Image source={{ uri: doctorInfo.logo_url }} style={styles.headerLogo} resizeMode="contain" />
         ) : null}
         <Text style={styles.title}>{doctorInfo?.clinic_name || 'MedVerse Patient Portal'}</Text>
-        <Text style={styles.doctorSub}>{doctorInfo?.doctor_name ? `${doctorInfo.doctor_name} - ${doctorInfo.specialty}` : 'بوابة استعراض السجلات والروشتات الطبية المعتمدة'}</Text>
+        <Text style={styles.doctorSub}>
+          {doctorInfo?.doctor_name ? `${doctorInfo.doctor_name} - ${doctorInfo.specialty}` : 'بوابة استعراض السجلات والروشتات والأشعات الطبية المعتمدة'}
+        </Text>
       </View>
 
       {!patientData ? (
@@ -167,13 +218,13 @@ export default function PatientPortal({ onBackToDashboard, doctorClinicId }) {
           />
           <TouchableOpacity
             style={[styles.btn, loading && styles.btnDisabled]}
-            onPress={handleFetchRecords}
+            onPress={() => handleFetchRecords()}
             disabled={loading}
           >
             {loading ? (
               <ActivityIndicator color="#FFFFFF" />
             ) : (
-              <Text style={styles.btnText}>عرض التقارير والروشتات 🚀</Text>
+              <Text style={styles.btnText}>عرض التقارير والروشتات والأشعة 🚀</Text>
             )}
           </TouchableOpacity>
 
@@ -187,44 +238,75 @@ export default function PatientPortal({ onBackToDashboard, doctorClinicId }) {
         <View style={{ marginBottom: 30 }}>
           <View style={styles.patientCard}>
             <View style={styles.row}>
-              <Text style={styles.patientName}>👤 {patientData.full_name}</Text>
+              <Text style={styles.patientName}>👤 المريض: {patientData.full_name}</Text>
               <TouchableOpacity onPress={() => setPatientData(null)}>
                 <Text style={styles.logoutText}>خروج ✕</Text>
               </TouchableOpacity>
             </View>
             <Text style={styles.patientCodeText}>Patient ID: {patientData.patient_code}</Text>
+
+            <TouchableOpacity style={styles.sharePassBtn} onPress={handleCopyTemporaryShareLink}>
+              <Text style={styles.sharePassBtnText}>🔗 نسخ رابط مشاركة الملف الطبي مع الأطباء</Text>
+            </TouchableOpacity>
           </View>
 
-          <Text style={styles.sectionTitleHeader}>📋 السجلات والروشتات المعتمدة ({medicalRecords.length})</Text>
+          <Text style={styles.sectionTitleHeader}>📋 السجلات المعتمدة والأشعات ({medicalRecords.length})</Text>
 
           {medicalRecords.length === 0 ? (
             <View style={styles.emptyBox}>
-              <Text style={styles.emptyText}>لا توجد تقارير معتمدة متاحة حالياً لهذا الكود.</Text>
+              <Text style={styles.emptyText}>لا توجد تقارير أو أشعات معتمدة متاحة حالياً لهذا الكود.</Text>
             </View>
           ) : (
             medicalRecords.map((item, idx) => {
               const fields = item.dynamic_fields || {};
+              const scansList = fields.scans_list || (fields.scanUrl ? [{ url: fields.scanUrl, title: fields.scanTitle || 'أشعة طبية' }] : []);
+
               return (
                 <View key={item.id || idx} style={styles.recordCard}>
                   <View style={styles.row}>
                     <Text style={styles.recordDate}>
-                      📅 زيارة بتاريخ: {new Date(item.created_at || Date.now()).toLocaleDateString('ar-EG')}
+                      📅 زيارة بتاريخ: {new Date(item.created_at || item.visit_date || Date.now()).toLocaleDateString('ar-EG')}
                     </Text>
                     <Text style={styles.verifiedBadge}>✓ معتمد</Text>
                   </View>
 
                   <View style={styles.divider} />
 
-                  <Text style={styles.recordLabel}>التشخيص المعتمد:</Text>
+                  <Text style={styles.recordLabel}>التشخيص المعتمد / عنوان الفحص:</Text>
                   <Text style={styles.recordValue}>{item.diagnosis || 'لا يوجد تشخيص مدون'}</Text>
 
-                  {/* High-Resolution Medical Imaging Viewer (Read-Only) */}
-                  {fields.scanUrl ? (
-                    <View style={styles.scanBox}>
-                      <Text style={styles.scanTitle}>🖼️ الأشعة والمرفقات الطبية ({fields.scanTitle || 'معاينة الأشعة'}):</Text>
-                      <Image source={{ uri: fields.scanUrl }} style={styles.scanImage} resizeMode="contain" />
+                  {/* قائمة صور الأشعة المرفوعة منفصلة مع زِر تنزيل وشريط تقدم مستقل لكل صورة */}
+                  {scansList.length > 0 && (
+                    <View style={styles.scansContainer}>
+                      <Text style={styles.scansHeaderTitle}>🖼️ مرفقات صور الأشعة المرفوعة ({scansList.length}):</Text>
+                      
+                      {scansList.map((scanItem, sIdx) => {
+                        const progress = downloadProgressMap[scanItem.url];
+
+                        return (
+                          <View key={sIdx} style={styles.scanItemCard}>
+                            <Image source={{ uri: scanItem.url }} style={styles.scanImage} resizeMode="contain" />
+                            <Text style={styles.scanTitle}>{scanItem.title || 'صورة أشعة عالية الدقة'}</Text>
+
+                            {/* شريط تقدم التحميل المباشر أسفل الصورة */}
+                            {progress !== undefined && progress !== null && (
+                              <View style={styles.downloadProgressBarBox}>
+                                <View style={[styles.downloadProgressBarFill, { width: `${progress}%` }]} />
+                                <Text style={styles.downloadProgressText}>جاري التنزيل... {progress}%</Text>
+                              </View>
+                            )}
+
+                            <TouchableOpacity
+                              style={styles.downloadScanBtn}
+                              onPress={() => handleDownloadSingleScan(scanItem.url, scanItem.title)}
+                            >
+                              <Text style={styles.downloadScanBtnText}>⬇️ تنزيل الأشعة بجودة عالية (High-Res Image)</Text>
+                            </TouchableOpacity>
+                          </View>
+                        );
+                      })}
                     </View>
-                  ) : null}
+                  )}
 
                   <TouchableOpacity
                     style={styles.downloadPdfBtn}
@@ -263,18 +345,32 @@ const styles = StyleSheet.create({
   patientName: { fontSize: 16, fontWeight: 'bold', color: '#FFFFFF' },
   logoutText: { color: '#EF4444', fontSize: 12, fontWeight: 'bold' },
   patientCodeText: { color: '#38BDF8', fontSize: 12, marginTop: 4, textAlign: 'right', fontFamily: 'monospace' },
-  recordCard: { backgroundColor: '#1E293B', padding: 16, borderRadius: 12, marginBottom: 12, borderWidth: 1, borderColor: '#334155' },
+  
+  sharePassBtn: { backgroundColor: '#0369A1', padding: 8, borderRadius: 6, marginTop: 10, alignItems: 'center' },
+  sharePassBtnText: { color: '#FFFFFF', fontSize: 11, fontWeight: 'bold' },
+
+  recordCard: { backgroundColor: '#1E293B', padding: 16, borderRadius: 12, marginBottom: 15, borderWidth: 1, borderColor: '#334155' },
   recordDate: { fontSize: 12, color: '#94A3B8' },
   verifiedBadge: { backgroundColor: '#065F46', color: '#34D399', fontSize: 10, fontWeight: 'bold', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 12 },
   divider: { height: 1, backgroundColor: '#334155', marginVertical: 10 },
   recordLabel: { fontSize: 12, color: '#94A3B8', textAlign: 'right', marginBottom: 4 },
-  recordValue: { fontSize: 14, color: '#F8FAFC', textAlign: 'right', marginBottom: 15 },
-  scanBox: { backgroundColor: '#0F172A', padding: 10, borderRadius: 8, marginBottom: 15, borderWidth: 1, borderColor: '#334155' },
-  scanTitle: { fontSize: 11, fontWeight: 'bold', color: '#38BDF8', marginBottom: 8, textAlign: 'right' },
-  scanImage: { width: '100%', height: 200, borderRadius: 6 },
-  downloadPdfBtn: { backgroundColor: '#059669', padding: 12, borderRadius: 8, alignItems: 'center' },
+  recordValue: { fontSize: 14, color: '#F8FAFC', textAlign: 'right', marginBottom: 12 },
+
+  scansContainer: { backgroundColor: '#0F172A', padding: 12, borderRadius: 10, marginBottom: 15, borderWidth: 1, borderColor: '#334155' },
+  scansHeaderTitle: { fontSize: 12, fontWeight: 'bold', color: '#38BDF8', marginBottom: 10, textAlign: 'right' },
+  scanItemCard: { backgroundColor: '#1E293B', padding: 10, borderRadius: 8, marginBottom: 12, alignItems: 'center', borderWidth: 1, borderColor: '#475569' },
+  scanImage: { width: '100%', height: 220, borderRadius: 6, backgroundColor: '#000' },
+  scanTitle: { fontSize: 12, fontWeight: 'bold', color: '#F8FAFC', marginTop: 6, textAlign: 'center' },
+
+  downloadScanBtn: { backgroundColor: '#059669', padding: 10, borderRadius: 6, width: '100%', alignItems: 'center', marginTop: 8 },
+  downloadScanBtnText: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 11 },
+
+  downloadProgressBarBox: { width: '100%', height: 16, backgroundColor: '#0F172A', borderRadius: 8, overflow: 'hidden', marginTop: 8, justifyContent: 'center' },
+  downloadProgressBarFill: { height: '100%', backgroundColor: '#0284C7', position: 'absolute' },
+  downloadProgressText: { color: '#FFFFFF', fontSize: 10, fontWeight: 'bold', textAlign: 'center', zIndex: 1 },
+
+  downloadPdfBtn: { backgroundColor: '#0284C7', padding: 12, borderRadius: 8, alignItems: 'center' },
   downloadPdfBtnText: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 13 },
   emptyBox: { padding: 20, alignItems: 'center' },
   emptyText: { color: '#64748B', fontSize: 13 }
 });
- 
