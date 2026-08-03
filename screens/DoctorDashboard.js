@@ -38,7 +38,7 @@ const isSpecialtyMatching = (specA, specB) => {
   return false;
 };
 
-// دالة حساب الوقت المتبقي الفعلي بالدقائق والساعات
+// دالة حساب الوقت المتبقي الفعلي بالدقائق والساعات والأيام بدقة متناهية
 const getExactTimeLeftMessage = (expiryDateString) => {
   if (!expiryDateString) return '';
 
@@ -49,13 +49,12 @@ const getExactTimeLeftMessage = (expiryDateString) => {
   if (diffMs <= 0) return 'منتهي الآن';
 
   const totalMinutes = Math.floor(diffMs / (1000 * 60));
-  const totalHours = Math.floor(totalMinutes / 60);
-  const days = Math.floor(totalHours / 24);
-  const hours = totalHours % 24;
+  const days = Math.floor(totalMinutes / (60 * 24));
+  const hours = Math.floor((totalMinutes % (60 * 24)) / 60);
   const minutes = totalMinutes % 60;
 
   if (days > 0) {
-    return `باقي ${days} يوم و ${hours} ساعة و ${minutes} دقيقة`;
+    return `متبقي ${days} يوم و ${hours} ساعة و ${minutes} دقيقة`;
   } else if (hours > 0) {
     return `متبقي ${hours} ساعة و ${minutes} دقيقة فقط!`;
   } else {
@@ -195,7 +194,7 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
     setDynamicTimeLeftText(getExactTimeLeftMessage(subscriptionAccess.expiryDate));
     const timer = setInterval(() => {
       setDynamicTimeLeftText(getExactTimeLeftMessage(subscriptionAccess.expiryDate));
-    }, 60000);
+    }, 30000); // تحديث دقيق كل 30 ثانية
     return () => clearInterval(timer);
   }, [subscriptionAccess.expiryDate]);
 
@@ -242,13 +241,44 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
     setSelectedScanFiles(prev => prev.filter(item => item.id !== id));
   };
 
+  // جلب الأشعة المربوطة بـ Patient ID المباشر لضمان الموثوقية
+  const fetchPatientScansByPatientId = async (pId) => {
+    if (!pId) return;
+    try {
+      const { data: records, error } = await supabase
+        .from('medical_records')
+        .select('*')
+        .eq('patient_id', pId)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setPatientHistory(records || []);
+
+      let allScans = [];
+      (records || []).forEach(r => {
+        const df = r.dynamic_fields || {};
+        if (df.scans_list && Array.isArray(df.scans_list)) {
+          df.scans_list.forEach(sc => {
+            allScans.push({ ...sc, recordId: r.id });
+          });
+        } else if (df.scanUrl) {
+          allScans.push({ url: df.scanUrl, title: df.scanTitle || 'أشعة طبية', recordId: r.id });
+        }
+      });
+
+      setPatientScansGrid(allScans);
+    } catch (e) {
+      console.error('Fetch Scans Error:', e);
+    }
+  };
+
   const handleSaveScansToPatientFile = async () => {
     if (!patientName.trim()) {
-      showAlert('تنبيه', 'يرجى إدخال اسم المريض أو اختياره أولاً لحفظ الأشعة بملفه.');
+      showAlert('تنبيه', 'يرجى إدخال اسم المريض أولاً.');
       return;
     }
     if (selectedScanFiles.length === 0) {
-      showAlert('تنبيه', 'يرجى اختيار صور الأشعة أولاً.');
+      showAlert('تنبيه', 'يرجى اختيار صور الأشعة.');
       return;
     }
 
@@ -330,9 +360,9 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
         dynamic_fields: { scans_list: uploadedList }
       }]);
 
-      showAlert('تم الحفظ بنجاح ✅', `تم حفظ (${uploadedList.length}) أشعة منفصلة في ملف المريض [${patientCode}].`);
+      showAlert('تم الحفظ بنجاح ✅', `تم حفظ (${uploadedList.length}) أشعة في ملف المريض [${patientCode}].`);
       setSelectedScanFiles([]);
-      fetchPatientScansByPatientId(patientId);
+      await fetchPatientScansByPatientId(patientId);
 
     } catch (err) {
       showAlert('خطأ', 'فشل حفظ الأشعات: ' + err.message);
@@ -343,7 +373,7 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
 
   const handleDeleteSavedScanFromRecord = async (recordId, scanUrl) => {
     if (Platform.OS === 'web') {
-      if (!window.confirm("هل أنت متأكد من حذف صورة الأشعة هذه نهائياً من ملف المريض؟")) return;
+      if (!window.confirm("هل أنت متأكد من حذف صورة الأشعة هذه نهائياً؟")) return;
     }
 
     try {
@@ -357,8 +387,8 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
         .update({ dynamic_fields: { ...record.dynamic_fields, scans_list: updatedScans } })
         .eq('id', recordId);
 
-      showAlert('تم الحذف', 'تم حذف الصورة من ملف المريض بنجاح.');
-      fetchPatientHistory(patientName);
+      showAlert('تم الحذف', 'تم حذف الصورة من ملف المريض.');
+      if (selectedPatientCode) fetchPatientHistory(patientName);
     } catch (err) {
       showAlert('خطأ', err.message);
     }
@@ -470,8 +500,7 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
         if (clinic.clinic_name) setClinicName(clinic.clinic_name);
         if (clinic.specialty) {
           setRegisteredSpecialty(clinic.specialty);
-          if (!initialSpecialty) setSpecialty(clinic.specialty);
-          else if (!isSpecialtyMatching(initialSpecialty, clinic.specialty)) setShowMismatchModal(true);
+          setSpecialty(clinic.specialty);
         }
         if (clinic.logo_url) setClinicLogoUrl(clinic.logo_url);
         if (clinic.stamp_url) setDigitalStampUrl(clinic.stamp_url);
@@ -481,6 +510,7 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
     } catch (e) { console.error(e); }
   };
 
+  // التحديث الفوري المتبادل لتخصص الطبيب
   const handleSaveProfile = async () => {
     setLoading(true);
     try {
@@ -504,43 +534,19 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
         user_id: currentUserId || null
       };
 
-      if (existingClinic) await supabase.from('clinics').update(profilePayload).eq('id', existingClinic.id);
-      else await supabase.from('clinics').insert([profilePayload]);
+      if (existingClinic) {
+        await supabase.from('clinics').update(profilePayload).eq('id', existingClinic.id);
+      } else {
+        await supabase.from('clinics').insert([profilePayload]);
+      }
 
       setRegisteredSpecialty(specialty);
-      setSpecialty(specialty);
-      showAlert('تم الحفظ', 'تم حفظ التخصص والتحديث فوراً!');
+      setShowMismatchModal(false);
+      showAlert('تم الحفظ', 'تم حفظ وتحديث التخصص بنجاح!');
     } catch (err) {
       showAlert('خطأ', 'فشل الحفظ: ' + err.message);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const fetchPatientScansByPatientId = async (pId) => {
-    if (!pId) return;
-    try {
-      const { data: records } = await supabase
-        .from('medical_records')
-        .select('*')
-        .eq('patient_id', pId)
-        .order('created_at', { ascending: false });
-
-      setPatientHistory(records || []);
-
-      let allScans = [];
-      (records || []).forEach(r => {
-        if (r.dynamic_fields?.scans_list && Array.isArray(r.dynamic_fields.scans_list)) {
-          r.dynamic_fields.scans_list.forEach(sc => {
-            allScans.push({ ...sc, recordId: r.id });
-          });
-        } else if (r.dynamic_fields?.scanUrl) {
-          allScans.push({ url: r.dynamic_fields.scanUrl, title: r.dynamic_fields.scanTitle || 'أشعة طبية', recordId: r.id });
-        }
-      });
-      setPatientScansGrid(allScans);
-    } catch (e) {
-      console.error(e);
     }
   };
 
