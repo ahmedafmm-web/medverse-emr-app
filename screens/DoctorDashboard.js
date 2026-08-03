@@ -38,6 +38,35 @@ const isSpecialtyMatching = (specA, specB) => {
   return false;
 };
 
+// دالة حساب الوقت المتبقي الفعلي بالدقائق والساعات
+const getExactTimeLeftMessage = (expiryDateString) => {
+  if (!expiryDateString) return '';
+
+  const now = new Date();
+  const expiry = new Date(expiryDateString);
+  const diffMs = expiry - now;
+
+  if (diffMs <= 0) {
+    return 'منتهي الآن';
+  }
+
+  const totalHours = Math.floor(diffMs / (1000 * 60 * 60));
+  const days = Math.floor(totalHours / 24);
+  const hours = totalHours % 24;
+  const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+
+  if (days >= 3) {
+    return `باقي ${days} أيام على انتهاء الاشتراك`;
+  }
+  if (days > 0) {
+    return `باقي ${days} يوم و ${hours} ساعة و ${minutes} دقيقة على انتهاء الاشتراك`;
+  }
+  if (hours > 0) {
+    return `متبقي ${hours} ساعة و ${minutes} دقيقة فقط على إيقاف الخدمة!`;
+  }
+  return `متبقي ${minutes} دقيقة فقط على إيقاف الخدمة!`;
+};
+
 export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchPortal }) {
   const [session, setSession] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
@@ -46,7 +75,8 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
   const [password, setPassword] = useState('');
   const [authSubmitting, setAuthSubmitting] = useState(false);
 
-  const [subscriptionAccess, setSubscriptionAccess] = useState({ allowed: true, daysLeft: null, message: '' });
+  const [subscriptionAccess, setSubscriptionAccess] = useState({ allowed: true, daysLeft: null, expiryDate: null, message: '', showAlert: false });
+  const [dynamicTimeLeftText, setDynamicTimeLeftText] = useState('');
 
   const [activeTab, setActiveTab] = useState('prescription');
   const [clinicDoctorName, setClinicDoctorName] = useState('د. أحمد محمد');
@@ -66,7 +96,6 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
   const [scanUploadProgress, setScanUploadProgress] = useState(0);
   const [uploadingScans, setUploadingScans] = useState(false);
 
-  // Lightbox Modal لمعاينة وتكبير الأشعة للطبيب
   const [viewingImageModal, setViewingImageModal] = useState(null);
   const [zoomScale, setZoomScale] = useState(1);
 
@@ -95,7 +124,7 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
 
   const [loading, setLoading] = useState(false);
   const [patientHistory, setPatientHistory] = useState([]);
-  const [patientScansGrid, setPatientScansGrid] = useState([]); // لجميع صور أشعة المريض
+  const [patientScansGrid, setPatientScansGrid] = useState([]);
   const [searchingHistory, setSearchingHistory] = useState(false);
   const [allDoctorPatients, setAllDoctorPatients] = useState([]);
   const [loadingPatientsList, setLoadingPatientsList] = useState(false);
@@ -126,7 +155,8 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
     }
     const cleanPhone = patientPhone.replace(/[^0-9]/g, '');
     const phoneWithCountry = cleanPhone.startsWith('2') ? cleanPhone : `2${cleanPhone}`;
-    const message = `مرحباً ${patientName}،\nإليك رابط سجلـك الطبي وتقرير الأشعة الخاص بك لدى ${clinicDoctorName}:\nhttps://medverse-emr-suite.vercel.app/?c=${selectedPatientCode}`;
+    const baseUrl = Platform.OS === 'web' && typeof window !== 'undefined' ? window.location.origin.split('?')[0] : 'https://medverse-emr-suite.vercel.app';
+    const message = `مرحباً ${patientName}،\nإليك رابط سجلـك الطبي وتقرير الأشعة الخاص بك لدى ${clinicDoctorName}:\n${baseUrl}?c=${selectedPatientCode}`;
     const url = `https://wa.me/${phoneWithCountry}?text=${encodeURIComponent(message)}`;
     if (Platform.OS === 'web') {
       window.open(url, '_blank');
@@ -168,7 +198,19 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
   const checkSubscription = async (user) => {
     const subStatus = await verifyDoctorAccess(user);
     setSubscriptionAccess(subStatus);
+    if (subStatus.expiryDate) {
+      setDynamicTimeLeftText(getExactTimeLeftMessage(subStatus.expiryDate));
+    }
   };
+
+  useEffect(() => {
+    if (!subscriptionAccess.expiryDate) return;
+    setDynamicTimeLeftText(getExactTimeLeftMessage(subscriptionAccess.expiryDate));
+    const timer = setInterval(() => {
+      setDynamicTimeLeftText(getExactTimeLeftMessage(subscriptionAccess.expiryDate));
+    }, 60000);
+    return () => clearInterval(timer);
+  }, [subscriptionAccess.expiryDate]);
 
   const compressImage = (file, maxWidth = 1400, quality = 0.85) => {
     return new Promise((resolve) => {
@@ -285,7 +327,8 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
       for (let i = 0; i < total; i++) {
         const item = selectedScanFiles[i];
         const compressed = await compressImage(item.file, 1600, 0.9);
-        const filePath = `patient_scans/${patientCode}/${Date.now()}_${i}.jpg`;
+        const uniqueId = Math.random().toString(36).substring(2, 9);
+        const filePath = `patient_scans/${patientCode}/${Date.now()}_${uniqueId}_${i}.jpg`;
 
         const { error: uploadErr } = await supabase.storage
           .from('clinic-assets')
@@ -329,7 +372,9 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
   };
 
   const handleDeleteSavedScanFromRecord = async (recordId, scanUrl) => {
-    if (!window.confirm("هل أنت متأكد من حذف صورة الأشعة هذه نهائياً من ملف المريض؟")) return;
+    if (Platform.OS === 'web') {
+      if (!window.confirm("هل أنت متأكد من حذف صورة الأشعة هذه نهائياً من ملف المريض؟")) return;
+    }
 
     try {
       const record = patientHistory.find(r => r.id === recordId);
@@ -437,9 +482,8 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
       return;
     }
 
-    const portalUrl = Platform.OS === 'web' && typeof window !== 'undefined'
-      ? `${window.location.origin}/?c=${currentUserId}`
-      : `https://medverse-emr-suite.vercel.app/?c=${currentUserId}`;
+    const baseUrl = Platform.OS === 'web' && typeof window !== 'undefined' ? window.location.origin.split('?')[0] : 'https://medverse-emr-suite.vercel.app';
+    const portalUrl = `${baseUrl}?c=${currentUserId}`;
 
     if (Platform.OS === 'web' && navigator.clipboard) {
       navigator.clipboard.writeText(portalUrl);
@@ -516,7 +560,8 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
       }
 
       setRegisteredSpecialty(specialty);
-      showAlert('تم الحفظ', 'تم حفظ بيانات الطبيب والختم الإلكتروني بنجاح!');
+      setSpecialty(specialty);
+      showAlert('تم الحفظ', 'تم حفظ بيانات الطبيب والتخصص المعتمد بنجاح!');
     } catch (err) {
       showAlert('خطأ', 'فشل حفظ بيانات البروفايل: ' + err.message);
     } finally {
@@ -575,10 +620,9 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
 
         setPatientHistory(records || []);
 
-        // تجميع شبكة جميع الأشعات
-        const allScans = [];
+        let allScans = [];
         (records || []).forEach(r => {
-          if (r.dynamic_fields?.scans_list) {
+          if (r.dynamic_fields?.scans_list && Array.isArray(r.dynamic_fields.scans_list)) {
             r.dynamic_fields.scans_list.forEach(sc => {
               allScans.push({ ...sc, recordId: r.id });
             });
@@ -935,7 +979,7 @@ Return JSON ONLY:
   if (authLoading) {
     return (
       <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
-        <ActivityIndicator size="large" color="#38BDF8" />
+        <ActivityIndicator size="large" color="#00F2FE" />
       </View>
     );
   }
@@ -1036,7 +1080,7 @@ Return JSON ONLY:
               <Text style={styles.zoomBtnText}>🔍 تكبير (+)</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.zoomBtn} onPress={() => setZoomScale(1)}>
-              <Text style={styles.zoomBtnText}>🔄 إعادة ضغط (1x)</Text>
+              <Text style={styles.zoomBtnText}>🔄 إعادة (1x)</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.zoomBtn} onPress={() => setZoomScale(z => Math.max(z - 0.3, 0.5))}>
               <Text style={styles.zoomBtnText}>🔍 تصغير (-)</Text>
@@ -1092,13 +1136,19 @@ Return JSON ONLY:
 
       {subscriptionAccess.showAlert && (
         <View style={styles.subWarningBanner}>
-          <Text style={styles.subWarningText}>⚠️ {subscriptionAccess.message} - يرجى تجديد الاشتراك لتجنب إيقاف الخدمة.</Text>
+          <Text style={styles.subWarningIcon}>⏳</Text>
+          <Text style={styles.subWarningText}>
+            تنبيه الاشتراك: {dynamicTimeLeftText || subscriptionAccess.message}
+          </Text>
+          <TouchableOpacity style={styles.renewQuickBtn} onPress={handleOpenWhatsApp}>
+            <Text style={styles.renewQuickBtnText}>تجديد ⚡</Text>
+          </TouchableOpacity>
         </View>
       )}
 
       <View style={styles.header}>
         <View style={styles.topUserRow}>
-          <Text style={styles.userEmailText}>👤 {session.user.email}</Text>
+          <Text style={styles.userEmailText}>⚡ {clinicDoctorName} ({session?.user?.email})</Text>
 
           {onSwitchPortal && (
             <TouchableOpacity onPress={onSwitchPortal} style={styles.switchPortalBtn}>
@@ -1111,7 +1161,7 @@ Return JSON ONLY:
           </TouchableOpacity>
         </View>
         <Text style={styles.title}>MedVerse Smart EMR Suite</Text>
-        <Text style={styles.subtitle}>لوحة تحكم الطبيب السريرية ({specialty})</Text>
+        <Text style={styles.subtitle}>منظومة إدارة العيادات والأشعة الذكية ({specialty})</Text>
       </View>
 
       <View style={styles.navBar}>
@@ -1119,7 +1169,7 @@ Return JSON ONLY:
           style={[styles.navBtn, activeTab === 'prescription' && styles.navBtnActive]} 
           onPress={() => setActiveTab('prescription')}
         >
-          <Text style={[styles.navBtnText, activeTab === 'prescription' && styles.navBtnTextActive]}>🩺 الروشتة والأشعة</Text>
+          <Text style={[styles.navBtnText, activeTab === 'prescription' && styles.navBtnTextActive]}>🩺 الكشف والأشعة</Text>
         </TouchableOpacity>
 
         <TouchableOpacity 
@@ -1129,14 +1179,14 @@ Return JSON ONLY:
             fetchAllPatients();
           }}
         >
-          <Text style={[styles.navBtnText, activeTab === 'patients' && styles.navBtnTextActive]}>📂 قائمة مرضاي</Text>
+          <Text style={[styles.navBtnText, activeTab === 'patients' && styles.navBtnTextActive]}>📂 قائمة المرضى</Text>
         </TouchableOpacity>
 
         <TouchableOpacity 
           style={[styles.navBtn, activeTab === 'profile' && styles.navBtnActive]} 
           onPress={() => setActiveTab('profile')}
         >
-          <Text style={[styles.navBtnText, activeTab === 'profile' && styles.navBtnTextActive]}>⚙️ ملف العيادة والختم</Text>
+          <Text style={[styles.navBtnText, activeTab === 'profile' && styles.navBtnTextActive]}>⚙️ بروفايل العيادة</Text>
         </TouchableOpacity>
       </View>
 
@@ -1175,10 +1225,10 @@ Return JSON ONLY:
           <TextInput style={styles.input} value={specialty} onChangeText={setSpecialty} />
 
           <Text style={styles.label}>رقم هاتف العيادة للتواصل</Text>
-          <TextInput style={styles.input} value={clinicPhone} onChangeText={setClinicPhone} placeholder="01xxxxxxxxx" placeholderTextColor="#94A3B8" />
+          <TextInput style={styles.input} value={clinicPhone} onChangeText={setClinicPhone} placeholder="01xxxxxxxxx" placeholderTextColor="#64748B" />
 
           <Text style={styles.label}>عنوان العيادة التفصيلي</Text>
-          <TextInput style={styles.input} value={clinicAddress} onChangeText={setClinicAddress} placeholder="المحافظة - الشارع - المبنى" placeholderTextColor="#94A3B8" />
+          <TextInput style={styles.input} value={clinicAddress} onChangeText={setClinicAddress} placeholder="المحافظة - الشارع - المبنى" placeholderTextColor="#64748B" />
 
           <Text style={styles.label}>شعار / لوجو العيادة (رفع ملف صورة مباشر):</Text>
           {Platform.OS === 'web' ? (
@@ -1186,7 +1236,7 @@ Return JSON ONLY:
               type="file" 
               accept="image/*" 
               onChange={handleUploadLogoFile}
-              style={{ marginBottom: 10, color: '#FFFFFF' }}
+              style={{ marginBottom: 10, color: '#00F2FE' }}
             />
           ) : null}
 
@@ -1218,7 +1268,7 @@ Return JSON ONLY:
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>📂 قائمة مرضى العيادة والملفات الطبية</Text>
           {loadingPatientsList ? (
-            <ActivityIndicator color="#38BDF8" style={{ marginVertical: 20 }} />
+            <ActivityIndicator color="#00F2FE" style={{ marginVertical: 20 }} />
           ) : allDoctorPatients.length === 0 ? (
             <Text style={styles.emptyText}>لا يوجد مرضى مسجلين حتى الآن.</Text>
           ) : (
@@ -1269,7 +1319,7 @@ Return JSON ONLY:
             <TextInput 
               style={styles.input} 
               placeholder="أدخل اسم المريض..." 
-              placeholderTextColor="#94A3B8"
+              placeholderTextColor="#64748B"
               value={patientName}
               onChangeText={(val) => {
                 setPatientName(val);
@@ -1292,7 +1342,7 @@ Return JSON ONLY:
                 <TextInput 
                   style={styles.input} 
                   placeholder="مثال: 58" 
-                  placeholderTextColor="#94A3B8"
+                  placeholderTextColor="#64748B"
                   keyboardType="numeric"
                   value={age}
                   onChangeText={setAge}
@@ -1304,7 +1354,7 @@ Return JSON ONLY:
                 <TextInput 
                   style={styles.input} 
                   placeholder="01xxxxxxxxx" 
-                  placeholderTextColor="#94A3B8"
+                  placeholderTextColor="#64748B"
                   keyboardType="phone-pad"
                   value={patientPhone}
                   onChangeText={setPatientPhone}
@@ -1313,10 +1363,10 @@ Return JSON ONLY:
             </View>
 
             <Text style={styles.label}>الأمراض المزمنة</Text>
-            <TextInput style={styles.input} placeholder="مثال: روماتويد، ضغط، سكر..." placeholderTextColor="#94A3B8" value={chronicDiseases} onChangeText={setChronicDiseases} />
+            <TextInput style={styles.input} placeholder="مثال: روماتويد، ضغط، سكر..." placeholderTextColor="#64748B" value={chronicDiseases} onChangeText={setChronicDiseases} />
 
             <Text style={styles.label}>التاريخ المرضي العائلي</Text>
-            <TextInput style={styles.input} placeholder="مثال: أمراض مناعية..." placeholderTextColor="#94A3B8" value={familyHistory} onChangeText={setFamilyHistory} />
+            <TextInput style={styles.input} placeholder="مثال: أمراض مناعية..." placeholderTextColor="#64748B" value={familyHistory} onChangeText={setFamilyHistory} />
           </View>
 
           {/* قسم Grid View لعرض وتحكم صور أشعة المريض */}
@@ -1350,7 +1400,7 @@ Return JSON ONLY:
               <TextInput 
                 style={styles.input} 
                 placeholder="عنوان المرفق (مثال: أشعة سينية جديدة)" 
-                placeholderTextColor="#94A3B8" 
+                placeholderTextColor="#64748B" 
                 value={scanGroupTitle} 
                 onChangeText={setScanGroupTitle} 
               />
@@ -1361,7 +1411,7 @@ Return JSON ONLY:
                   accept="image/*" 
                   multiple
                   onChange={handleSelectMultipleScans}
-                  style={{ marginBottom: 12, color: '#FFFFFF' }}
+                  style={{ marginBottom: 12, color: '#00F2FE' }}
                 />
               ) : null}
 
@@ -1409,10 +1459,10 @@ Return JSON ONLY:
             <Text style={styles.sectionTitle}>🩺 الشكوى الحالية والفحوصات الإكلينيكية</Text>
             
             <Text style={styles.label}>الأعراض والشكوى الحالية:</Text>
-            <TextInput style={[styles.input, styles.textArea]} placeholder="صف الأعراض بالتفصيل..." placeholderTextColor="#94A3B8" multiline numberOfLines={3} value={symptomsInput} onChangeText={setSymptomsInput} />
+            <TextInput style={[styles.input, styles.textArea]} placeholder="صف الأعراض بالتفصيل..." placeholderTextColor="#64748B" multiline numberOfLines={3} value={symptomsInput} onChangeText={setSymptomsInput} />
 
             <Text style={styles.label}>ملاحظات الفحوصات والتحاليل والمتابعة:</Text>
-            <TextInput style={[styles.input, styles.textArea]} placeholder="اكتب نتائج تحاليل RF, Anti-CCP أو الأشعة..." placeholderTextColor="#94A3B8" multiline numberOfLines={2} value={doctorNotes} onChangeText={setDoctorNotes} />
+            <TextInput style={[styles.input, styles.textArea]} placeholder="اكتب نتائج تحاليل RF, Anti-CCP أو الأشعة..." placeholderTextColor="#64748B" multiline numberOfLines={2} value={doctorNotes} onChangeText={setDoctorNotes} />
 
             <TouchableOpacity style={styles.aiButton} onPress={handleClinicalAnalysis} disabled={analyzing}>
               {analyzing ? <ActivityIndicator color="#FFFFFF" size="small" /> : <Text style={styles.aiButtonText}>✨ تحليل الحالة بـ LLaMA 3.3 70B AI ({specialty})</Text>}
@@ -1454,9 +1504,9 @@ Return JSON ONLY:
 
             <View style={styles.addMedBox}>
               <Text style={styles.label}>إضافة دواء يدوي (مع فحص التفاعلات):</Text>
-              <TextInput style={styles.input} placeholder="اسم الدواء (إنجليزي)" placeholderTextColor="#94A3B8" value={newMedName} onChangeText={setNewMedName} />
-              <TextInput style={styles.input} placeholder="الجرعة والتوقيت" placeholderTextColor="#94A3B8" value={newMedDose} onChangeText={setNewMedDose} />
-              <TextInput style={styles.input} placeholder="دواعي الاستعمال" placeholderTextColor="#94A3B8" value={newMedReason} onChangeText={setNewMedReason} />
+              <TextInput style={styles.input} placeholder="اسم الدواء (إنجليزي)" placeholderTextColor="#64748B" value={newMedName} onChangeText={setNewMedName} />
+              <TextInput style={styles.input} placeholder="الجرعة والتوقيت" placeholderTextColor="#64748B" value={newMedDose} onChangeText={setNewMedDose} />
+              <TextInput style={styles.input} placeholder="دواعي الاستعمال" placeholderTextColor="#64748B" value={newMedReason} onChangeText={setNewMedReason} />
               
               <TouchableOpacity style={styles.addMedBtn} onPress={handleCheckAndAddManualMed} disabled={checkingMed}>
                 {checkingMed ? <ActivityIndicator color="#FFFFFF" size="small" /> : <Text style={styles.addMedBtnText}>🔍 فحص وإضافة الدواء للروشتة</Text>}
@@ -1480,35 +1530,38 @@ Return JSON ONLY:
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0F172A', padding: 15 },
-  header: { marginBottom: 15, alignItems: 'center', marginTop: 15 },
-  title: { fontSize: 20, fontWeight: 'bold', color: '#38BDF8' },
-  subtitle: { fontSize: 12, color: '#94A3B8', marginTop: 4, fontWeight: '600' },
-  
-  topUserRow: { flexDirection: 'row-reverse', justifyContent: 'space-between', width: '100%', paddingHorizontal: 10, marginBottom: 10, alignItems: 'center' },
+  container: { flex: 1, backgroundColor: '#090D16', padding: 14 },
+  header: { marginBottom: 15, alignItems: 'center', marginTop: 10 },
+  title: { fontSize: 22, fontWeight: '900', color: '#00F2FE', letterSpacing: 0.5 },
+  subtitle: { fontSize: 12, color: '#94A3B8', marginTop: 3, fontWeight: '600' },
+
+  topUserRow: { flexDirection: 'row-reverse', justifyContent: 'space-between', width: '100%', marginBottom: 10, alignItems: 'center' },
   userEmailText: { color: '#38BDF8', fontSize: 11, fontWeight: 'bold' },
-  signOutBtn: { backgroundColor: '#334155', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6 },
+  signOutBtn: { backgroundColor: '#1E293B', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, borderWidth: 1, borderColor: '#334155' },
   signOutText: { color: '#EF4444', fontSize: 11, fontWeight: 'bold' },
 
-  switchPortalBtn: { backgroundColor: '#0284C7', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6 },
-  switchPortalBtnText: { color: '#FFFFFF', fontSize: 11, fontWeight: 'bold' },
+  switchPortalBtn: { backgroundColor: '#1E293B', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, borderWidth: 1, borderColor: '#334155' },
+  switchPortalBtnText: { color: '#00F2FE', fontSize: 11, fontWeight: 'bold' },
 
-  subWarningBanner: { backgroundColor: '#B45309', padding: 10, borderRadius: 8, marginBottom: 15, alignItems: 'center' },
-  subWarningText: { color: '#FFFFFF', fontSize: 12, fontWeight: 'bold', textAlign: 'center' },
+  subWarningBanner: { backgroundColor: '#B45309', paddingVertical: 10, paddingHorizontal: 14, borderRadius: 10, marginBottom: 15, flexDirection: 'row-reverse', alignItems: 'center', borderWidth: 1, borderColor: '#F59E0B' },
+  subWarningIcon: { fontSize: 16, marginLeft: 6 },
+  subWarningText: { color: '#FFFFFF', fontSize: 12, fontWeight: 'bold', flex: 1, textAlign: 'right' },
+  renewQuickBtn: { backgroundColor: '#10B981', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6 },
+  renewQuickBtnText: { color: '#FFFFFF', fontSize: 11, fontWeight: 'bold' },
 
-  authCard: { backgroundColor: '#1E293B', padding: 20, borderRadius: 16, borderWidth: 1, borderColor: '#334155' },
-  authTitle: { fontSize: 20, fontWeight: 'bold', color: '#38BDF8', textAlign: 'center', marginBottom: 5 },
+  authCard: { backgroundColor: '#131C2E', padding: 20, borderRadius: 16, borderWidth: 1, borderColor: '#1E293B' },
+  authTitle: { fontSize: 20, fontWeight: 'bold', color: '#00F2FE', textAlign: 'center', marginBottom: 5 },
   authSub: { fontSize: 13, color: '#94A3B8', textAlign: 'center', marginBottom: 20 },
   authSubmitBtn: { backgroundColor: '#0284C7', padding: 14, borderRadius: 10, alignItems: 'center', marginTop: 10 },
   authSubmitBtnText: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 14 },
   authToggleBtn: { marginTop: 15, alignItems: 'center' },
   authToggleBtnText: { color: '#38BDF8', fontSize: 12 },
 
-  paywallCard: { backgroundColor: '#1E293B', padding: 20, borderRadius: 16, borderWidth: 1, borderColor: '#EF4444', alignItems: 'center' },
+  paywallCard: { backgroundColor: '#131C2E', padding: 20, borderRadius: 16, borderWidth: 1, borderColor: '#EF4444', alignItems: 'center' },
   paywallIcon: { fontSize: 40, marginBottom: 10 },
   paywallTitle: { fontSize: 20, fontWeight: 'bold', color: '#EF4444', marginBottom: 8 },
   paywallReason: { fontSize: 13, color: '#FCA5A5', textAlign: 'center', marginBottom: 20, lineHeight: 20 },
-  paywallInfoBox: { backgroundColor: '#0F172A', padding: 15, borderRadius: 10, width: '100%', marginBottom: 15, borderWidth: 1, borderColor: '#334155' },
+  paywallInfoBox: { backgroundColor: '#090D16', padding: 15, borderRadius: 10, width: '100%', marginBottom: 15, borderWidth: 1, borderColor: '#1E293B' },
   paywallInfoTitle: { fontSize: 13, fontWeight: 'bold', color: '#38BDF8', marginBottom: 10, textAlign: 'right' },
   paymentMethodRow: { marginBottom: 12 },
   paymentMethodText: { fontSize: 12, color: '#CBD5E1', textAlign: 'right', marginBottom: 4 },
@@ -1520,108 +1573,108 @@ const styles = StyleSheet.create({
   whatsappBtnText: { color: '#FFFFFF', fontSize: 13, fontWeight: 'bold' },
   paywallSignOutBtn: { marginTop: 5 },
 
-  navBar: { flexDirection: 'row-reverse', backgroundColor: '#1E293B', borderRadius: 10, padding: 4, marginBottom: 15, borderWidth: 1, borderColor: '#334155' },
+  navBar: { flexDirection: 'row-reverse', backgroundColor: '#131C2E', borderRadius: 12, padding: 4, marginBottom: 15, borderWidth: 1, borderColor: '#1E293B' },
   navBtn: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 8 },
   navBtnActive: { backgroundColor: '#0284C7' },
-  navBtnText: { color: '#94A3B8', fontSize: 11, fontWeight: 'bold' },
+  navBtnText: { color: '#94A3B8', fontSize: 12, fontWeight: 'bold' },
   navBtnTextActive: { color: '#FFFFFF' },
 
-  card: { backgroundColor: '#1E293B', padding: 16, borderRadius: 12, marginBottom: 15, borderWidth: 1, borderColor: '#334155' },
+  card: { backgroundColor: '#131C2E', padding: 16, borderRadius: 16, marginBottom: 15, borderWidth: 1, borderColor: '#1E293B' },
   cardHeaderRow: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
   dummyBtn: { backgroundColor: '#0284C7', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6 },
   dummyBtnText: { color: '#FFFFFF', fontSize: 11, fontWeight: 'bold' },
-  sectionTitle: { fontSize: 15, fontWeight: 'bold', color: '#F8FAFC', marginBottom: 6, textAlign: 'right' },
+  sectionTitle: { fontSize: 15, fontWeight: 'bold', color: '#F8FAFC', marginBottom: 10, textAlign: 'right' },
   subSectionTitle: { fontSize: 13, fontWeight: 'bold', color: '#38BDF8', marginTop: 12, marginBottom: 8, textAlign: 'right' },
   label: { fontSize: 12, color: '#CBD5E1', marginBottom: 4, textAlign: 'right' },
-  input: { borderWidth: 1, borderColor: '#475569', borderRadius: 8, padding: 10, backgroundColor: '#0F172A', marginBottom: 12, textAlign: 'right', color: '#FFFFFF', fontSize: 13 },
+  input: { borderWidth: 1, borderColor: '#1E293B', borderRadius: 10, padding: 12, backgroundColor: '#090D16', marginBottom: 12, textAlign: 'right', color: '#FFFFFF', fontSize: 13 },
   rowInputs: { flexDirection: 'row-reverse' },
   textArea: { height: 70, textAlignVertical: 'top' },
   
-  specChip: { backgroundColor: '#0F172A', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, marginRight: 8, borderWidth: 1, borderColor: '#334155' },
-  specChipActive: { backgroundColor: '#0284C7', borderColor: '#38BDF8' },
+  specChip: { backgroundColor: '#090D16', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, marginRight: 8, borderWidth: 1, borderColor: '#1E293B' },
+  specChipActive: { backgroundColor: '#0284C7', borderColor: '#00F2FE' },
   specChipText: { color: '#94A3B8', fontSize: 11 },
   specChipTextActive: { color: '#FFFFFF', fontWeight: 'bold' },
 
-  patientChip: { backgroundColor: '#0F172A', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, marginRight: 6, borderWidth: 1, borderColor: '#334155' },
-  patientChipActive: { backgroundColor: '#0369A1', borderColor: '#38BDF8' },
+  patientChip: { backgroundColor: '#090D16', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, marginRight: 6, borderWidth: 1, borderColor: '#1E293B' },
+  patientChipActive: { backgroundColor: '#0369A1', borderColor: '#00F2FE' },
   patientChipText: { color: '#CBD5E1', fontSize: 11 },
   patientChipTextActive: { color: '#FFFFFF', fontWeight: 'bold' },
-  selectedCodeBadge: { color: '#34D399', fontSize: 11, fontWeight: 'bold', textAlign: 'right', marginBottom: 10 },
+  selectedCodeBadge: { color: '#10B981', fontSize: 11, fontWeight: 'bold', textAlign: 'right', marginBottom: 10 },
   whatsappShareBtn: { backgroundColor: '#16A34A', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6, marginBottom: 10 },
   whatsappShareBtnText: { color: '#FFFFFF', fontSize: 11, fontWeight: 'bold' },
 
-  scanPreviewCard: { marginRight: 10, backgroundColor: '#0F172A', padding: 6, borderRadius: 8, alignItems: 'center', borderWidth: 1, borderColor: '#334155' },
+  scanPreviewCard: { marginRight: 10, backgroundColor: '#090D16', padding: 6, borderRadius: 8, alignItems: 'center', borderWidth: 1, borderColor: '#1E293B' },
   scanPreviewImg: { width: 100, height: 100, borderRadius: 6 },
   deleteScanBtn: { backgroundColor: '#991B1B', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4, marginTop: 4 },
   deleteScanBtnText: { color: '#FFFFFF', fontSize: 10, fontWeight: 'bold' },
 
   scansGridContainer: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 10, marginBottom: 15 },
-  scanGridCard: { width: '31%', backgroundColor: '#0F172A', padding: 6, borderRadius: 8, alignItems: 'center', borderWidth: 1, borderColor: '#334155' },
-  scanGridImg: { width: '100%', height: 90, borderRadius: 6 },
-  scanGridTitle: { color: '#CBD5E1', fontSize: 10, marginTop: 4, textAlign: 'center' },
+  scanGridCard: { width: '31%', backgroundColor: '#090D16', padding: 6, borderRadius: 10, alignItems: 'center', borderWidth: 1, borderColor: '#1E293B' },
+  scanGridImg: { width: '100%', height: 90, borderRadius: 8 },
+  scanGridTitle: { color: '#94A3B8', fontSize: 10, marginTop: 4, textAlign: 'center' },
   scanGridDeleteBtn: { backgroundColor: '#991B1B', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, marginTop: 4, width: '100%', alignItems: 'center' },
   scanGridDeleteText: { color: '#FFFFFF', fontSize: 10 },
 
-  progressBarContainer: { height: 18, backgroundColor: '#0F172A', borderRadius: 9, overflow: 'hidden', marginBottom: 12, justifyContent: 'center', borderWidth: 1, borderColor: '#334155' },
+  progressBarContainer: { height: 18, backgroundColor: '#090D16', borderRadius: 9, overflow: 'hidden', marginBottom: 12, justifyContent: 'center', borderWidth: 1, borderColor: '#1E293B' },
   progressBarFill: { height: '100%', backgroundColor: '#059669', position: 'absolute' },
   progressText: { color: '#FFFFFF', fontSize: 10, fontWeight: 'bold', textAlign: 'center', zIndex: 1 },
 
-  saveScansBtn: { backgroundColor: '#059669', padding: 14, borderRadius: 8, alignItems: 'center' },
+  saveScansBtn: { backgroundColor: '#10B981', padding: 14, borderRadius: 10, alignItems: 'center' },
   saveScansBtnText: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 13 },
 
   deleteImgBtn: { backgroundColor: '#991B1B', padding: 6, borderRadius: 6, marginTop: 6, alignItems: 'center' },
   deleteImgBtnText: { color: '#FFFFFF', fontSize: 11, fontWeight: 'bold' },
 
-  linkCardBox: { backgroundColor: '#0F172A', padding: 12, borderRadius: 8, marginBottom: 15, borderWidth: 1, borderColor: '#0284C7' },
-  linkBoxTitle: { fontSize: 13, fontWeight: 'bold', color: '#38BDF8', textAlign: 'right' },
+  linkCardBox: { backgroundColor: '#090D16', padding: 12, borderRadius: 8, marginBottom: 15, borderWidth: 1, borderColor: '#0284C7' },
+  linkBoxTitle: { fontSize: 13, fontWeight: 'bold', color: '#00F2FE', textAlign: 'right' },
   linkBoxSub: { fontSize: 11, color: '#94A3B8', textAlign: 'right', marginTop: 2, marginBottom: 8 },
   copyLinkBtn: { backgroundColor: '#0284C7', padding: 10, borderRadius: 6, alignItems: 'center' },
   copyLinkBtnText: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 12 },
 
-  previewBox: { backgroundColor: '#0F172A', padding: 10, borderRadius: 8, alignItems: 'center', marginBottom: 12, borderWidth: 1, borderColor: '#334155' },
+  previewBox: { backgroundColor: '#090D16', padding: 10, borderRadius: 8, alignItems: 'center', marginBottom: 12, borderWidth: 1, borderColor: '#1E293B' },
   stampImage: { width: 120, height: 80, marginTop: 5 },
-  saveProfileBtn: { backgroundColor: '#059669', padding: 12, borderRadius: 8, alignItems: 'center', marginTop: 5 },
+  saveProfileBtn: { backgroundColor: '#10B981', padding: 12, borderRadius: 8, alignItems: 'center', marginTop: 5 },
   saveProfileBtnText: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 13 },
 
-  patientListItem: { backgroundColor: '#0F172A', padding: 12, borderRadius: 8, marginBottom: 8, borderWidth: 1, borderColor: '#334155' },
+  patientListItem: { backgroundColor: '#090D16', padding: 12, borderRadius: 8, marginBottom: 8, borderWidth: 1, borderColor: '#1E293B' },
   patientItemName: { fontSize: 14, fontWeight: 'bold', color: '#FFFFFF' },
-  patientItemCode: { fontSize: 12, color: '#38BDF8', fontWeight: 'bold' },
+  patientItemCode: { fontSize: 12, color: '#00F2FE', fontWeight: 'bold' },
   patientItemSub: { fontSize: 11, color: '#94A3B8', textAlign: 'right', marginTop: 4 },
-  emptyText: { color: '#64748B', fontSize: 13, textAlign: 'center', marginVertical: 15 },
+  emptyText: { color: '#64748B', fontSize: 12, textAlign: 'center', marginVertical: 10 },
 
   aiButton: { backgroundColor: '#0284C7', padding: 12, borderRadius: 8, alignItems: 'center', marginBottom: 12, marginTop: 5 },
   aiButtonText: { color: '#FFFFFF', fontSize: 13, fontWeight: 'bold' },
-  aiReportBox: { backgroundColor: 'rgba(3, 105, 161, 0.3)', padding: 12, borderRadius: 10, borderWidth: 1, borderColor: '#0284C7' },
-  aiReportHeader: { fontSize: 12, fontWeight: 'bold', color: '#38BDF8', marginBottom: 6, textAlign: 'right' },
+  aiReportBox: { backgroundColor: 'rgba(3, 105, 161, 0.2)', padding: 12, borderRadius: 10, borderWidth: 1, borderColor: '#0284C7' },
+  aiReportHeader: { fontSize: 12, fontWeight: 'bold', color: '#00F2FE', marginBottom: 6, textAlign: 'right' },
   warningBox: { backgroundColor: 'rgba(153, 27, 27, 0.4)', padding: 10, borderRadius: 6, borderWidth: 1, borderColor: '#EF4444', marginTop: 6, marginBottom: 6 },
   warningText: { color: '#FCA5A5', fontSize: 11, fontWeight: 'bold', textAlign: 'right' },
   aiDiagText: { fontSize: 12, color: '#F8FAFC', textAlign: 'right' },
-  medCard: { backgroundColor: '#0F172A', padding: 12, borderRadius: 8, borderWidth: 1, borderColor: '#334155', marginBottom: 10 },
+  medCard: { backgroundColor: '#090D16', padding: 12, borderRadius: 8, borderWidth: 1, borderColor: '#1E293B', marginBottom: 10 },
   medHeader: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
   medName: { fontSize: 13, fontWeight: 'bold', color: '#FFFFFF' },
   deleteText: { color: '#EF4444', fontSize: 11, fontWeight: 'bold' },
   medDetail: { fontSize: 11, color: '#94A3B8', textAlign: 'right', marginTop: 2 },
-  addMedBox: { backgroundColor: '#0F172A', padding: 12, borderRadius: 8, marginTop: 10, borderWidth: 1, borderColor: '#334155' },
-  addMedBtn: { backgroundColor: '#334155', padding: 10, borderRadius: 6, alignItems: 'center', marginTop: 4 },
-  addMedBtnText: { color: '#38BDF8', fontSize: 12, fontWeight: 'bold' },
-  saveButton: { backgroundColor: '#059669', padding: 16, borderRadius: 10, alignItems: 'center', marginBottom: 35 },
+  addMedBox: { backgroundColor: '#090D16', padding: 12, borderRadius: 8, marginTop: 10, borderWidth: 1, borderColor: '#1E293B' },
+  addMedBtn: { backgroundColor: '#1E293B', padding: 10, borderRadius: 6, alignItems: 'center', marginTop: 4 },
+  addMedBtnText: { color: '#00F2FE', fontSize: 12, fontWeight: 'bold' },
+  saveButton: { backgroundColor: '#10B981', padding: 16, borderRadius: 10, alignItems: 'center', marginBottom: 35 },
   saveButtonDisabled: { opacity: 0.6 },
   saveButtonText: { color: '#FFFFFF', fontSize: 15, fontWeight: 'bold' },
 
-  lightboxOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.92)', justifyContent: 'center', alignItems: 'center', padding: 20 },
+  lightboxOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.95)', justifyContent: 'center', alignItems: 'center', padding: 20 },
   lightboxCloseBtn: { position: 'absolute', top: 20, right: 20, backgroundColor: '#EF4444', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6, zIndex: 10 },
   lightboxCloseText: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 12 },
   lightboxControls: { position: 'absolute', bottom: 30, flexDirection: 'row-reverse', gap: 10, zIndex: 10 },
   zoomBtn: { backgroundColor: '#0284C7', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 6 },
   zoomBtnText: { color: '#FFFFFF', fontSize: 11, fontWeight: 'bold' },
-  lightboxTitle: { color: '#38BDF8', fontSize: 13, fontWeight: 'bold', marginTop: 12, textAlign: 'center' },
+  lightboxTitle: { color: '#00F2FE', fontSize: 13, fontWeight: 'bold', marginTop: 12, textAlign: 'center' },
 
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', alignItems: 'center', padding: 20 },
-  modalContent: { backgroundColor: '#1E293B', padding: 20, borderRadius: 16, width: '100%', maxWidth: 450, borderWidth: 1, borderColor: '#EF4444' },
+  modalContent: { backgroundColor: '#131C2E', padding: 20, borderRadius: 16, width: '100%', maxWidth: 450, borderWidth: 1, borderColor: '#EF4444' },
   modalTitle: { fontSize: 16, fontWeight: 'bold', color: '#EF4444', marginBottom: 8, textAlign: 'right' },
   modalSub: { fontSize: 13, color: '#CBD5E1', marginBottom: 20, textAlign: 'right', lineHeight: 20 },
   modalButtonsRow: { flexDirection: 'row-reverse', justifyContent: 'space-between', gap: 10 },
-  modalStayBtn: { flex: 1, backgroundColor: '#334155', padding: 10, borderRadius: 8, alignItems: 'center' },
+  modalStayBtn: { flex: 1, backgroundColor: '#1E293B', padding: 10, borderRadius: 8, alignItems: 'center' },
   modalStayBtnText: { color: '#94A3B8', fontSize: 11, fontWeight: 'bold' },
   modalGoBtn: { flex: 1.2, backgroundColor: '#0284C7', padding: 10, borderRadius: 8, alignItems: 'center' },
   modalGoBtnText: { color: '#FFFFFF', fontSize: 11, fontWeight: 'bold' }
