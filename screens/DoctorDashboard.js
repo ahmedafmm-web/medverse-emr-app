@@ -141,15 +141,18 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
     setSubscriptionAccess(subStatus);
   };
 
-  // --- دالة ضغط الصور تلقائياً وحفظ الجودة (Image Compression) ---
+  // --- دالة ضغط الصور فائقة السرعة والموافقة للموبايل والويب ---
   const compressImage = (file, maxWidth = 1000, quality = 0.8) => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = (event) => {
+    return new Promise((resolve) => {
+      try {
+        if (!file || !file.type.includes('image')) return resolve(file);
+
+        const objectUrl = URL.createObjectURL(file);
         const img = new Image();
-        img.src = event.target.result;
+        img.src = objectUrl;
+
         img.onload = () => {
+          URL.revokeObjectURL(objectUrl);
           const canvas = document.createElement('canvas');
           let width = img.width;
           let height = img.height;
@@ -166,49 +169,50 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
 
           canvas.toBlob(
             (blob) => {
-              if (blob) {
-                resolve(blob);
-              } else {
-                reject(new Error('فشل ضغط الصورة'));
-              }
+              resolve(blob || file);
             },
             'image/jpeg',
             quality
           );
         };
-      };
-      reader.onerror = (error) => reject(error);
+
+        img.onerror = () => {
+          URL.revokeObjectURL(objectUrl);
+          resolve(file);
+        };
+      } catch (e) {
+        resolve(file);
+      }
     });
   };
 
-  // --- دالة رفع اللوجو مع شريط التقدم والضغط ---
+  // --- دالة رفع اللوجو المحدثة بالكامل ---
   const handleUploadLogoFile = async (event) => {
     const file = event.target.files[0];
     if (!file) return;
 
     setUploadingLogo(true);
-    setLogoUploadProgress(20);
+    setLogoUploadProgress(10);
 
     try {
       const compressedBlob = await compressImage(file, 800, 0.85);
       setLogoUploadProgress(50);
 
-      const filePath = `logos/${Date.now()}_${file.name}`;
+      const filePath = `logos/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
       const { data, error } = await supabase.storage
         .from('clinic-assets')
         .upload(filePath, compressedBlob, { upsert: true });
 
-      setLogoUploadProgress(80);
+      setLogoUploadProgress(85);
 
       if (error) {
-        // في حال عدم وجود Bucket مخصص، يتم تحويلها إلى Base64 معالجة بالدقة
         const reader = new FileReader();
-        reader.readAsDataURL(compressedBlob);
-        reader.onloadend = () => {
+        reader.onload = () => {
           setClinicLogoUrl(reader.result);
           setLogoUploadProgress(100);
           setUploadingLogo(false);
         };
+        reader.readAsDataURL(compressedBlob);
       } else {
         const { data: publicUrlData } = supabase.storage.from('clinic-assets').getPublicUrl(filePath);
         setClinicLogoUrl(publicUrlData.publicUrl);
@@ -216,38 +220,38 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
         setUploadingLogo(false);
       }
     } catch (err) {
-      showAlert('خطأ في الرفع', 'تعذر رفع وتصغير الصورة: ' + err.message);
+      showAlert('خطأ في الرفع', err.message || 'تعذر رفع وتصغير الصورة');
       setUploadingLogo(false);
     }
   };
 
-  // --- دالة رفع صورة الأشعة مع شريط التقدم والضغط ---
+  // --- دالة رفع صورة الأشعة المحدثة بالكامل ---
   const handleUploadScanFile = async (event) => {
     const file = event.target.files[0];
     if (!file) return;
 
     setUploadingScan(true);
-    setScanUploadProgress(20);
+    setScanUploadProgress(10);
 
     try {
       const compressedBlob = await compressImage(file, 1200, 0.85);
       setScanUploadProgress(50);
 
-      const filePath = `scans/${Date.now()}_${file.name}`;
+      const filePath = `scans/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
       const { data, error } = await supabase.storage
         .from('clinic-assets')
         .upload(filePath, compressedBlob, { upsert: true });
 
-      setScanUploadProgress(80);
+      setScanUploadProgress(85);
 
       if (error) {
         const reader = new FileReader();
-        reader.readAsDataURL(compressedBlob);
-        reader.onloadend = () => {
+        reader.onload = () => {
           setUploadedScanUrl(reader.result);
           setScanUploadProgress(100);
           setUploadingScan(false);
         };
+        reader.readAsDataURL(compressedBlob);
       } else {
         const { data: publicUrlData } = supabase.storage.from('clinic-assets').getPublicUrl(filePath);
         setUploadedScanUrl(publicUrlData.publicUrl);
@@ -255,7 +259,7 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
         setUploadingScan(false);
       }
     } catch (err) {
-      showAlert('خطأ في الرفع', 'تعذر رفع صورة الأشعة: ' + err.message);
+      showAlert('خطأ في الرفع', err.message || 'تعذر رفع صورة الأشعة');
       setUploadingScan(false);
     }
   };
@@ -340,7 +344,7 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
         if (clinic.clinic_name) setClinicName(clinic.clinic_name);
         if (clinic.specialty) {
           setSpecialty(clinic.specialty);
-          setRegisteredSpecialty(clinic.specialty); // حفظ التخصص الأصلي المسجل
+          setRegisteredSpecialty(clinic.specialty);
         }
         if (clinic.logo_url) setClinicLogoUrl(clinic.logo_url);
         if (clinic.stamp_url) setDigitalStampUrl(clinic.stamp_url);
@@ -476,7 +480,6 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
     fetchPatientHistory(dummyName);
   };
 
-  // --- التحليل الإكلينيكي بالذكاء الاصطناعي مع دعم تخصص الروماتيزم والروماتويد ---
   const handleClinicalAnalysis = async () => {
     if (!symptomsInput.trim()) {
       showAlert('تنبيه', 'يرجى كتابة الأعراض والشكوى الحالية للمريض أولاً.');
@@ -1377,3 +1380,4 @@ const styles = StyleSheet.create({
   historyDate: { fontSize: 10, color: '#38BDF8', fontWeight: 'bold', textAlign: 'right' },
   historyDiagnosis: { fontSize: 11, color: '#CBD5E1', textAlign: 'right' }
 });
+ 
