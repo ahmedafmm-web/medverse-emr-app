@@ -1,4 +1,4 @@
-import { supabase } from '../../supabaseClient';
+import { supabase } from '../supabaseClient';
 import { Platform } from 'react-native';
 
 const SUB_CACHE_KEY = 'MEDVERSE_SUB_STATUS';
@@ -38,31 +38,40 @@ export const verifyDoctorAccess = async (user) => {
       return { allowed: false, message: 'يرجى تسجيل الدخول أولاً.' };
     }
 
+    const userEmail = user.email.toLowerCase();
+
     const { data, error } = await supabase
       .from('subscriptions')
       .select('*')
-      .eq('email', user.email)
-      .single();
+      .ilike('email', userEmail)
+      .maybeSingle();
 
     const now = new Date();
 
     if (!data) {
+      const trialEndDate = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
       const { data: newSub, error: insertError } = await supabase
         .from('subscriptions')
         .insert([{
           user_id: user.id,
-          email: user.email,
+          email: userEmail,
           plan_type: 'trial',
           status: 'active',
           has_used_trial: true,
-          ends_at: new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000)
+          ends_at: trialEndDate.toISOString()
         }])
         .select()
         .single();
 
       if (insertError) throw insertError;
 
-      const result = { allowed: true, daysLeft: 3, message: 'مرحباً بك في فترتك التجريبية (3 أيام)' };
+      const result = { 
+        allowed: true, 
+        daysLeft: 3, 
+        expiryDate: trialEndDate.toISOString(),
+        showAlert: true,
+        message: 'مرحباً بك في فترتك التجريبية (3 أيام)' 
+      };
       await saveLocalStatus(result);
       return result;
     }
@@ -79,7 +88,7 @@ export const verifyDoctorAccess = async (user) => {
       await supabase
         .from('subscriptions')
         .update({ status: 'expired' })
-        .eq('email', user.email);
+        .ilike('email', userEmail);
 
       const result = { 
         allowed: false, 
@@ -90,13 +99,18 @@ export const verifyDoctorAccess = async (user) => {
       return result;
     }
 
-    const daysLeft = Math.ceil((expiryDate - now) / (1000 * 60 * 60 * 24));
+    const diffMs = expiryDate.getTime() - now.getTime();
+    const daysLeft = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+    
+    // حساب الفرق بدقة وترجيع تاريخ الانتهاء ISO كاملاً
     const result = { 
       allowed: true, 
       daysLeft, 
+      expiryDate: expiryDate.toISOString(),
       showAlert: daysLeft <= 3,
       message: daysLeft <= 3 ? `تنبيه: متبقي على انتهاء اشتراكك ${daysLeft} أيام!` : 'الاشتراك ساري' 
     };
+    
     await saveLocalStatus(result);
     return result;
 
@@ -107,4 +121,3 @@ export const verifyDoctorAccess = async (user) => {
     return { allowed: false, message: 'حدث خطأ أثناء التحقق من حالة الاشتراك.' };
   }
 };
- 
