@@ -1,4 +1,4 @@
-import { supabase } from '../supabaseClient';
+import { supabase } from '../../supabaseClient';
 import { Platform } from 'react-native';
 
 const SUB_CACHE_KEY = 'MEDVERSE_SUB_STATUS';
