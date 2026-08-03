@@ -30,6 +30,10 @@ export const generatePrescriptionPDF = async (patient = {}, diagnosis = '', deta
       `).join('')
     : '<div style="font-size: 11px; color: #64748B;">لا توجد تفاصيل إضافية</div>';
 
+  const patientCode = patient.code || '';
+  const shareWhatsappUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent('كود المريض الخاص بي هو: ' + patientCode)}`;
+  const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=80x80&data=${encodeURIComponent(patientCode)}`;
+
   const htmlContent = `
     <!DOCTYPE html>
     <html dir="rtl" lang="ar">
@@ -99,6 +103,18 @@ export const generatePrescriptionPDF = async (patient = {}, diagnosis = '', deta
           padding: 10px 12px; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center;
         }
         .patient-detail { font-size: 12px; color: #334155; }
+
+        .share-btn {
+          background-color: #25D366;
+          color: #FFFFFF !important;
+          text-decoration: none;
+          font-size: 10px;
+          font-weight: bold;
+          padding: 3px 8px;
+          border-radius: 4px;
+          display: inline-block;
+          margin-right: 6px;
+        }
         
         .section-title {
           font-size: 13px; font-weight: bold; color: #0284C7;
@@ -108,10 +124,11 @@ export const generatePrescriptionPDF = async (patient = {}, diagnosis = '', deta
         .diagnosis-box {
           background-color: #F0F9FF; border: 1px solid #BAE6FD; border-radius: 6px;
           padding: 8px 12px; font-size: 12px; font-weight: bold; color: #0369A1; margin-bottom: 12px;
+          text-align: right; direction: rtl; line-height: 1.6;
         }
         
         table { width: 100%; border-collapse: collapse; margin-top: 6px; margin-bottom: 20px; table-layout: fixed; }
-        th { background-color: #F1F5F9; color: #475569; font-size: 11px; padding: 8px; text-align: right; border-bottom: 2px solid #CBD5E1; }
+        th { background-color: #F1F5F9; color: #475569; font-size: 11px; padding: 8px; text-align: right; border-bottom: 2px solid #CBD5E1; direction: rtl; }
         
         .footer {
           margin-top: 30px; padding-top: 12px; border-top: 1px solid #E2E8F0;
@@ -119,7 +136,7 @@ export const generatePrescriptionPDF = async (patient = {}, diagnosis = '', deta
         }
         .qr-placeholder {
           font-size: 10px; color: #0284C7; font-weight: bold;
-          border: 1px dashed #0284C7; padding: 4px 8px; border-radius: 4px;
+          border: 1px dashed #0284C7; padding: 4px 8px; border-radius: 4px; margin-top: 4px;
         }
         .stamp-box {
           text-align: center; width: 140px;
@@ -131,6 +148,7 @@ export const generatePrescriptionPDF = async (patient = {}, diagnosis = '', deta
         /* قواعد الحظر والطباعة لحفظ ملف PDF نظيف */
         @media print {
           .action-bar { display: none !important; }
+          .share-btn { display: none !important; }
           body { background-color: #FFFFFF !important; padding: 0 !important; }
           .prescription-container { box-shadow: none !important; padding: 0 !important; width: 100% !important; max-width: none !important; }
         }
@@ -164,8 +182,9 @@ export const generatePrescriptionPDF = async (patient = {}, diagnosis = '', deta
             <span class="patient-detail"><strong>اسم المريض:</strong> ${patient.name || ''}</span>
             ${patient.phone ? `<span class="patient-detail" style="margin-right: 12px;">| <strong>الهاتف:</strong> ${patient.phone}</span>` : ''}
           </div>
-          <div>
-            <span class="patient-detail"><strong>Patient ID:</strong> ${patient.code || ''}</span>
+          <div style="display: flex; align-items: center;">
+            <span class="patient-detail"><strong>Patient ID:</strong> ${patientCode}</span>
+            ${patientCode ? `<a href="${shareWhatsappUrl}" target="_blank" class="share-btn">📲 مشاركة الكود</a>` : ''}
             <span class="patient-detail" style="margin-right: 12px;">| <strong>التاريخ:</strong> ${currentDate}</span>
           </div>
         </div>
@@ -196,7 +215,10 @@ export const generatePrescriptionPDF = async (patient = {}, diagnosis = '', deta
 
         <div class="footer">
           <div><span>Powered by <strong>MedVerse Smart EMR Suite</strong></span></div>
-          <div class="qr-placeholder">🔒 رمز تحقق إلكتروني معتمد: VERIFY-${patient.code || ''}</div>
+          <div style="text-align: center;">
+            ${patientCode ? `<img src="${qrCodeUrl}" style="width: 45px; height: 45px; display: block; margin: 0 auto;" alt="QR Code" />` : ''}
+            <div class="qr-placeholder">🔒 رمز تحقق إلكتروني معتمد: VERIFY-${patientCode}</div>
+          </div>
           <div class="stamp-box">
             ${clinicInfo.stampUrl ? `<img src="${clinicInfo.stampUrl}" class="stamp-img" />` : ''}
             <div style="font-size: 11px; font-weight: bold; color: #334155;">توقيع وختم الطبيب</div>
@@ -217,7 +239,6 @@ export const generatePrescriptionPDF = async (patient = {}, diagnosis = '', deta
         printWindow.document.close();
         printWindow.focus();
 
-        // استدعاء الطباعة تلقائياً بعد تحميل الصفحة مع مهلة للموبايل والكمبيوتر
         setTimeout(() => {
           try {
             printWindow.print();
@@ -226,11 +247,9 @@ export const generatePrescriptionPDF = async (patient = {}, diagnosis = '', deta
           }
         }, 500);
       } else {
-        // حارس أمان في حال تم حظر Pop-up على المتصفح
         await Print.printAsync({ html: htmlContent });
       }
     } else {
-      // التطبيق الأصلي على هواتف Android و iOS
       const { uri } = await Print.printToFileAsync({ html: htmlContent });
       if (await Sharing.isAvailableAsync()) {
         await Sharing.shareAsync(uri);
