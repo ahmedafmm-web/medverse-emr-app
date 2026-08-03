@@ -7,6 +7,7 @@ export default function App() {
   const [currentStep, setCurrentStep] = useState('landing');
   const [selectedSpecialty, setSelectedSpecialty] = useState('');
   const [encryptedClinicId, setEncryptedClinicId] = useState(null);
+  const [directPatientCode, setDirectPatientCode] = useState(null);
 
   const specialties = [
     { id: 'internal', name: '🩺 الطب الباطني والأمراض المزمنة' },
@@ -19,12 +20,19 @@ export default function App() {
   ];
 
   useEffect(() => {
-    // Reading encrypted portal link parameters from URL on Web
+    // معالجة روابط التوجيه الذكية من الـ URL عند الفتح بالمتصفح
     if (Platform.OS === 'web' && typeof window !== 'undefined') {
       const urlParams = new URLSearchParams(window.location.search);
-      const clinicParam = urlParams.get('clinic') || urlParams.get('c');
-      if (clinicParam) {
-        setEncryptedClinicId(clinicParam);
+      const queryParam = urlParams.get('clinic') || urlParams.get('c') || urlParams.get('patient');
+      
+      if (queryParam) {
+        if (queryParam.startsWith('PAT-')) {
+          setDirectPatientCode(queryParam);
+          setEncryptedClinicId(null);
+        } else {
+          setEncryptedClinicId(queryParam);
+          setDirectPatientCode(null);
+        }
         setCurrentStep('patient');
       }
     }
@@ -37,12 +45,13 @@ export default function App() {
 
   const handleResetToLanding = () => {
     setSelectedSpecialty('');
+    setDirectPatientCode(null);
     setCurrentStep('landing');
   };
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#0F172A" />
+      <StatusBar barStyle="light-content" backgroundColor="#090D16" />
 
       {currentStep !== 'landing' && (
         <View style={styles.topBar}>
@@ -110,6 +119,7 @@ export default function App() {
           <DoctorDashboard 
             specialty={selectedSpecialty} 
             onSwitchPortal={handleResetToLanding}
+            onUpdateSpecialty={(newSpec) => setSelectedSpecialty(newSpec)}
           />
         </View>
       )}
@@ -118,7 +128,8 @@ export default function App() {
         <View style={styles.body}>
           <PatientPortal 
             onBackToDashboard={handleResetToLanding} 
-            doctorClinicId={encryptedClinicId} 
+            doctorClinicId={encryptedClinicId}
+            initialPatientCode={directPatientCode}
           />
         </View>
       )}
@@ -127,32 +138,31 @@ export default function App() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0F172A', paddingTop: Platform.OS === 'web' ? 0 : 0 },
+  container: { flex: 1, backgroundColor: '#090D16', paddingTop: Platform.OS === 'web' ? 0 : 0 },
   topBar: {
     flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center',
-    backgroundColor: '#1E293B', paddingHorizontal: 15, paddingVertical: 10,
-    borderBottomWidth: 1, borderBottomColor: '#334155'
+    backgroundColor: '#131C2E', paddingHorizontal: 15, paddingVertical: 10,
+    borderBottomWidth: 1, borderBottomColor: '#1E293B'
   },
-  backButton: { backgroundColor: '#334155', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6 },
-  backButtonText: { color: '#38BDF8', fontSize: 13, fontWeight: 'bold' },
-  specialtyBadge: { color: '#F1F5F9', backgroundColor: '#0284C7', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, fontSize: 12, fontWeight: 'bold' },
+  backButton: { backgroundColor: '#1E293B', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: '#334155' },
+  backButtonText: { color: '#00F2FE', fontSize: 13, fontWeight: 'bold' },
+  specialtyBadge: { color: '#FFFFFF', backgroundColor: '#0284C7', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, fontSize: 12, fontWeight: 'bold' },
   landingContainer: { padding: 20, alignItems: 'center', justifyContent: 'center' },
-  mainTitle: { fontSize: 28, fontWeight: 'bold', color: '#38BDF8', marginTop: 30, textAlign: 'center' },
-  subTitle: { fontSize: 16, color: '#94A3B8', marginTop: 8, marginBottom: 30, textAlign: 'center' },
-  selectPrompt: { fontSize: 18, color: '#F8FAFC', marginBottom: 20, fontWeight: '600' },
+  mainTitle: { fontSize: 28, fontWeight: '900', color: '#00F2FE', marginTop: 30, textAlign: 'center', letterSpacing: 0.5 },
+  subTitle: { fontSize: 15, color: '#94A3B8', marginTop: 8, marginBottom: 30, textAlign: 'center' },
+  selectPrompt: { fontSize: 17, color: '#F8FAFC', marginBottom: 20, fontWeight: '600' },
   portalCardsContainer: { width: '100%', maxWidth: 500, gap: 20 },
-  portalCard: { padding: 25, borderRadius: 16, alignItems: 'center', borderWidth: 1, borderColor: '#334155' },
-  doctorCard: { backgroundColor: '#1E293B' },
-  patientCard: { backgroundColor: '#0F2942' },
+  portalCard: { padding: 25, borderRadius: 16, alignItems: 'center', borderWidth: 1, borderColor: '#1E293B' },
+  doctorCard: { backgroundColor: '#131C2E' },
+  patientCard: { backgroundColor: '#0C1929' },
   portalIcon: { fontSize: 40, marginBottom: 10 },
   portalTitle: { fontSize: 22, fontWeight: 'bold', color: '#FFFFFF', marginBottom: 8 },
-  portalDesc: { fontSize: 14, color: '#94A3B8', textAlign: 'center', lineHeight: 20 },
+  portalDesc: { fontSize: 13, color: '#94A3B8', textAlign: 'center', lineHeight: 20 },
   specialtyContainer: { padding: 20, alignItems: 'center' },
   sectionTitle: { fontSize: 24, fontWeight: 'bold', color: '#FFFFFF', marginTop: 20 },
-  sectionSub: { fontSize: 14, color: '#94A3B8', marginBottom: 25, textAlign: 'center' },
+  sectionSub: { fontSize: 13, color: '#94A3B8', marginBottom: 25, textAlign: 'center' },
   grid: { width: '100%', maxWidth: 500, gap: 12 },
-  specialtyCard: { backgroundColor: '#1E293B', padding: 18, borderRadius: 12, borderWidth: 1, borderColor: '#334155', alignItems: 'center' },
-  specialtyText: { color: '#F8FAFC', fontSize: 16, fontWeight: 'bold' },
+  specialtyCard: { backgroundColor: '#131C2E', padding: 18, borderRadius: 12, borderWidth: 1, borderColor: '#1E293B', alignItems: 'center' },
+  specialtyText: { color: '#F8FAFC', fontSize: 15, fontWeight: 'bold' },
   body: { flex: 1 }
 });
- 
