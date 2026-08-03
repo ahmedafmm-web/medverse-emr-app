@@ -12,8 +12,6 @@ export default function PatientPortal({ onBackToDashboard, doctorClinicId }) {
   const [patientData, setPatientData] = useState(null);
   const [medicalRecords, setMedicalRecords] = useState([]);
   const [doctorInfo, setDoctorInfo] = useState(null);
-
-  // حالة شريط تقدم تنزيل كل صورة أشعة على حدة
   const [downloadProgressMap, setDownloadProgressMap] = useState({});
 
   const showAlert = (title, message) => {
@@ -26,13 +24,18 @@ export default function PatientPortal({ onBackToDashboard, doctorClinicId }) {
 
   useEffect(() => {
     let cId = doctorClinicId;
-    if (!cId && Platform.OS === 'web' && typeof window !== 'undefined') {
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
       const urlParams = new URLSearchParams(window.location.search);
-      cId = urlParams.get('c');
-    }
-
-    if (cId) {
-      fetchClinicHeader(cId);
+      const queryCode = urlParams.get('c');
+      if (queryCode) {
+        cId = queryCode;
+        if (queryCode.startsWith('PAT-')) {
+          setPatientCode(queryCode);
+          handleFetchRecords(queryCode);
+        } else {
+          fetchClinicHeader(queryCode);
+        }
+      }
     }
   }, [doctorClinicId]);
 
@@ -43,7 +46,6 @@ export default function PatientPortal({ onBackToDashboard, doctorClinicId }) {
         .select('doctor_name, clinic_name, specialty, logo_url, stamp_url, phone, address, email');
 
       query = query.or(`id.eq.${identifier},user_id.eq.${identifier}`);
-
       const { data, error } = await query.limit(1).maybeSingle();
 
       if (!error && data) {
@@ -96,9 +98,7 @@ export default function PatientPortal({ onBackToDashboard, doctorClinicId }) {
           .limit(1)
           .maybeSingle();
 
-        if (cData) {
-          setDoctorInfo(cData);
-        }
+        if (cData) setDoctorInfo(cData);
       }
 
     } catch (error) {
@@ -109,10 +109,8 @@ export default function PatientPortal({ onBackToDashboard, doctorClinicId }) {
     }
   };
 
-  // --- دالة تنزيل صورة الأشعة المنفصلة عالية الدقة مع شريط التقدم ---
   const handleDownloadSingleScan = async (scanUrl, scanTitle) => {
     if (!scanUrl) return;
-
     setDownloadProgressMap(prev => ({ ...prev, [scanUrl]: 15 }));
 
     try {
@@ -143,7 +141,6 @@ export default function PatientPortal({ onBackToDashboard, doctorClinicId }) {
     }
   };
 
-  // --- نسخ رابط المشاركة المؤقت للاستشاريين وإصلاح مسار 404 ---
   const handleCopyTemporaryShareLink = () => {
     if (!patientData?.patient_code) return;
     const baseUrl = Platform.OS === 'web' && typeof window !== 'undefined' ? window.location.origin.split('?')[0] : 'https://medverse-emr-suite.vercel.app';
@@ -151,7 +148,7 @@ export default function PatientPortal({ onBackToDashboard, doctorClinicId }) {
 
     if (Platform.OS === 'web' && navigator.clipboard) {
       navigator.clipboard.writeText(shareUrl);
-      showAlert('تم نسخ رابط المشاركة 📋', `يمكنك إرسال هذا الرابط للأطباء أو المعامل لمعاينة ملفك:\n${shareUrl}`);
+      showAlert('تم نسخ رابط المشاركة 📋', shareUrl);
     } else {
       showAlert('رابط ملفك الطبي', shareUrl);
     }
@@ -184,14 +181,12 @@ export default function PatientPortal({ onBackToDashboard, doctorClinicId }) {
         clinicInfo
       );
     } catch (err) {
-      console.error('PDF Generation Error:', err);
       showAlert('خطأ', 'حدث خطأ أثناء إعداد الروشتة للطباعة.');
     }
   };
 
   return (
     <ScrollView style={styles.container}>
-      {/* --- Dynamic Doctor/Clinic Header --- */}
       <View style={styles.header}>
         {doctorInfo?.logo_url ? (
           <Image source={{ uri: doctorInfo.logo_url }} style={styles.headerLogo} resizeMode="contain" />
@@ -273,7 +268,6 @@ export default function PatientPortal({ onBackToDashboard, doctorClinicId }) {
                   <Text style={styles.recordLabel}>التشخيص المعتمد / عنوان الفحص:</Text>
                   <Text style={styles.recordValue}>{item.diagnosis || 'لا يوجد تشخيص مدون'}</Text>
 
-                  {/* قائمة صور الأشعة المرفوعة منفصلة مع زِر تنزيل وشريط تقدم مستقل لكل صورة */}
                   {scansList.length > 0 && (
                     <View style={styles.scansContainer}>
                       <Text style={styles.scansHeaderTitle}>🖼️ مرفقات صور الأشعة المرفوعة ({scansList.length}):</Text>
@@ -286,7 +280,6 @@ export default function PatientPortal({ onBackToDashboard, doctorClinicId }) {
                             <Image source={{ uri: scanItem.url }} style={styles.scanImage} resizeMode="contain" />
                             <Text style={styles.scanTitle}>{scanItem.title || 'صورة أشعة عالية الدقة'}</Text>
 
-                            {/* شريط تقدم التحميل المباشر أسفل الصورة */}
                             {progress !== undefined && progress !== null && (
                               <View style={styles.downloadProgressBarBox}>
                                 <View style={[styles.downloadProgressBarFill, { width: `${progress}%` }]} />
@@ -343,30 +336,24 @@ const styles = StyleSheet.create({
   patientName: { fontSize: 16, fontWeight: 'bold', color: '#FFFFFF' },
   logoutText: { color: '#EF4444', fontSize: 12, fontWeight: 'bold' },
   patientCodeText: { color: '#00F2FE', fontSize: 12, marginTop: 4, textAlign: 'right', fontFamily: 'monospace' },
-  
   sharePassBtn: { backgroundColor: '#0284C7', padding: 10, borderRadius: 8, marginTop: 10, alignItems: 'center' },
   sharePassBtnText: { color: '#FFFFFF', fontSize: 11, fontWeight: 'bold' },
-
   recordCard: { backgroundColor: '#131C2E', padding: 16, borderRadius: 12, marginBottom: 15, borderWidth: 1, borderColor: '#1E293B' },
   recordDate: { fontSize: 12, color: '#94A3B8' },
   verifiedBadge: { backgroundColor: 'rgba(16, 185, 129, 0.2)', color: '#10B981', fontSize: 10, fontWeight: 'bold', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 12, borderWidth: 1, borderColor: '#10B981' },
   divider: { height: 1, backgroundColor: '#1E293B', marginVertical: 10 },
   recordLabel: { fontSize: 12, color: '#94A3B8', textAlign: 'right', marginBottom: 4 },
   recordValue: { fontSize: 14, color: '#F8FAFC', textAlign: 'right', marginBottom: 12 },
-
   scansContainer: { backgroundColor: '#090D16', padding: 12, borderRadius: 10, marginBottom: 15, borderWidth: 1, borderColor: '#1E293B' },
   scansHeaderTitle: { fontSize: 12, fontWeight: 'bold', color: '#00F2FE', marginBottom: 10, textAlign: 'right' },
   scanItemCard: { backgroundColor: '#131C2E', padding: 10, borderRadius: 8, marginBottom: 12, alignItems: 'center', borderWidth: 1, borderColor: '#1E293B' },
   scanImage: { width: '100%', height: 220, borderRadius: 6, backgroundColor: '#000' },
   scanTitle: { fontSize: 12, fontWeight: 'bold', color: '#F8FAFC', marginTop: 6, textAlign: 'center' },
-
   downloadScanBtn: { backgroundColor: '#10B981', padding: 10, borderRadius: 6, width: '100%', alignItems: 'center', marginTop: 8 },
   downloadScanBtnText: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 11 },
-
   downloadProgressBarBox: { width: '100%', height: 16, backgroundColor: '#090D16', borderRadius: 8, overflow: 'hidden', marginTop: 8, justifyContent: 'center', borderWidth: 1, borderColor: '#1E293B' },
   downloadProgressBarFill: { height: '100%', backgroundColor: '#0284C7', position: 'absolute' },
   downloadProgressText: { color: '#FFFFFF', fontSize: 10, fontWeight: 'bold', textAlign: 'center', zIndex: 1 },
-
   downloadPdfBtn: { backgroundColor: '#0284C7', padding: 12, borderRadius: 8, alignItems: 'center' },
   downloadPdfBtnText: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 13 },
   emptyBox: { padding: 20, alignItems: 'center' },
