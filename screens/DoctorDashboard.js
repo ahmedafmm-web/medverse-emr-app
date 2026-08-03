@@ -22,7 +22,6 @@ const sanitizeText = (str) => {
   return str.replace(/[^\u0600-\u06FF a-zA-Z0-9.,()\-\:\/]/g, '').trim();
 };
 
-// دالة المطابقة المرنة للتخصصات
 const isSpecialtyMatching = (specA, specB) => {
   if (!specA || !specB) return true;
   const cleanA = specA.toLowerCase();
@@ -38,13 +37,12 @@ const isSpecialtyMatching = (specA, specB) => {
   return false;
 };
 
-// دالة حساب الوقت المتبقي الفعلي بالدقائق والساعات والأيام بدقة متناهية
 const getExactTimeLeftMessage = (expiryDateString) => {
   if (!expiryDateString) return '';
 
   const now = new Date();
   const expiry = new Date(expiryDateString);
-  const diffMs = expiry - now;
+  const diffMs = expiry.getTime() - now.getTime();
 
   if (diffMs <= 0) return 'منتهي الآن';
 
@@ -62,7 +60,7 @@ const getExactTimeLeftMessage = (expiryDateString) => {
   }
 };
 
-export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchPortal }) {
+export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchPortal, onUpdateSpecialty }) {
   const [session, setSession] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [isSigningUp, setIsSigningUp] = useState(false);
@@ -74,9 +72,9 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
   const [dynamicTimeLeftText, setDynamicTimeLeftText] = useState('');
 
   const [activeTab, setActiveTab] = useState('prescription');
-  const [clinicDoctorName, setClinicDoctorName] = useState('د. أحمد محمد');
-  const [clinicName, setClinicName] = useState('عيادة MedVerse التخصصية');
-  const [specialty, setSpecialty] = useState(initialSpecialty || 'استشاري أمراض القلب والباطنة');
+  const [clinicDoctorName, setClinicDoctorName] = useState('د. حسام المنفلوطي');
+  const [clinicName, setClinicName] = useState('عياده المنفلوطي');
+  const [specialty, setSpecialty] = useState(initialSpecialty || 'استشاري أمراض الروماتيزم والروماتويد والأمراض المناعية');
   const [registeredSpecialty, setRegisteredSpecialty] = useState('');
   const [clinicLogoUrl, setClinicLogoUrl] = useState('https://cdn-icons-png.flaticon.com/512/387/387561.png');
   const [digitalStampUrl, setDigitalStampUrl] = useState('');
@@ -101,6 +99,7 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
   const [chronicDiseases, setChronicDiseases] = useState('');
   const [familyHistory, setFamilyHistory] = useState('');
   const [selectedPatientCode, setSelectedPatientCode] = useState('');
+  const [currentPatientId, setCurrentPatientId] = useState(null);
 
   const [symptomsInput, setSymptomsInput] = useState('');
   const [doctorNotes, setDoctorNotes] = useState('');
@@ -194,7 +193,7 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
     setDynamicTimeLeftText(getExactTimeLeftMessage(subscriptionAccess.expiryDate));
     const timer = setInterval(() => {
       setDynamicTimeLeftText(getExactTimeLeftMessage(subscriptionAccess.expiryDate));
-    }, 30000); // تحديث دقيق كل 30 ثانية
+    }, 30000);
     return () => clearInterval(timer);
   }, [subscriptionAccess.expiryDate]);
 
@@ -241,9 +240,9 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
     setSelectedScanFiles(prev => prev.filter(item => item.id !== id));
   };
 
-  // جلب الأشعة المربوطة بـ Patient ID المباشر لضمان الموثوقية
   const fetchPatientScansByPatientId = async (pId) => {
     if (!pId) return;
+    setSearchingHistory(true);
     try {
       const { data: records, error } = await supabase
         .from('medical_records')
@@ -256,19 +255,60 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
 
       let allScans = [];
       (records || []).forEach(r => {
-        const df = r.dynamic_fields || {};
-        if (df.scans_list && Array.isArray(df.scans_list)) {
+        const df = typeof r.dynamic_fields === 'string' 
+          ? JSON.parse(r.dynamic_fields) 
+          : (r.dynamic_fields || {});
+          
+        if (df && Array.isArray(df.scans_list)) {
           df.scans_list.forEach(sc => {
-            allScans.push({ ...sc, recordId: r.id });
+            allScans.push({ ...sc, recordId: r.id, date: r.created_at || r.visit_date });
           });
-        } else if (df.scanUrl) {
-          allScans.push({ url: df.scanUrl, title: df.scanTitle || 'أشعة طبية', recordId: r.id });
+        } else if (df && df.scanUrl) {
+          allScans.push({ url: df.scanUrl, title: df.scanTitle || 'أشعة طبية', recordId: r.id, date: r.created_at });
         }
       });
 
       setPatientScansGrid(allScans);
     } catch (e) {
       console.error('Fetch Scans Error:', e);
+    } finally {
+      setSearchingHistory(false);
+    }
+  };
+
+  const handleSearchPatientByName = async (name) => {
+    setPatientName(name);
+    if (!name || name.trim().length < 2) {
+      setPatientHistory([]);
+      setPatientScansGrid([]);
+      setSelectedPatientCode('');
+      setCurrentPatientId(null);
+      return;
+    }
+
+    try {
+      const userEmail = session?.user?.email?.toLowerCase();
+      const { data: patient } = await supabase
+        .from('patients')
+        .select('id, patient_code, phone, age, gender')
+        .ilike('full_name', `%${name.trim()}%`)
+        .maybeSingle();
+
+      if (patient) {
+        setSelectedPatientCode(patient.patient_code);
+        setCurrentPatientId(patient.id);
+        if (patient.phone) setPatientPhone(patient.phone);
+        if (patient.age) setAge(String(patient.age));
+        if (patient.gender) setGender(patient.gender);
+        await fetchPatientScansByPatientId(patient.id);
+      } else {
+        setPatientHistory([]);
+        setPatientScansGrid([]);
+        setSelectedPatientCode('');
+        setCurrentPatientId(null);
+      }
+    } catch (e) {
+      console.error(e);
     }
   };
 
@@ -288,37 +328,39 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
     try {
       const userEmail = session?.user?.email?.toLowerCase();
       let patientCode = selectedPatientCode;
-      let patientId = null;
+      let patientId = currentPatientId;
 
-      const { data: existingPatient } = await supabase
-        .from('patients')
-        .select('id, patient_code')
-        .eq('full_name', patientName.trim())
-        .ilike('doctor_email', userEmail)
-        .maybeSingle();
-
-      if (existingPatient) {
-        patientId = existingPatient.id;
-        patientCode = existingPatient.patient_code;
-      } else {
-        const generatedCode = 'PAT-' + Math.floor(10000 + Math.random() * 90000);
-        const { data: newPatient, error: pErr } = await supabase
+      if (!patientId) {
+        const { data: existingPatient } = await supabase
           .from('patients')
-          .insert([{
-            full_name: patientName.trim(),
-            phone: patientPhone || null,
-            age: age ? parseInt(age) : null,
-            gender: gender,
-            patient_code: generatedCode,
-            doctor_email: userEmail || null
-          }])
           .select('id, patient_code')
-          .single();
+          .ilike('full_name', patientName.trim())
+          .maybeSingle();
 
-        if (pErr) throw pErr;
-        patientId = newPatient.id;
-        patientCode = newPatient.patient_code;
+        if (existingPatient) {
+          patientId = existingPatient.id;
+          patientCode = existingPatient.patient_code;
+        } else {
+          const generatedCode = 'PAT-' + Math.floor(10000 + Math.random() * 90000);
+          const { data: newPatient, error: pErr } = await supabase
+            .from('patients')
+            .insert([{
+              full_name: patientName.trim(),
+              phone: patientPhone || null,
+              age: age ? parseInt(age) : null,
+              gender: gender,
+              patient_code: generatedCode,
+              doctor_email: userEmail || null
+            }])
+            .select('id, patient_code')
+            .single();
+
+          if (pErr) throw pErr;
+          patientId = newPatient.id;
+          patientCode = newPatient.patient_code;
+        }
         setSelectedPatientCode(patientCode);
+        setCurrentPatientId(patientId);
       }
 
       const uploadedList = [];
@@ -356,7 +398,7 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
         patient_id: patientId,
         doctor_email: userEmail,
         visit_date: new Date().toISOString().split('T')[0],
-        diagnosis: 'مرفقات وأشعة طبية جديدة',
+        diagnosis: scanGroupTitle ? `أشعة وفحوصات: ${scanGroupTitle}` : 'أشعة ومستندات مرفقة',
         dynamic_fields: { scans_list: uploadedList }
       }]);
 
@@ -378,17 +420,18 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
 
     try {
       const record = patientHistory.find(r => r.id === recordId);
-      if (!record || !record.dynamic_fields?.scans_list) return;
+      if (!record || !record.dynamic_fields) return;
 
-      const updatedScans = record.dynamic_fields.scans_list.filter(s => s.url !== scanUrl);
+      const df = typeof record.dynamic_fields === 'string' ? JSON.parse(record.dynamic_fields) : record.dynamic_fields;
+      const updatedScans = (df.scans_list || []).filter(s => s.url !== scanUrl);
       
       await supabase
         .from('medical_records')
-        .update({ dynamic_fields: { ...record.dynamic_fields, scans_list: updatedScans } })
+        .update({ dynamic_fields: { ...df, scans_list: updatedScans } })
         .eq('id', recordId);
 
       showAlert('تم الحذف', 'تم حذف الصورة من ملف المريض.');
-      if (selectedPatientCode) fetchPatientHistory(patientName);
+      if (currentPatientId) fetchPatientScansByPatientId(currentPatientId);
     } catch (err) {
       showAlert('خطأ', err.message);
     }
@@ -501,6 +544,7 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
         if (clinic.specialty) {
           setRegisteredSpecialty(clinic.specialty);
           setSpecialty(clinic.specialty);
+          if (onUpdateSpecialty) onUpdateSpecialty(clinic.specialty);
         }
         if (clinic.logo_url) setClinicLogoUrl(clinic.logo_url);
         if (clinic.stamp_url) setDigitalStampUrl(clinic.stamp_url);
@@ -510,7 +554,6 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
     } catch (e) { console.error(e); }
   };
 
-  // التحديث الفوري المتبادل لتخصص الطبيب
   const handleSaveProfile = async () => {
     setLoading(true);
     try {
@@ -542,44 +585,12 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
 
       setRegisteredSpecialty(specialty);
       setShowMismatchModal(false);
+      if (onUpdateSpecialty) onUpdateSpecialty(specialty);
       showAlert('تم الحفظ', 'تم حفظ وتحديث التخصص بنجاح!');
     } catch (err) {
       showAlert('خطأ', 'فشل الحفظ: ' + err.message);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const fetchPatientHistory = async (name) => {
-    if (!name || name.trim().length < 2) {
-      setPatientHistory([]);
-      setPatientScansGrid([]);
-      return;
-    }
-    setSearchingHistory(true);
-    try {
-      const userEmail = session?.user?.email?.toLowerCase();
-
-      const { data: patient } = await supabase
-        .from('patients')
-        .select('id, patient_code')
-        .ilike('full_name', `%${name.trim()}%`)
-        .ilike('doctor_email', userEmail)
-        .limit(1)
-        .maybeSingle();
-
-      if (patient) {
-        setSelectedPatientCode(patient.patient_code);
-        await fetchPatientScansByPatientId(patient.id);
-      } else {
-        setPatientHistory([]);
-        setPatientScansGrid([]);
-      }
-    } catch (e) {
-      setPatientHistory([]);
-      setPatientScansGrid([]);
-    } finally {
-      setSearchingHistory(false);
     }
   };
 
@@ -604,12 +615,13 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
     setAge(patient.age ? String(patient.age) : '');
     setGender(patient.gender || 'ذكر');
     setSelectedPatientCode(patient.patient_code || '');
+    setCurrentPatientId(patient.id);
     setActiveTab('prescription');
     fetchPatientScansByPatientId(patient.id);
   };
 
   const handleFillDummyData = () => {
-    const dummyName = 'أحمد محمود السيد';
+    const dummyName = 'أحمد علي حسين';
     setPatientName(dummyName);
     setPatientPhone('01012345678');
     setAge('54');
@@ -618,7 +630,7 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
     setFamilyHistory('تاريخ عائلي للأمراض المناعية والروماتيزم');
     setSymptomsInput('آلام وآنتفاخ بالمعصمين واليدين صباحاً تستمر لأكثر من ساعة مع إجهاد عام.');
     setDoctorNotes('تحليل RF و Anti-CCP إيجابي مرتفع، ESR 45.');
-    fetchPatientHistory(dummyName);
+    handleSearchPatientByName(dummyName);
   };
 
   const handleClinicalAnalysis = async () => {
@@ -805,37 +817,38 @@ Return JSON ONLY:
         clinicId = newClinic?.id;
       }
 
-      let patientRealId = null;
+      let patientRealId = currentPatientId;
       let patientRealCode = generatedCode;
 
-      const { data: existingPatient } = await supabase
-        .from('patients')
-        .select('id, patient_code')
-        .eq('full_name', patientName.trim())
-        .ilike('doctor_email', userEmail)
-        .maybeSingle();
-
-      if (existingPatient) {
-        patientRealId = existingPatient.id;
-        patientRealCode = existingPatient.patient_code;
-      } else {
-        const { data: newPatient, error: pErr } = await supabase
+      if (!patientRealId) {
+        const { data: existingPatient } = await supabase
           .from('patients')
-          .insert([{
-            full_name: patientName.trim(),
-            phone: patientPhone || null,
-            age: age ? parseInt(age) : null,
-            gender: gender,
-            patient_code: generatedCode,
-            clinic_id: clinicId,
-            doctor_email: userEmail || null
-          }])
           .select('id, patient_code')
-          .single();
+          .ilike('full_name', patientName.trim())
+          .maybeSingle();
 
-        if (pErr) throw new Error('خطأ في حفظ بيانات المريض: ' + pErr.message);
-        patientRealId = newPatient?.id;
-        patientRealCode = newPatient?.patient_code || generatedCode;
+        if (existingPatient) {
+          patientRealId = existingPatient.id;
+          patientRealCode = existingPatient.patient_code;
+        } else {
+          const { data: newPatient, error: pErr } = await supabase
+            .from('patients')
+            .insert([{
+              full_name: patientName.trim(),
+              phone: patientPhone || null,
+              age: age ? parseInt(age) : null,
+              gender: gender,
+              patient_code: generatedCode,
+              clinic_id: clinicId,
+              doctor_email: userEmail || null
+            }])
+            .select('id, patient_code')
+            .single();
+
+          if (pErr) throw new Error('خطأ في حفظ بيانات المريض: ' + pErr.message);
+          patientRealId = newPatient?.id;
+          patientRealCode = newPatient?.patient_code || generatedCode;
+        }
       }
 
       if (patientRealId) {
@@ -891,6 +904,7 @@ Return JSON ONLY:
       setDoctorNotes('');
       setFinalDiagnosis('');
       setSelectedPatientCode('');
+      setCurrentPatientId(null);
       setPrescribedMeds([]);
       setAiReport(null);
 
@@ -1017,7 +1031,6 @@ Return JSON ONLY:
 
   return (
     <ScrollView style={styles.container}>
-      {/* Lightbox Modal */}
       <Modal visible={!!viewingImageModal} transparent animationType="fade">
         <View style={styles.lightboxOverlay}>
           <TouchableOpacity style={styles.lightboxCloseBtn} onPress={() => { setViewingImageModal(null); setZoomScale(1); }}>
@@ -1043,7 +1056,6 @@ Return JSON ONLY:
         </View>
       </Modal>
 
-      {/* Warning Banner */}
       {subscriptionAccess.showAlert && (
         <View style={styles.subWarningBanner}>
           <Text style={styles.subWarningIcon}>⏳</Text>
@@ -1056,7 +1068,6 @@ Return JSON ONLY:
         </View>
       )}
 
-      {/* App Header */}
       <View style={styles.header}>
         <View style={styles.topUserRow}>
           <Text style={styles.userEmailText}>⚡ {clinicDoctorName} ({session?.user?.email})</Text>
@@ -1073,7 +1084,6 @@ Return JSON ONLY:
         <Text style={styles.subtitle}>منظومة إدارة العيادات والأشعة الذكية ({specialty})</Text>
       </View>
 
-      {/* Navigation Bar */}
       <View style={styles.navBar}>
         <TouchableOpacity style={[styles.navBtn, activeTab === 'prescription' && styles.navBtnActive]} onPress={() => setActiveTab('prescription')}>
           <Text style={[styles.navBtnText, activeTab === 'prescription' && styles.navBtnTextActive]}>🩺 الكشف والأشعة</Text>
@@ -1086,7 +1096,6 @@ Return JSON ONLY:
         </TouchableOpacity>
       </View>
 
-      {/* TAB 1: PROFILE */}
       {activeTab === 'profile' && (
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>⚙️ بيانات الطبيب، العيادة، والختم الإلكتروني</Text>
@@ -1159,7 +1168,6 @@ Return JSON ONLY:
         </View>
       )}
 
-      {/* TAB 2: PATIENTS */}
       {activeTab === 'patients' && (
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>📂 قائمة مرضى العيادة والملفات الطبية</Text>
@@ -1181,7 +1189,6 @@ Return JSON ONLY:
         </View>
       )}
 
-      {/* TAB 3: CONSULTATION & MULTI-SCANS */}
       {activeTab === 'prescription' && (
         <>
           <View style={styles.card}>
@@ -1217,10 +1224,7 @@ Return JSON ONLY:
               placeholder="أدخل اسم المريض..." 
               placeholderTextColor="#64748B"
               value={patientName}
-              onChangeText={(val) => {
-                setPatientName(val);
-                fetchPatientHistory(val);
-              }}
+              onChangeText={handleSearchPatientByName}
             />
 
             {selectedPatientCode ? (
@@ -1265,90 +1269,106 @@ Return JSON ONLY:
             <TextInput style={styles.input} placeholder="مثال: أمراض مناعية..." placeholderTextColor="#64748B" value={familyHistory} onChangeText={setFamilyHistory} />
           </View>
 
-          {/* قسم Grid View لعرض وتحكم صور أشعة المريض */}
           {patientName.trim() !== '' && (
-            <View style={styles.card}>
-              <Text style={styles.sectionTitle}>🖼️ شبكة أشعة ومرفقات المريض (Grid View)</Text>
-              
-              {patientScansGrid.length === 0 ? (
-                <Text style={styles.emptyText}>لا توجد صور أشعة مرفوعة حالياً لـ {patientName}.</Text>
-              ) : (
-                <View style={styles.scansGridContainer}>
-                  {patientScansGrid.map((sc, idx) => (
-                    <View key={idx} style={styles.scanGridCard}>
-                      <TouchableOpacity onPress={() => { setViewingImageModal(sc); setZoomScale(1); }}>
-                        <Image source={{ uri: sc.url }} style={styles.scanGridImg} />
-                      </TouchableOpacity>
-                      <Text style={styles.scanGridTitle} numberOfLines={1}>{sc.title}</Text>
-                      <TouchableOpacity 
-                        style={styles.scanGridDeleteBtn}
-                        onPress={() => handleDeleteSavedScanFromRecord(sc.recordId, sc.url)}
-                      >
-                        <Text style={styles.scanGridDeleteText}>🗑️ حذف</Text>
-                      </TouchableOpacity>
-                    </View>
-                  ))}
-                </View>
-              )}
-
-              {/* أداة الرفع المتعدد الجديدة للمريض */}
-              <Text style={styles.subSectionTitle}>➕ إضافة أشعات وفحوصات جديدة للمريض:</Text>
-              <TextInput 
-                style={styles.input} 
-                placeholder="عنوان المرفق (مثال: أشعة سينية جديدة)" 
-                placeholderTextColor="#64748B" 
-                value={scanGroupTitle} 
-                onChangeText={setScanGroupTitle} 
-              />
-
-              {Platform.OS === 'web' ? (
-                <input 
-                  type="file" 
-                  accept="image/*" 
-                  multiple
-                  onChange={handleSelectMultipleScans}
-                  style={{ marginBottom: 12, color: '#00F2FE' }}
-                />
-              ) : null}
-
-              {selectedScanFiles.length > 0 && (
-                <View style={{ marginBottom: 15 }}>
-                  <Text style={styles.label}>معاينة الصور المختارة للرفع ({selectedScanFiles.length} صورة):</Text>
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                    {selectedScanFiles.map((item) => (
-                      <View key={item.id} style={styles.scanPreviewCard}>
-                        <Image source={{ uri: item.previewUrl }} style={styles.scanPreviewImg} />
+            <>
+              <View style={styles.card}>
+                <Text style={styles.sectionTitle}>🖼️ شبكة أشعة ومرفقات المريض (Grid View)</Text>
+                
+                {searchingHistory ? (
+                  <ActivityIndicator color="#00F2FE" style={{ marginVertical: 10 }} />
+                ) : patientScansGrid.length === 0 ? (
+                  <Text style={styles.emptyText}>لا توجد صور أشعة مرفوعة حالياً لـ {patientName}.</Text>
+                ) : (
+                  <View style={styles.scansGridContainer}>
+                    {patientScansGrid.map((sc, idx) => (
+                      <View key={idx} style={styles.scanGridCard}>
+                        <TouchableOpacity onPress={() => { setViewingImageModal(sc); setZoomScale(1); }}>
+                          <Image source={{ uri: sc.url }} style={styles.scanGridImg} />
+                        </TouchableOpacity>
+                        <Text style={styles.scanGridTitle} numberOfLines={1}>{sc.title}</Text>
                         <TouchableOpacity 
-                          style={styles.deleteScanBtn}
-                          onPress={() => handleRemoveSingleScan(item.id)}
+                          style={styles.scanGridDeleteBtn}
+                          onPress={() => handleDeleteSavedScanFromRecord(sc.recordId, sc.url)}
                         >
-                          <Text style={styles.deleteScanBtnText}>إزالة ✕</Text>
+                          <Text style={styles.scanGridDeleteText}>🗑️ حذف</Text>
                         </TouchableOpacity>
                       </View>
                     ))}
-                  </ScrollView>
-                </View>
-              )}
-
-              {uploadingScans && (
-                <View style={styles.progressBarContainer}>
-                  <View style={[styles.progressBarFill, { width: `${scanUploadProgress}%` }]} />
-                  <Text style={styles.progressText}>جاري رفع ومعالجة الصور... {scanUploadProgress}%</Text>
-                </View>
-              )}
-
-              <TouchableOpacity 
-                style={styles.saveScansBtn} 
-                onPress={handleSaveScansToPatientFile}
-                disabled={uploadingScans}
-              >
-                {uploadingScans ? (
-                  <ActivityIndicator color="#FFFFFF" />
-                ) : (
-                  <Text style={styles.saveScansBtnText}>💾 حفظ وإضافة الأشاعات لملف المريض</Text>
+                  </View>
                 )}
-              </TouchableOpacity>
-            </View>
+
+                <Text style={styles.subSectionTitle}>➕ إضافة أشعات وفحوصات جديدة للمريض:</Text>
+                <TextInput 
+                  style={styles.input} 
+                  placeholder="عنوان المرفق (مثال: أشعة سينية جديدة)" 
+                  placeholderTextColor="#64748B" 
+                  value={scanGroupTitle} 
+                  onChangeText={setScanGroupTitle} 
+                />
+
+                {Platform.OS === 'web' ? (
+                  <input 
+                    type="file" 
+                    accept="image/*" 
+                    multiple
+                    onChange={handleSelectMultipleScans}
+                    style={{ marginBottom: 12, color: '#00F2FE' }}
+                  />
+                ) : null}
+
+                {selectedScanFiles.length > 0 && (
+                  <View style={{ marginBottom: 15 }}>
+                    <Text style={styles.label}>معاينة الصور المختارة للرفع ({selectedScanFiles.length} صورة):</Text>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                      {selectedScanFiles.map((item) => (
+                        <View key={item.id} style={styles.scanPreviewCard}>
+                          <Image source={{ uri: item.previewUrl }} style={styles.scanPreviewImg} />
+                          <TouchableOpacity 
+                            style={styles.deleteScanBtn}
+                            onPress={() => handleRemoveSingleScan(item.id)}
+                          >
+                            <Text style={styles.deleteScanBtnText}>إزالة ✕</Text>
+                          </TouchableOpacity>
+                        </View>
+                      ))}
+                    </ScrollView>
+                  </View>
+                )}
+
+                {uploadingScans && (
+                  <View style={styles.progressBarContainer}>
+                    <View style={[styles.progressBarFill, { width: `${scanUploadProgress}%` }]} />
+                    <Text style={styles.progressText}>جاري رفع ومعالجة الصور... {scanUploadProgress}%</Text>
+                  </View>
+                )}
+
+                <TouchableOpacity 
+                  style={styles.saveScansBtn} 
+                  onPress={handleSaveScansToPatientFile}
+                  disabled={uploadingScans}
+                >
+                  {uploadingScans ? (
+                    <ActivityIndicator color="#FFFFFF" />
+                  ) : (
+                    <Text style={styles.saveScansBtnText}>💾 حفظ وإضافة الأشاعات لملف المريض</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.card}>
+                <Text style={styles.sectionTitle}>📋 تاريخ الزيارات والروشتات المعتمدة السابقة</Text>
+                {patientHistory.length === 0 ? (
+                  <Text style={styles.emptyText}>لا توجد زيارات أو روشتات مسجلة سابقاً.</Text>
+                ) : (
+                  patientHistory.map((rec, rIdx) => (
+                    <View key={rec.id || rIdx} style={styles.historyRecordCard}>
+                      <Text style={styles.historyDate}>📅 زيارة بتاريخ: {new Date(rec.created_at || rec.visit_date).toLocaleDateString('ar-EG')}</Text>
+                      <Text style={styles.historyDiagnosis}>التشخيص / البيان: {rec.diagnosis || 'فحص واكتشاف إكلينيكي'}</Text>
+                    </View>
+                  ))
+                )}
+              </View>
+            </>
           )}
 
           <View style={styles.card}>
@@ -1537,6 +1557,10 @@ const styles = StyleSheet.create({
   patientItemCode: { fontSize: 12, color: '#00F2FE', fontWeight: 'bold' },
   patientItemSub: { fontSize: 11, color: '#94A3B8', textAlign: 'right', marginTop: 4 },
   emptyText: { color: '#64748B', fontSize: 12, textAlign: 'center', marginVertical: 10 },
+
+  historyRecordCard: { backgroundColor: '#090D16', padding: 12, borderRadius: 10, marginBottom: 8, borderWidth: 1, borderColor: '#1E293B' },
+  historyDate: { color: '#38BDF8', fontSize: 11, fontWeight: 'bold', textAlign: 'right' },
+  historyDiagnosis: { color: '#F8FAFC', fontSize: 13, marginTop: 4, textAlign: 'right' },
 
   aiButton: { backgroundColor: '#0284C7', padding: 12, borderRadius: 8, alignItems: 'center', marginBottom: 12, marginTop: 5 },
   aiButtonText: { color: '#FFFFFF', fontSize: 13, fontWeight: 'bold' },
