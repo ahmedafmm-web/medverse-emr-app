@@ -1,10 +1,13 @@
 import { supabase } from '../../supabaseClient';
+import { Platform } from 'react-native';
+
+const SUB_CACHE_KEY = 'MEDVERSE_SUB_STATUS';
 
 // دالة مساعدة لضغط الصور وتصغير حجمها للحفاظ على سرعة الرفع والأداء
 const compressImageBlob = (blob, maxWidth = 1000, quality = 0.8) => {
   return new Promise((resolve) => {
     if (typeof window === 'undefined' || !blob.type.includes('image')) {
-      return resolve(blob); // إذا لم تكن صورة أو كنا خارج البيئة التفاعلية نرجع الملف كما هو
+      return resolve(blob);
     }
 
     const img = new Image();
@@ -33,7 +36,7 @@ const compressImageBlob = (blob, maxWidth = 1000, quality = 0.8) => {
       );
     };
     img.onerror = () => resolve(blob);
-  );
+  });
 };
 
 export const uploadMediaFile = async (fileInput, fileName, onProgress = null) => {
@@ -42,7 +45,6 @@ export const uploadMediaFile = async (fileInput, fileName, onProgress = null) =>
 
     let blob;
     if (typeof fileInput === 'string') {
-      // في حال تمرير File URI أو Base64
       const response = await fetch(fileInput);
       blob = await response.blob();
     } else if (fileInput instanceof Blob || fileInput instanceof File) {
@@ -51,7 +53,6 @@ export const uploadMediaFile = async (fileInput, fileName, onProgress = null) =>
       throw new Error('نوع الملف غير مدعوم');
     }
 
-    // 1. ضغط الصورة تقليلاً للحجم
     if (onProgress) onProgress(40);
     const compressedBlob = await compressImageBlob(blob, 1000, 0.8);
 
@@ -60,9 +61,8 @@ export const uploadMediaFile = async (fileInput, fileName, onProgress = null) =>
 
     if (onProgress) onProgress(60);
 
-    // 2. الرفع إلى Supabase Storage
     const { data, error } = await supabase.storage
-      .from('medverse_media')
+      .from('clinic-assets')
       .upload(filePath, compressedBlob, {
         cacheControl: '3600',
         upsert: true
@@ -72,9 +72,8 @@ export const uploadMediaFile = async (fileInput, fileName, onProgress = null) =>
 
     if (onProgress) onProgress(90);
 
-    // 3. الحصول على الرابط العام المباشر للملف
     const { data: publicUrlData } = supabase.storage
-      .from('medverse_media')
+      .from('clinic-assets')
       .getPublicUrl(filePath);
 
     if (onProgress) onProgress(100);
