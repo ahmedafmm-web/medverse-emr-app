@@ -87,13 +87,14 @@ export default function PatientPortal({ onBackToDashboard, doctorClinicId }) {
       if (rErr) throw rErr;
       setMedicalRecords(records || []);
 
-      if (!doctorInfo && patient.doctor_email) {
-        const { data: cData } = await supabase
-          .from('clinics')
-          .select('doctor_name, clinic_name, specialty, logo_url, stamp_url, phone, address')
-          .ilike('email', patient.doctor_email)
-          .limit(1)
-          .maybeSingle();
+      if (!doctorInfo) {
+        let clinicQuery = supabase.from('clinics').select('doctor_name, clinic_name, specialty, logo_url, stamp_url, phone, address');
+        if (patient.doctor_email) {
+          clinicQuery = clinicQuery.ilike('email', patient.doctor_email);
+        } else if (patient.clinic_id) {
+          clinicQuery = clinicQuery.eq('id', patient.clinic_id);
+        }
+        const { data: cData } = await clinicQuery.limit(1).maybeSingle();
 
         if (cData) setDoctorInfo(cData);
       }
@@ -356,3 +357,4 @@ const styles = StyleSheet.create({
   emptyBox: { padding: 20, alignItems: 'center' },
   emptyText: { color: '#64748B', fontSize: 13 }
 });
+ 
