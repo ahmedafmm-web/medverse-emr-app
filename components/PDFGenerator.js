@@ -50,7 +50,6 @@ export const generatePrescriptionPDF = async (patient = {}, diagnosis = '', deta
           -webkit-print-color-adjust: exact;
         }
 
-        /* شريط أزرار التحكم العلوي */
         .action-bar {
           display: flex;
           justify-content: center;
@@ -145,7 +144,6 @@ export const generatePrescriptionPDF = async (patient = {}, diagnosis = '', deta
           max-height: 65px; width: auto; max-width: 130px; display: block; margin: 0 auto 4px auto;
         }
 
-        /* قواعد الحظر والطباعة لحفظ ملف PDF نظيف */
         @media print {
           .action-bar { display: none !important; }
           .share-btn { display: none !important; }
@@ -227,6 +225,13 @@ export const generatePrescriptionPDF = async (patient = {}, diagnosis = '', deta
         </div>
       </div>
 
+      <script>
+        window.onload = function() {
+          setTimeout(function() {
+            try { window.print(); } catch(e) {}
+          }, 300);
+        };
+      </script>
     </body>
     </html>
   `;
@@ -237,15 +242,6 @@ export const generatePrescriptionPDF = async (patient = {}, diagnosis = '', deta
       if (printWindow) {
         printWindow.document.write(htmlContent);
         printWindow.document.close();
-        printWindow.focus();
-
-        setTimeout(() => {
-          try {
-            printWindow.print();
-          } catch (e) {
-            console.log('Print trigger handled by manual button.');
-          }
-        }, 500);
       } else {
         await Print.printAsync({ html: htmlContent });
       }
@@ -259,3 +255,4 @@ export const generatePrescriptionPDF = async (patient = {}, diagnosis = '', deta
     console.error("PDF Generation Error:", error);
   }
 };
+ 
