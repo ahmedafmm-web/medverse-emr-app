@@ -20,7 +20,6 @@ export default function App() {
   ];
 
   useEffect(() => {
-    // معالجة روابط التوجيه الذكية من الـ URL عند الفتح بالمتصفح
     if (Platform.OS === 'web' && typeof window !== 'undefined') {
       const urlParams = new URLSearchParams(window.location.search);
       const queryParam = urlParams.get('clinic') || urlParams.get('c') || urlParams.get('patient');
