@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, StyleSheet, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, TextInput, StyleSheet, TouchableOpacity, Alert, Platform } from 'react-native';
 
 export default function DynamicFormBuilder({ schema, formData, onChange, onUpdateSchema, presets, onSelectPreset }) {
   const [newFieldLabel, setNewFieldLabel] = useState('');
@@ -10,22 +10,31 @@ export default function DynamicFormBuilder({ schema, formData, onChange, onUpdat
     if (!text) return null;
     const lowerText = text.toLowerCase();
     
-    if (lowerText.includes('aspirin') && lowerText.includes('warfarin')) {
+    const hasAspirin = lowerText.includes('aspirin') || lowerText.includes('اسبرين') || lowerText.includes('أسبرين');
+    const hasWarfarin = lowerText.includes('warfarin') || lowerText.includes('وارفارين');
+    if (hasAspirin && hasWarfarin) {
       return '⚠️ تحذير طبي: تعارض خطير بين Aspirin و Warfarin يزيد من خطر النزيف!';
     }
-    if (lowerText.includes('panadol') && lowerText.includes('paracetamol')) {
+
+    const hasPanadol = lowerText.includes('panadol') || lowerText.includes('بنادول');
+    const hasParacetamol = lowerText.includes('paracetamol') || lowerText.includes('باراسيتامول');
+    if (hasPanadol && hasParacetamol) {
       return '⚠️ تنبيه: تكرار نفس المادة الفعالة (Paracetamol) قد يسبب زيادة عن الجرعة الآمنة!';
     }
     return null;
   };
 
+  const showAlert = (title, message) => {
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      window.alert(`${title}\n${message}`);
+    } else {
+      Alert.alert(title, message);
+    }
+  };
+
   const handleAddField = () => {
     if (!newFieldLabel.trim()) {
-      if (typeof window !== 'undefined' && window.alert) {
-        window.alert('تنبيه: يرجى إدخال اسم الحقل الجديد.');
-      } else {
-        Alert.alert('تنبيه', 'يرجى إدخال اسم الحقل الجديد.');
-      }
+      showAlert('تنبيه', 'يرجى إدخال اسم الحقل الجديد.');
       return;
     }
     const newKey = 'custom_' + Date.now();
@@ -33,14 +42,14 @@ export default function DynamicFormBuilder({ schema, formData, onChange, onUpdat
       ...(schema || []),
       { key: newKey, label: newFieldLabel.trim(), type: newFieldType, placeholder: '' }
     ];
-    onUpdateSchema(updatedSchema);
+    if (onUpdateSchema) onUpdateSchema(updatedSchema);
     setNewFieldLabel('');
     setShowAddFieldModal(false);
   };
 
   const handleRemoveField = (keyToRemove) => {
     const updatedSchema = (schema || []).filter(field => field.key !== keyToRemove);
-    onUpdateSchema(updatedSchema);
+    if (onUpdateSchema) onUpdateSchema(updatedSchema);
   };
 
   return (
@@ -82,7 +91,7 @@ export default function DynamicFormBuilder({ schema, formData, onChange, onUpdat
                   alertMessage && styles.inputAlertBorder
                 ]}
                 placeholder={field.placeholder || 'أدخل التفاصيل...'}
-                placeholderTextColor="#94A3B8"
+                placeholderTextColor="#64748B"
                 value={(formData && formData[field.key]) || ''}
                 onChangeText={(text) => onChange && onChange(field.key, text)}
                 multiline={field.type === 'textarea'}
@@ -116,7 +125,7 @@ export default function DynamicFormBuilder({ schema, formData, onChange, onUpdat
           <TextInput
             style={styles.input}
             placeholder="اسم الحقل (مثال: الفحوصات المطلوبة)"
-            placeholderTextColor="#94A3B8"
+            placeholderTextColor="#64748B"
             value={newFieldLabel}
             onChangeText={setNewFieldLabel}
           />
@@ -150,38 +159,38 @@ export default function DynamicFormBuilder({ schema, formData, onChange, onUpdat
 
 const styles = StyleSheet.create({
   container: { marginVertical: 10 },
-  presetsContainer: { marginBottom: 15, backgroundColor: '#F1F5F9', padding: 10, borderRadius: 8 },
-  presetsTitle: { fontSize: 12, fontWeight: 'bold', color: '#334155', marginBottom: 8, textAlign: 'right' },
+  presetsContainer: { marginBottom: 15, backgroundColor: '#090D16', padding: 10, borderRadius: 10, borderWidth: 1, borderColor: '#1E293B' },
+  presetsTitle: { fontSize: 12, fontWeight: 'bold', color: '#00F2FE', marginBottom: 8, textAlign: 'right' },
   presetButtonsRow: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 6 },
   presetChip: { backgroundColor: '#0284C7', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 15 },
   presetChipText: { color: '#FFFFFF', fontSize: 11, fontWeight: 'bold' },
   emptyContainer: { padding: 15, alignItems: 'center' },
-  emptyText: { color: '#94A3B8', fontSize: 13 },
+  emptyText: { color: '#64748B', fontSize: 13 },
   fieldGroup: { marginBottom: 15 },
   labelHeader: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
-  label: { fontSize: 13, fontWeight: 'bold', color: '#0F172A', textAlign: 'right' },
+  label: { fontSize: 13, fontWeight: 'bold', color: '#F8FAFC', textAlign: 'right' },
   removeText: { fontSize: 11, color: '#EF4444', fontWeight: 'bold' },
   input: {
-    borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 8, padding: 11,
-    backgroundColor: '#FFFFFF', fontSize: 14, textAlign: 'right', color: '#1E293B'
+    borderWidth: 1, borderColor: '#1E293B', borderRadius: 8, padding: 11,
+    backgroundColor: '#090D16', fontSize: 13, textAlign: 'right', color: '#FFFFFF'
   },
   textArea: { height: 75, textAlignVertical: 'top' },
-  inputAlertBorder: { borderColor: '#EF4444', borderWidth: 1.5, backgroundColor: '#FEF2F2' },
-  alertBox: { marginTop: 5, backgroundColor: '#FEE2E2', padding: 8, borderRadius: 6, borderWidth: 1, borderColor: '#FCA5A5' },
-  alertText: { color: '#991B1B', fontSize: 11, fontWeight: 'bold', textAlign: 'right' },
+  inputAlertBorder: { borderColor: '#EF4444', borderWidth: 1.5, backgroundColor: 'rgba(153, 27, 27, 0.2)' },
+  alertBox: { marginTop: 5, backgroundColor: 'rgba(153, 27, 27, 0.4)', padding: 8, borderRadius: 6, borderWidth: 1, borderColor: '#EF4444' },
+  alertText: { color: '#FCA5A5', fontSize: 11, fontWeight: 'bold', textAlign: 'right' },
   addFieldBtn: { borderWidth: 1, borderColor: '#0284C7', borderStyle: 'dashed', padding: 12, borderRadius: 8, alignItems: 'center', marginTop: 5 },
-  addFieldBtnText: { color: '#0284C7', fontSize: 13, fontWeight: 'bold' },
-  addModalCard: { backgroundColor: '#F8FAFC', padding: 12, borderRadius: 8, borderWidth: 1, borderColor: '#E2E8F0', marginTop: 10 },
-  addModalTitle: { fontSize: 13, fontWeight: 'bold', color: '#0F172A', marginBottom: 10, textAlign: 'right' },
+  addFieldBtnText: { color: '#00F2FE', fontSize: 13, fontWeight: 'bold' },
+  addModalCard: { backgroundColor: '#131C2E', padding: 12, borderRadius: 8, borderWidth: 1, borderColor: '#1E293B', marginTop: 10 },
+  addModalTitle: { fontSize: 13, fontWeight: 'bold', color: '#F8FAFC', marginBottom: 10, textAlign: 'right' },
   typeSelectorRow: { flexDirection: 'row-reverse', gap: 10, marginBottom: 12 },
-  typeBtn: { flex: 1, padding: 8, borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 6, alignItems: 'center' },
-  typeBtnActive: { backgroundColor: '#0F172A', borderColor: '#0F172A' },
-  typeBtnText: { fontSize: 12, color: '#475569' },
+  typeBtn: { flex: 1, padding: 8, borderWidth: 1, borderColor: '#1E293B', borderRadius: 6, alignItems: 'center', backgroundColor: '#090D16' },
+  typeBtnActive: { backgroundColor: '#0284C7', borderColor: '#00F2FE' },
+  typeBtnText: { fontSize: 12, color: '#94A3B8' },
   typeBtnTextActive: { color: '#FFFFFF', fontWeight: 'bold' },
   modalActionsRow: { flexDirection: 'row-reverse', gap: 8 },
   saveFieldBtn: { flex: 1, backgroundColor: '#10B981', padding: 10, borderRadius: 6, alignItems: 'center' },
   saveFieldBtnText: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 12 },
   cancelFieldBtn: { padding: 10, borderRadius: 6, alignItems: 'center' },
-  cancelFieldBtnText: { color: '#64748B', fontSize: 12 }
+  cancelFieldBtnText: { color: '#94A3B8', fontSize: 12 }
 });
  
