@@ -22,18 +22,29 @@ const sanitizeText = (str) => {
   return str.replace(/[^\u0600-\u06FF a-zA-Z0-9.,()\-\:\/]/g, '').trim();
 };
 
-const isSpecialtyMatching = (specA, specB) => {
-  if (!specA || !specB) return true;
-  const cleanA = specA.toLowerCase();
-  const cleanB = specB.toLowerCase();
-  if (cleanA === cleanB) return true;
+// دالة المقارنة الذكية المحدثة التي تقارن الكلمات المفتاحية الموجودة في نص البروفايل مباشرة
+const isSpecialtyMatching = (selectedSpec, registeredSpec) => {
+  if (!selectedSpec || !registeredSpec) return true;
 
-  const keywords = ['روماتيزم', 'روماتويد', 'مناع', 'قلب', 'باطن', 'عظام', 'أطفال', 'جلدية', 'جراح'];
-  for (let kw of keywords) {
-    if (cleanA.includes(kw) && cleanB.includes(kw)) {
+  // تنظيف النصوص من الإيموجي والرموز للحصول على الكلمات العربية فقط
+  const cleanSelected = selectedSpec.replace(/[^\u0600-\u06FF a-zA-Z]/g, '').trim().toLowerCase();
+  const cleanRegistered = registeredSpec.replace(/[^\u0600-\u06FF a-zA-Z]/g, '').trim().toLowerCase();
+
+  // إذا كان النص متطابق تماماً
+  if (cleanSelected === cleanRegistered) return true;
+
+  // استخراج الكلمات التي يزيد طولها عن حرفين من النص المسجل بالبروفايل
+  const registeredWords = cleanRegistered
+    .split(/\s+/)
+    .filter(word => word.length > 2 && !['استشاري', 'أخصائي', 'دكتور', 'طبيب', 'مركز', 'عيادة', 'الأمراض', 'وجراحة', 'جراحة'].includes(word));
+
+  // إذا وجدت أي كلمة أساسية من نص البروفايل داخل التخصص المختار، نعتبرهما متطابقين
+  for (let word of registeredWords) {
+    if (cleanSelected.includes(word)) {
       return true;
     }
   }
+
   return false;
 };
 
@@ -76,7 +87,7 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
   const [clinicName, setClinicName] = useState('عياده المنفلوطي');
   const [specialty, setSpecialty] = useState(initialSpecialty || 'استشاري أمراض الروماتيزم والروماتويد والأمراض المناعية');
   const [registeredSpecialty, setRegisteredSpecialty] = useState('');
-  const [clinicLogoUrl, setClinicLogoUrl] = useState('[https://cdn-icons-png.flaticon.com/512/387/387561.png](https://cdn-icons-png.flaticon.com/512/387/387561.png)');
+  const [clinicLogoUrl, setClinicLogoUrl] = useState('https://cdn-icons-png.flaticon.com/512/387/387561.png');
   const [digitalStampUrl, setDigitalStampUrl] = useState('');
   const [clinicPhone, setClinicPhone] = useState('');
   const [clinicAddress, setClinicAddress] = useState('');
@@ -134,7 +145,7 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
   const handleOpenWhatsApp = () => {
     const userEmail = session?.user?.email || '';
     const message = `مرحباً دكتور، أود تفعيل اشتراكي في تطبيق MedVerse.\nالإيميل المسجل: ${userEmail}`;
-    const url = `[https://wa.me/201127834972?text=$](https://wa.me/201127834972?text=$){encodeURIComponent(message)}`;
+    const url = `https://wa.me/201127834972?text=${encodeURIComponent(message)}`;
     if (Platform.OS === 'web') window.open(url, '_blank');
     else Linking.openURL(url);
   };
@@ -146,15 +157,15 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
     }
     const cleanPhone = patientPhone.replace(/[^0-9]/g, '');
     const phoneWithCountry = cleanPhone.startsWith('2') ? cleanPhone : `2${cleanPhone}`;
-    const baseUrl = Platform.OS === 'web' && typeof window !== 'undefined' ? window.location.origin.split('?')[0] : '[https://medverse-emr-suite.vercel.app](https://medverse-emr-suite.vercel.app)';
+    const baseUrl = Platform.OS === 'web' && typeof window !== 'undefined' ? window.location.origin.split('?')[0] : 'https://medverse-emr-suite.vercel.app';
     const message = `مرحباً ${patientName}،\nإليك رابط سجلـك الطبي وتقرير الأشعة الخاص بك لدى ${clinicDoctorName}:\n${baseUrl}?c=${selectedPatientCode}`;
-    const url = `[https://wa.me/$](https://wa.me/$){phoneWithCountry}?text=${encodeURIComponent(message)}`;
+    const url = `https://wa.me/${phoneWithCountry}?text=${encodeURIComponent(message)}`;
     if (Platform.OS === 'web') window.open(url, '_blank');
     else Linking.openURL(url);
   };
 
   const handleOpenInstaPay = () => {
-    const url = '[https://ipn.eg/S/eg2400020548054885193/instapay/5xBjGv](https://ipn.eg/S/eg2400020548054885193/instapay/5xBjGv)';
+    const url = 'https://ipn.eg/S/eg2400020548054885193/instapay/5xBjGv';
     if (Platform.OS === 'web') window.open(url, '_blank');
     else Linking.openURL(url);
   };
@@ -525,7 +536,7 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
   const handleCopyPortalLink = () => {
     const currentUserId = session?.user?.id;
     if (!currentUserId) return;
-    const baseUrl = Platform.OS === 'web' && typeof window !== 'undefined' ? window.location.origin.split('?')[0] : '[https://medverse-emr-suite.vercel.app](https://medverse-emr-suite.vercel.app)';
+    const baseUrl = Platform.OS === 'web' && typeof window !== 'undefined' ? window.location.origin.split('?')[0] : 'https://medverse-emr-suite.vercel.app';
     const portalUrl = `${baseUrl}?c=${currentUserId}`;
     if (Platform.OS === 'web' && navigator.clipboard) {
       navigator.clipboard.writeText(portalUrl);
@@ -545,13 +556,19 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
       if (clinic && !error) {
         if (clinic.doctor_name) setClinicDoctorName(clinic.doctor_name);
         if (clinic.clinic_name) setClinicName(clinic.clinic_name);
+        
         if (clinic.specialty) {
           setRegisteredSpecialty(clinic.specialty);
-          if (initialSpecialty && !isSpecialtyMatching(initialSpecialty, clinic.specialty)) {
+          
+          // المقارنة تعتمد فقط وحصرياً على النص المكتوب في البروفايل clinic.specialty
+          const isMatched = isSpecialtyMatching(initialSpecialty, clinic.specialty);
+          
+          if (!isMatched) {
             setShowMismatchModal(true);
           } else {
             setSpecialty(clinic.specialty);
           }
+
           if (onUpdateSpecialty) onUpdateSpecialty(clinic.specialty);
         }
         if (clinic.logo_url) setClinicLogoUrl(clinic.logo_url);
@@ -677,7 +694,7 @@ Symptoms: ${symptomsInput}
 Doctor Notes: ${doctorNotes || 'لا يوجد'}`;
 
     try {
-      const response = await fetch("[https://api.groq.com/openai/v1/chat/completions](https://api.groq.com/openai/v1/chat/completions)", {
+      const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
         method: "POST",
         headers: {
           "Authorization": `Bearer ${activeApiKey}`,
@@ -748,7 +765,7 @@ Return JSON ONLY:
 `;
 
     try {
-      const res = await fetch("[https://api.groq.com/openai/v1/chat/completions](https://api.groq.com/openai/v1/chat/completions)", {
+      const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
         method: "POST",
         headers: {
           "Authorization": `Bearer ${GROQ_API_KEY}`,
@@ -1086,7 +1103,7 @@ Return JSON ONLY:
                   if (onUpdateSpecialty) onUpdateSpecialty(registeredSpecialty);
                 }}
               >
-                <Text style={styles.modalGoBtnText}>الانتقال لتخصصي ({registeredSpecialty})</Text>
+                <Text style={styles.modalGoBtnText}>الانتقال للتخصص المسجل بالبروفايل</Text>
               </TouchableOpacity>
               <TouchableOpacity 
                 style={styles.modalStayBtn} 
