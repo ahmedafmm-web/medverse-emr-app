@@ -76,7 +76,7 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
   const [clinicName, setClinicName] = useState('عياده المنفلوطي');
   const [specialty, setSpecialty] = useState(initialSpecialty || 'استشاري أمراض الروماتيزم والروماتويد والأمراض المناعية');
   const [registeredSpecialty, setRegisteredSpecialty] = useState('');
-  const [clinicLogoUrl, setClinicLogoUrl] = useState('https://cdn-icons-png.flaticon.com/512/387/387561.png');
+  const [clinicLogoUrl, setClinicLogoUrl] = useState('[https://cdn-icons-png.flaticon.com/512/387/387561.png](https://cdn-icons-png.flaticon.com/512/387/387561.png)');
   const [digitalStampUrl, setDigitalStampUrl] = useState('');
   const [clinicPhone, setClinicPhone] = useState('');
   const [clinicAddress, setClinicAddress] = useState('');
@@ -134,7 +134,7 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
   const handleOpenWhatsApp = () => {
     const userEmail = session?.user?.email || '';
     const message = `مرحباً دكتور، أود تفعيل اشتراكي في تطبيق MedVerse.\nالإيميل المسجل: ${userEmail}`;
-    const url = `https://wa.me/201127834972?text=${encodeURIComponent(message)}`;
+    const url = `[https://wa.me/201127834972?text=$](https://wa.me/201127834972?text=$){encodeURIComponent(message)}`;
     if (Platform.OS === 'web') window.open(url, '_blank');
     else Linking.openURL(url);
   };
@@ -146,15 +146,15 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
     }
     const cleanPhone = patientPhone.replace(/[^0-9]/g, '');
     const phoneWithCountry = cleanPhone.startsWith('2') ? cleanPhone : `2${cleanPhone}`;
-    const baseUrl = Platform.OS === 'web' && typeof window !== 'undefined' ? window.location.origin.split('?')[0] : 'https://medverse-emr-suite.vercel.app';
+    const baseUrl = Platform.OS === 'web' && typeof window !== 'undefined' ? window.location.origin.split('?')[0] : '[https://medverse-emr-suite.vercel.app](https://medverse-emr-suite.vercel.app)';
     const message = `مرحباً ${patientName}،\nإليك رابط سجلـك الطبي وتقرير الأشعة الخاص بك لدى ${clinicDoctorName}:\n${baseUrl}?c=${selectedPatientCode}`;
-    const url = `https://wa.me/${phoneWithCountry}?text=${encodeURIComponent(message)}`;
+    const url = `[https://wa.me/$](https://wa.me/$){phoneWithCountry}?text=${encodeURIComponent(message)}`;
     if (Platform.OS === 'web') window.open(url, '_blank');
     else Linking.openURL(url);
   };
 
   const handleOpenInstaPay = () => {
-    const url = 'https://ipn.eg/S/eg2400020548054885193/instapay/5xBjGv';
+    const url = '[https://ipn.eg/S/eg2400020548054885193/instapay/5xBjGv](https://ipn.eg/S/eg2400020548054885193/instapay/5xBjGv)';
     if (Platform.OS === 'web') window.open(url, '_blank');
     else Linking.openURL(url);
   };
@@ -244,10 +244,12 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
     if (!pId) return;
     setSearchingHistory(true);
     try {
+      const userEmail = session?.user?.email?.toLowerCase();
       const { data: records, error } = await supabase
         .from('medical_records')
         .select('*')
         .eq('patient_id', pId)
+        .ilike('doctor_email', userEmail)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -292,6 +294,7 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
         .from('patients')
         .select('id, patient_code, phone, age, gender')
         .ilike('full_name', `%${name.trim()}%`)
+        .ilike('doctor_email', userEmail)
         .maybeSingle();
 
       if (patient) {
@@ -335,6 +338,7 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
           .from('patients')
           .select('id, patient_code')
           .ilike('full_name', patientName.trim())
+          .ilike('doctor_email', userEmail)
           .maybeSingle();
 
         if (existingPatient) {
@@ -521,7 +525,7 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
   const handleCopyPortalLink = () => {
     const currentUserId = session?.user?.id;
     if (!currentUserId) return;
-    const baseUrl = Platform.OS === 'web' && typeof window !== 'undefined' ? window.location.origin.split('?')[0] : 'https://medverse-emr-suite.vercel.app';
+    const baseUrl = Platform.OS === 'web' && typeof window !== 'undefined' ? window.location.origin.split('?')[0] : '[https://medverse-emr-suite.vercel.app](https://medverse-emr-suite.vercel.app)';
     const portalUrl = `${baseUrl}?c=${currentUserId}`;
     if (Platform.OS === 'web' && navigator.clipboard) {
       navigator.clipboard.writeText(portalUrl);
@@ -543,7 +547,11 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
         if (clinic.clinic_name) setClinicName(clinic.clinic_name);
         if (clinic.specialty) {
           setRegisteredSpecialty(clinic.specialty);
-          setSpecialty(clinic.specialty);
+          if (initialSpecialty && !isSpecialtyMatching(initialSpecialty, clinic.specialty)) {
+            setShowMismatchModal(true);
+          } else {
+            setSpecialty(clinic.specialty);
+          }
           if (onUpdateSpecialty) onUpdateSpecialty(clinic.specialty);
         }
         if (clinic.logo_url) setClinicLogoUrl(clinic.logo_url);
@@ -633,6 +641,7 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
     handleSearchPatientByName(dummyName);
   };
 
+  // دالة الذكاء الاصطناعي مع معالجة حكيمة تمنع الانهيار
   const handleClinicalAnalysis = async () => {
     if (!symptomsInput.trim()) {
       showAlert('تنبيه', 'يرجى كتابة الأعراض والشكوى الحالية للمريض أولاً.');
@@ -640,47 +649,38 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
     }
 
     setAnalyzing(true);
+    setAiReport(null);
+
+    const activeApiKey = GROQ_API_KEY;
     const isRheumatology = specialty.includes('روماتيزم') || specialty.includes('روماتويد');
 
-    const systemPrompt = `You are a Senior Consultant Specialist in: ${specialty}.
-You strictly adhere to international evidence-based guidelines (e.g., ACR/EULAR for Rheumatology, ACC/AHA for Cardiology).
+    const systemPrompt = `You are an AI Clinical Assistant for a doctor in specialty: ${specialty}.
+Analyze the patient case and respond ONLY with a clean JSON object without Markdown formatting or triple backticks.
 
-${isRheumatology ? 'SPECIAL RHEUMATOLOGY INSTRUCTIONS: Focus deeply on Autoimmune Diseases, Rheumatoid Arthritis, DMARDs (Methotrexate, Leflunomide, etc.), Biological therapies, and inflammatory markers (RF, Anti-CCP, ESR, CRP).' : ''}
-
-CLINICAL REQUIREMENTS:
-1. DIAGNOSIS: Precise medical terminology in ENGLISH with accurate ARABIC explanation.
-2. MODERN MEDICATIONS: Prescribe modern GDMT tailored to specialty ${specialty}.
-   - "name": Drug Name STRICTLY IN ENGLISH.
-   - "dose": Detailed dose in ARABIC.
-   - "reason": Clinical justification in ARABIC.
-3. WARNINGS: Emergency red flags & drug interactions in ARABIC.
-4. Return ONLY valid JSON matching the exact schema requested without markdown.`;
-
-    const userPrompt = `Analyze the following patient case for ${specialty}:
-- Age: ${age || 'Unspecified'} | Gender: ${gender}
-- Chronic Diseases: ${chronicDiseases || 'None'}
-- Family History: ${familyHistory || 'None'}
-- Current Symptoms: ${symptomsInput}
-- Clinical Findings/Notes: ${doctorNotes || 'None'}
-
-JSON Structure Required:
+Expected JSON Structure:
 {
-  "diagnosis": "English Medical Term - الشرح بالعربي",
-  "warnings": ["تحذير إكلينيكي بالعربي"],
+  "diagnosis": "English Diagnosis - الشرح بالعربي",
+  "warnings": ["تحذير بالعربي"],
   "medications": [
     {
-      "name": "English Scientific/Trade Name",
+      "name": "Drug Name",
       "dose": "الجرعة بالعربي",
       "reason": "دواعي الاستعمال بالعربي"
     }
   ]
 }`;
 
+    const userPrompt = `Patient Specialty: ${specialty}
+Age: ${age || 'غير محدد'} | Gender: ${gender}
+Chronic: ${chronicDiseases || 'لا يوجد'}
+Symptoms: ${symptomsInput}
+Doctor Notes: ${doctorNotes || 'لا يوجد'}`;
+
     try {
-      const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      const response = await fetch("[https://api.groq.com/openai/v1/chat/completions](https://api.groq.com/openai/v1/chat/completions)", {
         method: "POST",
         headers: {
-          "Authorization": `Bearer ${GROQ_API_KEY}`,
+          "Authorization": `Bearer ${activeApiKey}`,
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
@@ -689,26 +689,36 @@ JSON Structure Required:
             { role: "system", content: systemPrompt },
             { role: "user", content: userPrompt }
           ],
-          temperature: 0.1,
-          response_format: { type: "json_object" }
+          temperature: 0.2
         })
       });
 
-      const data = await response.json();
-      if (!data.choices || !data.choices[0]) throw new Error('استجابة غير صالحة من خادم الذكاء الاصطناعي');
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData?.error?.message || `خطأ في استجابة السيرفر (${response.status})`);
+      }
 
-      const parsedResult = JSON.parse(data.choices[0].message.content);
+      const data = await response.json();
+      const rawContent = data?.choices?.[0]?.message?.content;
+
+      if (!rawContent) throw new Error('استجابة فارغة من خادم الذكاء الاصطناعي');
+
+      const cleanJsonString = rawContent.replace(/```json/g, '').replace(/```/g, '').trim();
+      const parsedResult = JSON.parse(cleanJsonString);
+
       if (parsedResult.warnings) {
         parsedResult.warnings = parsedResult.warnings.map(w => sanitizeText(w));
       }
 
       setAiReport(parsedResult);
-      setFinalDiagnosis(parsedResult.diagnosis || '');
-      setPrescribedMeds(parsedResult.medications || []);
+      if (parsedResult.diagnosis) setFinalDiagnosis(parsedResult.diagnosis);
+      if (parsedResult.medications && Array.isArray(parsedResult.medications)) {
+        setPrescribedMeds(parsedResult.medications);
+      }
 
     } catch (error) {
-      console.error("Groq API Error:", error);
-      showAlert('خطأ الاتصال', error.message);
+      console.error("Groq Analysis Error:", error);
+      showAlert('تنبيه الذكاء الاصطناعي', `تعذر التحليل التلقائي: ${error.message}\nيمكنك كتابة التشخيص والأدوية يدوياً والاستمرار بشكل طبيعي.`);
     } finally {
       setAnalyzing(false);
     }
@@ -738,7 +748,7 @@ Return JSON ONLY:
 `;
 
     try {
-      const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      const res = await fetch("[https://api.groq.com/openai/v1/chat/completions](https://api.groq.com/openai/v1/chat/completions)", {
         method: "POST",
         headers: {
           "Authorization": `Bearer ${GROQ_API_KEY}`,
@@ -750,13 +760,14 @@ Return JSON ONLY:
             { role: "system", content: systemPrompt },
             { role: "user", content: userPrompt }
           ],
-          temperature: 0.1,
-          response_format: { type: "json_object" }
+          temperature: 0.1
         })
       });
 
       const data = await res.json();
-      const parsed = JSON.parse(data.choices[0].message.content);
+      const rawContent = data?.choices?.[0]?.message?.content || '{}';
+      const cleanJsonString = rawContent.replace(/```json/g, '').replace(/```/g, '').trim();
+      const parsed = JSON.parse(cleanJsonString);
 
       if (parsed.safe) {
         setPrescribedMeds(prev => [...prev, { name: newMedName, dose: newMedDose, reason: newMedReason || 'إضافة مباشرة من الطبيب' }]);
@@ -825,6 +836,7 @@ Return JSON ONLY:
           .from('patients')
           .select('id, patient_code')
           .ilike('full_name', patientName.trim())
+          .ilike('doctor_email', userEmail)
           .maybeSingle();
 
         if (existingPatient) {
@@ -1031,6 +1043,7 @@ Return JSON ONLY:
 
   return (
     <ScrollView style={styles.container}>
+      {/* Lightbox Modal */}
       <Modal visible={!!viewingImageModal} transparent animationType="fade">
         <View style={styles.lightboxOverlay}>
           <TouchableOpacity style={styles.lightboxCloseBtn} onPress={() => { setViewingImageModal(null); setZoomScale(1); }}>
@@ -1056,6 +1069,37 @@ Return JSON ONLY:
         </View>
       </Modal>
 
+      {/* Specialty Mismatch Modal */}
+      <Modal visible={showMismatchModal} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>⚠️ تخصص العيادة المسجل مختلف</Text>
+            <Text style={styles.modalSub}>
+              أنت داخل على تخصص ({initialSpecialty}) لكن تخصصك المسجل في العيادة هو ({registeredSpecialty}). هل تريد الانتقال لتخصصك أم الاستمرار في هذا التخصص؟
+            </Text>
+            <View style={styles.modalButtonsRow}>
+              <TouchableOpacity 
+                style={styles.modalGoBtn} 
+                onPress={() => {
+                  setSpecialty(registeredSpecialty);
+                  setShowMismatchModal(false);
+                  if (onUpdateSpecialty) onUpdateSpecialty(registeredSpecialty);
+                }}
+              >
+                <Text style={styles.modalGoBtnText}>الانتقال لتخصصي ({registeredSpecialty})</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.modalStayBtn} 
+                onPress={() => setShowMismatchModal(false)}
+              >
+                <Text style={styles.modalStayBtnText}>الاستمرار بالتخصص الحالي</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Subscription Warning Banner */}
       {subscriptionAccess.showAlert && (
         <View style={styles.subWarningBanner}>
           <Text style={styles.subWarningIcon}>⏳</Text>
@@ -1068,6 +1112,7 @@ Return JSON ONLY:
         </View>
       )}
 
+      {/* Header */}
       <View style={styles.header}>
         <View style={styles.topUserRow}>
           <Text style={styles.userEmailText}>⚡ {clinicDoctorName} ({session?.user?.email})</Text>
@@ -1084,6 +1129,7 @@ Return JSON ONLY:
         <Text style={styles.subtitle}>منظومة إدارة العيادات والأشعة الذكية ({specialty})</Text>
       </View>
 
+      {/* Navigation Bar */}
       <View style={styles.navBar}>
         <TouchableOpacity style={[styles.navBtn, activeTab === 'prescription' && styles.navBtnActive]} onPress={() => setActiveTab('prescription')}>
           <Text style={[styles.navBtnText, activeTab === 'prescription' && styles.navBtnTextActive]}>🩺 الكشف والأشعة</Text>
@@ -1096,6 +1142,7 @@ Return JSON ONLY:
         </TouchableOpacity>
       </View>
 
+      {/* TAB 1: PROFILE */}
       {activeTab === 'profile' && (
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>⚙️ بيانات الطبيب، العيادة، والختم الإلكتروني</Text>
@@ -1168,6 +1215,7 @@ Return JSON ONLY:
         </View>
       )}
 
+      {/* TAB 2: PATIENTS */}
       {activeTab === 'patients' && (
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>📂 قائمة مرضى العيادة والملفات الطبية</Text>
@@ -1189,6 +1237,7 @@ Return JSON ONLY:
         </View>
       )}
 
+      {/* TAB 3: CONSULTATION & MULTI-SCANS */}
       {activeTab === 'prescription' && (
         <>
           <View style={styles.card}>
