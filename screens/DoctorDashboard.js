@@ -7,7 +7,8 @@ import { generatePrescriptionPDF } from '../components/PDFGenerator';
 import { supabase } from '../supabaseClient';
 import { verifyDoctorAccess } from '../src/services/subscriptionService';
 
-const GROQ_API_KEY = process.env.EXPO_PUBLIC_GROQ_API_KEY || "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";
+// اعتماد مفتاح البيئة السري المسجل في Vercel مباشرة دون وضع نص صريح
+const GROQ_API_KEY = process.env.EXPO_PUBLIC_GROQ_API_KEY;
 
 const SPECIALITIES_LIST = [
   "استشاري أمراض القلب والباطنة",
@@ -22,23 +23,18 @@ const sanitizeText = (str) => {
   return str.replace(/[^\u0600-\u06FF a-zA-Z0-9.,()\-\:\/]/g, '').trim();
 };
 
-// دالة المقارنة الذكية المحدثة التي تقارن الكلمات المفتاحية الموجودة في نص البروفايل مباشرة
 const isSpecialtyMatching = (selectedSpec, registeredSpec) => {
   if (!selectedSpec || !registeredSpec) return true;
 
-  // تنظيف النصوص من الإيموجي والرموز للحصول على الكلمات العربية فقط
   const cleanSelected = selectedSpec.replace(/[^\u0600-\u06FF a-zA-Z]/g, '').trim().toLowerCase();
   const cleanRegistered = registeredSpec.replace(/[^\u0600-\u06FF a-zA-Z]/g, '').trim().toLowerCase();
 
-  // إذا كان النص متطابق تماماً
   if (cleanSelected === cleanRegistered) return true;
 
-  // استخراج الكلمات التي يزيد طولها عن حرفين من النص المسجل بالبروفايل
   const registeredWords = cleanRegistered
     .split(/\s+/)
     .filter(word => word.length > 2 && !['استشاري', 'أخصائي', 'دكتور', 'طبيب', 'مركز', 'عيادة', 'الأمراض', 'وجراحة', 'جراحة'].includes(word));
 
-  // إذا وجدت أي كلمة أساسية من نص البروفايل داخل التخصص المختار، نعتبرهما متطابقين
   for (let word of registeredWords) {
     if (cleanSelected.includes(word)) {
       return true;
@@ -255,12 +251,10 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
     if (!pId) return;
     setSearchingHistory(true);
     try {
-      const userEmail = session?.user?.email?.toLowerCase();
       const { data: records, error } = await supabase
         .from('medical_records')
         .select('*')
         .eq('patient_id', pId)
-        .ilike('doctor_email', userEmail)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -331,6 +325,12 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
       showAlert('تنبيه', 'يرجى إدخال اسم المريض أولاً.');
       return;
     }
+
+    if (!currentPatientId && !selectedPatientCode) {
+      showAlert('تنبيه هام', 'يجب حفظ بيانات المريض وتأكيد كوده أولاً قبل إضافة الأشعات.');
+      return;
+    }
+
     if (selectedScanFiles.length === 0) {
       showAlert('تنبيه', 'يرجى اختيار صور الأشعة.');
       return;
@@ -343,40 +343,6 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
       const userEmail = session?.user?.email?.toLowerCase();
       let patientCode = selectedPatientCode;
       let patientId = currentPatientId;
-
-      if (!patientId) {
-        const { data: existingPatient } = await supabase
-          .from('patients')
-          .select('id, patient_code')
-          .ilike('full_name', patientName.trim())
-          .ilike('doctor_email', userEmail)
-          .maybeSingle();
-
-        if (existingPatient) {
-          patientId = existingPatient.id;
-          patientCode = existingPatient.patient_code;
-        } else {
-          const generatedCode = 'PAT-' + Math.floor(10000 + Math.random() * 90000);
-          const { data: newPatient, error: pErr } = await supabase
-            .from('patients')
-            .insert([{
-              full_name: patientName.trim(),
-              phone: patientPhone || null,
-              age: age ? parseInt(age) : null,
-              gender: gender,
-              patient_code: generatedCode,
-              doctor_email: userEmail || null
-            }])
-            .select('id, patient_code')
-            .single();
-
-          if (pErr) throw pErr;
-          patientId = newPatient.id;
-          patientCode = newPatient.patient_code;
-        }
-        setSelectedPatientCode(patientCode);
-        setCurrentPatientId(patientId);
-      }
 
       const uploadedList = [];
       const total = selectedScanFiles.length;
@@ -560,7 +526,6 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
         if (clinic.specialty) {
           setRegisteredSpecialty(clinic.specialty);
           
-          // المقارنة تعتمد فقط وحصرياً على النص المكتوب في البروفايل clinic.specialty
           const isMatched = isSpecialtyMatching(initialSpecialty, clinic.specialty);
           
           if (!isMatched) {
@@ -658,7 +623,6 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
     handleSearchPatientByName(dummyName);
   };
 
-  // دالة الذكاء الاصطناعي مع معالجة حكيمة تمنع الانهيار
   const handleClinicalAnalysis = async () => {
     if (!symptomsInput.trim()) {
       showAlert('تنبيه', 'يرجى كتابة الأعراض والشكوى الحالية للمريض أولاً.');
@@ -669,7 +633,6 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
     setAiReport(null);
 
     const activeApiKey = GROQ_API_KEY;
-    const isRheumatology = specialty.includes('روماتيزم') || specialty.includes('روماتويد');
 
     const systemPrompt = `You are an AI Clinical Assistant for a doctor in specialty: ${specialty}.
 Analyze the patient case and respond ONLY with a clean JSON object without Markdown formatting or triple backticks.
@@ -880,6 +843,9 @@ Return JSON ONLY:
         }
       }
 
+      setSelectedPatientCode(patientRealCode);
+      setCurrentPatientId(patientRealId);
+
       if (patientRealId) {
         const { error: recErr } = await supabase
           .from('medical_records')
@@ -920,22 +886,13 @@ Return JSON ONLY:
           clinicName: clinicName,
           specialty: specialty,
           logoUrl: clinicLogoUrl,
-          stampUrl: digitalStampUrl
+          stampUrl: digitalStampUrl,
+          phone: clinicPhone,
+          address: clinicAddress
         }
       );
 
-      setPatientName('');
-      setPatientPhone('');
-      setAge('');
-      setChronicDiseases('');
-      setFamilyHistory('');
-      setSymptomsInput('');
-      setDoctorNotes('');
-      setFinalDiagnosis('');
-      setSelectedPatientCode('');
-      setCurrentPatientId(null);
-      setPrescribedMeds([]);
-      setAiReport(null);
+      await fetchPatientScansByPatientId(patientRealId);
 
     } catch (error) {
       console.error('Detailed Save Error:', error);
@@ -967,6 +924,8 @@ Return JSON ONLY:
       );
     }
   };
+
+  const isPatientSavedInDb = Boolean(currentPatientId || selectedPatientCode);
 
   if (authLoading) {
     return (
@@ -1364,12 +1323,22 @@ Return JSON ONLY:
                 )}
 
                 <Text style={styles.subSectionTitle}>➕ إضافة أشعات وفحوصات جديدة للمريض:</Text>
+                
+                {!isPatientSavedInDb && (
+                  <View style={styles.warningInfoBox}>
+                    <Text style={styles.warningInfoText}>
+                      ⚠️ تنبيه: المريض جديد كلياً. يجب حفظ الكشف والتقرير أولاً لتوليد كود المريض قبل رفع وتثبيت الأشعات.
+                    </Text>
+                  </View>
+                )}
+
                 <TextInput 
-                  style={styles.input} 
+                  style={[styles.input, !isPatientSavedInDb && styles.inputDisabled]} 
                   placeholder="عنوان المرفق (مثال: أشعة سينية جديدة)" 
                   placeholderTextColor="#64748B" 
                   value={scanGroupTitle} 
-                  onChangeText={setScanGroupTitle} 
+                  onChangeText={setScanGroupTitle}
+                  editable={isPatientSavedInDb}
                 />
 
                 {Platform.OS === 'web' ? (
@@ -1377,8 +1346,9 @@ Return JSON ONLY:
                     type="file" 
                     accept="image/*" 
                     multiple
+                    disabled={!isPatientSavedInDb}
                     onChange={handleSelectMultipleScans}
-                    style={{ marginBottom: 12, color: '#00F2FE' }}
+                    style={{ marginBottom: 12, color: isPatientSavedInDb ? '#00F2FE' : '#64748B', opacity: isPatientSavedInDb ? 1 : 0.4, cursor: isPatientSavedInDb ? 'pointer' : 'not-allowed' }}
                   />
                 ) : null}
 
@@ -1409,14 +1379,19 @@ Return JSON ONLY:
                 )}
 
                 <TouchableOpacity 
-                  style={styles.saveScansBtn} 
+                  style={[
+                    styles.saveScansBtn, 
+                    (!isPatientSavedInDb || uploadingScans) && styles.saveScansBtnDisabled
+                  ]} 
                   onPress={handleSaveScansToPatientFile}
-                  disabled={uploadingScans}
+                  disabled={!isPatientSavedInDb || uploadingScans}
                 >
                   {uploadingScans ? (
                     <ActivityIndicator color="#FFFFFF" />
                   ) : (
-                    <Text style={styles.saveScansBtnText}>💾 حفظ وإضافة الأشاعات لملف المريض</Text>
+                    <Text style={styles.saveScansBtnText}>
+                      {isPatientSavedInDb ? '💾 حفظ وإضافة الأشاعات لملف المريض' : '🔒 زر الرفع مقفول (احفظ المريض أولاً)'}
+                    </Text>
                   )}
                 </TouchableOpacity>
               </View>
@@ -1569,6 +1544,7 @@ const styles = StyleSheet.create({
   subSectionTitle: { fontSize: 13, fontWeight: 'bold', color: '#38BDF8', marginTop: 12, marginBottom: 8, textAlign: 'right' },
   label: { fontSize: 12, color: '#CBD5E1', marginBottom: 4, textAlign: 'right' },
   input: { borderWidth: 1, borderColor: '#1E293B', borderRadius: 10, padding: 12, backgroundColor: '#090D16', marginBottom: 12, textAlign: 'right', color: '#FFFFFF', fontSize: 13 },
+  inputDisabled: { opacity: 0.5, backgroundColor: '#1E293B' },
   rowInputs: { flexDirection: 'row-reverse' },
   textArea: { height: 70, textAlignVertical: 'top' },
   
@@ -1601,7 +1577,11 @@ const styles = StyleSheet.create({
   progressBarFill: { height: '100%', backgroundColor: '#059669', position: 'absolute' },
   progressText: { color: '#FFFFFF', fontSize: 10, fontWeight: 'bold', textAlign: 'center', zIndex: 1 },
 
+  warningInfoBox: { backgroundColor: 'rgba(234, 179, 8, 0.15)', padding: 10, borderRadius: 8, borderWidth: 1, borderColor: '#EAB308', marginBottom: 10 },
+  warningInfoText: { color: '#FDE047', fontSize: 11, textAlign: 'right', lineHeight: 18 },
+
   saveScansBtn: { backgroundColor: '#10B981', padding: 14, borderRadius: 10, alignItems: 'center' },
+  saveScansBtnDisabled: { backgroundColor: '#334155', opacity: 0.6 },
   saveScansBtnText: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 13 },
 
   deleteImgBtn: { backgroundColor: '#991B1B', padding: 6, borderRadius: 6, marginTop: 6, alignItems: 'center' },
