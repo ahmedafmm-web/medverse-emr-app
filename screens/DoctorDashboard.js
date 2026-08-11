@@ -275,7 +275,7 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
             const rawUrl = sc.url || sc.publicUrl || sc.publicURL;
             if (rawUrl) {
               allScans.push({ 
-                url: rawUrl, 
+                url: String(rawUrl), 
                 title: sc.title || 'أشعة ومستند طبّي', 
                 recordId: r.id, 
                 date: r.created_at || r.visit_date 
@@ -284,7 +284,7 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
           });
         } else if (df.scanUrl) {
           allScans.push({ 
-            url: df.scanUrl, 
+            url: String(df.scanUrl), 
             title: df.scanTitle || 'أشعة طبية', 
             recordId: r.id, 
             date: r.created_at || r.visit_date 
@@ -388,7 +388,7 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
         let publicUrl = '';
         if (!uploadErr) {
           const { data: urlData } = supabase.storage.from('clinic-assets').getPublicUrl(filePath);
-          publicUrl = urlData?.publicUrl || urlData?.data?.publicUrl || urlData?.publicURL || `https://emynlqikbdwogijqfbfw.supabase.co/storage/v1/object/public/clinic-assets/${filePath}`;
+          publicUrl = urlData?.publicUrl || (urlData?.data ? urlData.data.publicUrl : null) || `https://emynlqikbdwogijqfbfw.supabase.co/storage/v1/object/public/clinic-assets/${filePath}`;
         } else {
           publicUrl = item.previewUrl;
         }
@@ -491,7 +491,7 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
 
   const handleAuth = async () => {
     if (!email.trim() || !password.trim()) {
-      showAlert('تنبيه', 'يرجى إدخل البريد الإلكتروني وكلمة السر.');
+      showAlert('تنبيه', 'يرجى إدخال البريد الإلكتروني وكلمة السر.');
       return;
     }
     setAuthSubmitting(true);
@@ -1071,7 +1071,11 @@ Return JSON ONLY:
           </View>
           {viewingImageModal && (
             <ScrollView contentContainerStyle={{ alignItems: 'center', justifyContent: 'center', flexGrow: 1 }} maximumZoomScale={5} minimumZoomScale={0.5}>
-              <Image source={{ uri: viewingImageModal.url }} style={{ width: 340 * zoomScale, height: 340 * zoomScale, borderRadius: 8, resizeMode: 'contain' }} />
+              <Image 
+                source={{ uri: viewingImageModal.url }} 
+                style={{ width: 340 * zoomScale, height: 340 * zoomScale, borderRadius: 8 }} 
+                resizeMode="contain"
+              />
               <Text style={styles.lightboxTitle}>{viewingImageModal.title}</Text>
             </ScrollView>
           )}
@@ -1341,11 +1345,19 @@ Return JSON ONLY:
                     {patientScansGrid.map((sc, idx) => (
                       <View key={idx} style={styles.scanGridCard}>
                         <TouchableOpacity onPress={() => { setViewingImageModal(sc); setZoomScale(1); }}>
-                          <Image 
-                            source={{ uri: sc.url }} 
-                            style={styles.scanGridImg} 
-                            resizeMode="cover"
-                          />
+                          {Platform.OS === 'web' ? (
+                            <img 
+                              src={sc.url} 
+                              alt={sc.title} 
+                              style={{ width: '100%', height: '90px', borderRadius: '8px', objectFit: 'cover' }} 
+                            />
+                          ) : (
+                            <Image 
+                              source={{ uri: sc.url }} 
+                              style={styles.scanGridImg} 
+                              resizeMode="cover"
+                            />
+                          )}
                         </TouchableOpacity>
                         <Text style={styles.scanGridTitle} numberOfLines={1}>{sc.title}</Text>
                         <TouchableOpacity 
@@ -1395,7 +1407,15 @@ Return JSON ONLY:
                     <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                       {selectedScanFiles.map((item) => (
                         <View key={item.id} style={styles.scanPreviewCard}>
-                          <Image source={{ uri: item.previewUrl }} style={styles.scanPreviewImg} />
+                          {Platform.OS === 'web' ? (
+                            <img 
+                              src={item.previewUrl} 
+                              alt="preview" 
+                              style={{ width: '100px', height: '100px', borderRadius: '6px', objectFit: 'cover' }} 
+                            />
+                          ) : (
+                            <Image source={{ uri: item.previewUrl }} style={styles.scanPreviewImg} />
+                          )}
                           <TouchableOpacity 
                             style={styles.deleteScanBtn}
                             onPress={() => handleRemoveSingleScan(item.id)}
@@ -1682,3 +1702,4 @@ const styles = StyleSheet.create({
   modalGoBtn: { flex: 1.2, backgroundColor: '#0284C7', padding: 10, borderRadius: 8, alignItems: 'center' },
   modalGoBtnText: { color: '#FFFFFF', fontSize: 11, fontWeight: 'bold' }
 });
+ 
