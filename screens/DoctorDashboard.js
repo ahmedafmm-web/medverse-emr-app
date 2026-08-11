@@ -7,6 +7,7 @@ import { generatePrescriptionPDF } from '../components/PDFGenerator';
 import { supabase } from '../supabaseClient';
 import { verifyDoctorAccess } from '../src/services/subscriptionService';
 
+// اعتماد مفتاح البيئة السري المسجل في Vercel مباشرة دون وضع نص صريح
 const GROQ_API_KEY = process.env.EXPO_PUBLIC_GROQ_API_KEY;
 
 const SPECIALITIES_LIST = [
@@ -203,6 +204,7 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
     return () => clearInterval(timer);
   }, [subscriptionAccess.expiryDate]);
 
+  // دالة ضغط محسنة خصيصاً لصور الأشعة بدقة 2400px وجودة 92% لضمان وضوح النصوص وقراءتها برمجياً
   const compressImage = (file, maxWidth = 2400, quality = 0.92) => {
     return new Promise((resolve) => {
       try {
@@ -361,6 +363,7 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
       let patientCode = selectedPatientCode;
       let patientId = currentPatientId;
 
+      // جلب رقم العيادة clinic_id الخاص بالطبيب لمنع خطأ NOT NULL
       let clinicId = null;
       let cQuery = supabase.from('clinics').select('id');
       if (userEmail) cQuery = cQuery.ilike('email', userEmail);
@@ -402,7 +405,7 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
         setScanUploadProgress(Math.round(((i + 1) / total) * 100));
       }
 
-      // إدراج السجل مع تمرير qr_verification_code و clinic_id لمنع أخطاء NOT NULL
+      // تمرير clinic_id و qr_verification_code لتفادي خطأ NOT NULL
       const { error: insertErr } = await supabase.from('medical_records').insert([{
         patient_id: patientId,
         clinic_id: clinicId,
@@ -1341,7 +1344,11 @@ Return JSON ONLY:
                     {patientScansGrid.map((sc, idx) => (
                       <View key={idx} style={styles.scanGridCard}>
                         <TouchableOpacity onPress={() => { setViewingImageModal(sc); setZoomScale(1); }}>
-                          <Image source={{ uri: sc.url }} style={styles.scanGridImg} />
+                          <Image 
+                            source={{ uri: sc.url }} 
+                            style={styles.scanGridImg} 
+                            resizeMode="cover"
+                          />
                         </TouchableOpacity>
                         <Text style={styles.scanGridTitle} numberOfLines={1}>{sc.title}</Text>
                         <TouchableOpacity 
@@ -1601,7 +1608,7 @@ const styles = StyleSheet.create({
 
   scansGridContainer: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 10, marginBottom: 15 },
   scanGridCard: { width: '31%', backgroundColor: '#090D16', padding: 6, borderRadius: 10, alignItems: 'center', borderWidth: 1, borderColor: '#1E293B' },
-  scanGridImg: { width: '100%', height: 90, borderRadius: 8 },
+  scanGridImg: { width: '100%', height: 90, borderRadius: 8, backgroundColor: '#1E293B' },
   scanGridTitle: { color: '#94A3B8', fontSize: 10, marginTop: 4, textAlign: 'center' },
   scanGridDeleteBtn: { backgroundColor: '#991B1B', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, marginTop: 4, width: '100%', alignItems: 'center' },
   scanGridDeleteText: { color: '#FFFFFF', fontSize: 10 },
