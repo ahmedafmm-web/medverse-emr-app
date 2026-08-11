@@ -7,7 +7,6 @@ import { generatePrescriptionPDF } from '../components/PDFGenerator';
 import { supabase } from '../supabaseClient';
 import { verifyDoctorAccess } from '../src/services/subscriptionService';
 
-// اعتماد مفتاح البيئة السري المسجل في Vercel مباشرة دون وضع نص صريح
 const GROQ_API_KEY = process.env.EXPO_PUBLIC_GROQ_API_KEY;
 
 const SPECIALITIES_LIST = [
@@ -273,10 +272,10 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
         
         if (Array.isArray(df.scans_list)) {
           df.scans_list.forEach(sc => {
-            const scanUrl = sc.url || sc.publicUrl || sc.publicURL;
-            if (scanUrl) {
+            const rawUrl = sc.url || sc.publicUrl || sc.publicURL;
+            if (rawUrl) {
               allScans.push({ 
-                url: scanUrl, 
+                url: rawUrl, 
                 title: sc.title || 'أشعة ومستند طبّي', 
                 recordId: r.id, 
                 date: r.created_at || r.visit_date 
@@ -389,7 +388,7 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
         let publicUrl = '';
         if (!uploadErr) {
           const { data: urlData } = supabase.storage.from('clinic-assets').getPublicUrl(filePath);
-          publicUrl = urlData?.publicUrl || urlData?.publicURL || `https://emynlqikbdwogijqfbfw.supabase.co/storage/v1/object/public/clinic-assets/${filePath}`;
+          publicUrl = urlData?.publicUrl || urlData?.data?.publicUrl || urlData?.publicURL || `https://emynlqikbdwogijqfbfw.supabase.co/storage/v1/object/public/clinic-assets/${filePath}`;
         } else {
           publicUrl = item.previewUrl;
         }
@@ -492,7 +491,7 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
 
   const handleAuth = async () => {
     if (!email.trim() || !password.trim()) {
-      showAlert('تنبيه', 'يرجى إدخال البريد الإلكتروني وكلمة السر.');
+      showAlert('تنبيه', 'يرجى إدخل البريد الإلكتروني وكلمة السر.');
       return;
     }
     setAuthSubmitting(true);
