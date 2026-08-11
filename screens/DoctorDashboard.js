@@ -7,7 +7,6 @@ import { generatePrescriptionPDF } from '../components/PDFGenerator';
 import { supabase } from '../supabaseClient';
 import { verifyDoctorAccess } from '../src/services/subscriptionService';
 
-// اعتماد مفتاح البيئة السري المسجل في Vercel مباشرة دون وضع نص صريح
 const GROQ_API_KEY = process.env.EXPO_PUBLIC_GROQ_API_KEY;
 
 const SPECIALITIES_LIST = [
@@ -204,7 +203,6 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
     return () => clearInterval(timer);
   }, [subscriptionAccess.expiryDate]);
 
-  // دالة ضغط محسنة خصيصاً لصور الأشعة بدقة 2400px وجودة 92% لضمان وضوح النصوص وقراءتها برمجياً
   const compressImage = (file, maxWidth = 2400, quality = 0.92) => {
     return new Promise((resolve) => {
       try {
@@ -363,7 +361,6 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
       let patientCode = selectedPatientCode;
       let patientId = currentPatientId;
 
-      // جلب رقم العيادة clinic_id الخاص بالطبيب لمنع خطأ NOT NULL
       let clinicId = null;
       let cQuery = supabase.from('clinics').select('id');
       if (userEmail) cQuery = cQuery.ilike('email', userEmail);
@@ -405,13 +402,14 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
         setScanUploadProgress(Math.round(((i + 1) / total) * 100));
       }
 
-      // تمرير clinic_id المجلوب لتفادي خطأ not-null constraint
+      // إدراج السجل مع تمرير qr_verification_code و clinic_id لمنع أخطاء NOT NULL
       const { error: insertErr } = await supabase.from('medical_records').insert([{
         patient_id: patientId,
         clinic_id: clinicId,
         doctor_email: userEmail,
         visit_date: new Date().toISOString().split('T')[0],
         diagnosis: scanGroupTitle ? `أشعة وفحوصات: ${scanGroupTitle}` : 'أشعة ومستندات مرفقة',
+        qr_verification_code: 'VERIFY-' + patientCode,
         dynamic_fields: { scans_list: uploadedList }
       }]);
 
