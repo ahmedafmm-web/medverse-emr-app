@@ -204,7 +204,8 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
     return () => clearInterval(timer);
   }, [subscriptionAccess.expiryDate]);
 
-  const compressImage = (file, maxWidth = 1400, quality = 0.85) => {
+  // دالة ضغط محسنة خصيصاً لصور الأشعة بدقة 2400px وجودة 92% لضمان وضوح النصوص وقراءتها برمجياً
+  const compressImage = (file, maxWidth = 2400, quality = 0.92) => {
     return new Promise((resolve) => {
       try {
         if (!file || !file.type.includes('image')) return resolve(file);
@@ -223,6 +224,8 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
           canvas.width = width;
           canvas.height = height;
           const ctx = canvas.getContext('2d');
+          ctx.imageSmoothingEnabled = true;
+          ctx.imageSmoothingQuality = 'high';
           ctx.drawImage(img, 0, 0, width, height);
           canvas.toBlob((blob) => resolve(blob || file), 'image/jpeg', quality);
         };
@@ -262,16 +265,27 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
 
       let allScans = [];
       (records || []).forEach(r => {
-        const df = typeof r.dynamic_fields === 'string' 
-          ? JSON.parse(r.dynamic_fields) 
-          : (r.dynamic_fields || {});
-          
+        let df = r.dynamic_fields;
+        if (typeof df === 'string') {
+          try { df = JSON.parse(df); } catch (e) { df = {}; }
+        }
+        
         if (df && Array.isArray(df.scans_list)) {
           df.scans_list.forEach(sc => {
-            allScans.push({ ...sc, recordId: r.id, date: r.created_at || r.visit_date });
+            allScans.push({ 
+              url: sc.url, 
+              title: sc.title || 'أشعة ومستند طبّي', 
+              recordId: r.id, 
+              date: r.created_at || r.visit_date 
+            });
           });
         } else if (df && df.scanUrl) {
-          allScans.push({ url: df.scanUrl, title: df.scanTitle || 'أشعة طبية', recordId: r.id, date: r.created_at });
+          allScans.push({ 
+            url: df.scanUrl, 
+            title: df.scanTitle || 'أشعة طبية', 
+            recordId: r.id, 
+            date: r.created_at || r.visit_date 
+          });
         }
       });
 
@@ -349,7 +363,7 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
 
       for (let i = 0; i < total; i++) {
         const item = selectedScanFiles[i];
-        const compressed = await compressImage(item.file, 1600, 0.9);
+        const compressed = await compressImage(item.file, 2400, 0.92);
         const uniqueId = Math.random().toString(36).substring(2, 9);
         const filePath = `patient_scans/${patientCode}/${Date.now()}_${uniqueId}_${i}.jpg`;
 
@@ -367,7 +381,7 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
 
         uploadedList.push({
           id: Date.now() + '_' + i,
-          title: item.title || scanGroupTitle || 'أشعة وفحص طبي',
+          title: item.title || scanGroupTitle || 'أشعة وفحص طبي بدقة عالية',
           url: publicUrl,
           created_at: new Date().toISOString()
         });
@@ -375,7 +389,7 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
         setScanUploadProgress(Math.round(((i + 1) / total) * 100));
       }
 
-      await supabase.from('medical_records').insert([{
+      const { error: insertErr } = await supabase.from('medical_records').insert([{
         patient_id: patientId,
         doctor_email: userEmail,
         visit_date: new Date().toISOString().split('T')[0],
@@ -383,8 +397,11 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
         dynamic_fields: { scans_list: uploadedList }
       }]);
 
-      showAlert('تم الحفظ بنجاح ✅', `تم حفظ (${uploadedList.length}) أشعة في ملف المريض [${patientCode}].`);
+      if (insertErr) throw insertErr;
+
+      showAlert('تم الحفظ بنجاح ✅', `تم حفظ (${uploadedList.length}) أشعة عالية الدقة في ملف المريض [${patientCode}].`);
       setSelectedScanFiles([]);
+      setScanGroupTitle('');
       await fetchPatientScansByPatientId(patientId);
 
     } catch (err) {
@@ -426,7 +443,7 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
     setLogoUploadProgress(10);
 
     try {
-      const compressedBlob = await compressImage(file, 800, 0.85);
+      const compressedBlob = await compressImage(file, 1000, 0.9);
       setLogoUploadProgress(50);
 
       const filePath = `logos/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
@@ -1019,25 +1036,25 @@ Return JSON ONLY:
 
   return (
     <ScrollView style={styles.container}>
-      {/* Lightbox Modal */}
+      {/* Lightbox Ultra-Zoom Modal */}
       <Modal visible={!!viewingImageModal} transparent animationType="fade">
         <View style={styles.lightboxOverlay}>
           <TouchableOpacity style={styles.lightboxCloseBtn} onPress={() => { setViewingImageModal(null); setZoomScale(1); }}>
             <Text style={styles.lightboxCloseText}>إغلاق ✕</Text>
           </TouchableOpacity>
           <View style={styles.lightboxControls}>
-            <TouchableOpacity style={styles.zoomBtn} onPress={() => setZoomScale(z => Math.min(z + 0.5, 3))}>
-              <Text style={styles.zoomBtnText}>🔍 تكبير (+)</Text>
+            <TouchableOpacity style={styles.zoomBtn} onPress={() => setZoomScale(z => Math.min(z + 0.8, 5))}>
+              <Text style={styles.zoomBtnText}>🔍 تكبير عالي (+)</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.zoomBtn} onPress={() => setZoomScale(1)}>
               <Text style={styles.zoomBtnText}>🔄 إعادة (1x)</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.zoomBtn} onPress={() => setZoomScale(z => Math.max(z - 0.3, 0.5))}>
+            <TouchableOpacity style={styles.zoomBtn} onPress={() => setZoomScale(z => Math.max(z - 0.4, 0.5))}>
               <Text style={styles.zoomBtnText}>🔍 تصغير (-)</Text>
             </TouchableOpacity>
           </View>
           {viewingImageModal && (
-            <ScrollView contentContainerStyle={{ alignItems: 'center', justifyContent: 'center', flexGrow: 1 }}>
+            <ScrollView contentContainerStyle={{ alignItems: 'center', justifyContent: 'center', flexGrow: 1 }} maximumZoomScale={5} minimumZoomScale={0.5}>
               <Image source={{ uri: viewingImageModal.url }} style={{ width: 340 * zoomScale, height: 340 * zoomScale, borderRadius: 8, resizeMode: 'contain' }} />
               <Text style={styles.lightboxTitle}>{viewingImageModal.title}</Text>
             </ScrollView>
