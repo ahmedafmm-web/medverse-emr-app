@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   StyleSheet, Text, View, TextInput, ScrollView, 
-  TouchableOpacity, ActivityIndicator, Platform, Image, Linking 
+  TouchableOpacity, ActivityIndicator, Platform, Image, Linking, Modal 
 } from 'react-native';
 import { supabase } from '../supabaseClient';
 import { generatePrescriptionPDF } from '../components/PDFGenerator';
@@ -13,6 +13,10 @@ export default function PatientPortal({ onBackToDashboard, doctorClinicId }) {
   const [medicalRecords, setMedicalRecords] = useState([]);
   const [doctorInfo, setDoctorInfo] = useState(null);
   const [downloadProgressMap, setDownloadProgressMap] = useState({});
+
+  // حالات المعاينة والتكبير الفائق للأشعة (Lightbox & Zoom)
+  const [viewingScanModal, setViewingScanModal] = useState(null);
+  const [zoomScale, setZoomScale] = useState(1);
 
   const showAlert = (title, message) => {
     if (Platform.OS === 'web') {
@@ -158,9 +162,9 @@ export default function PatientPortal({ onBackToDashboard, doctorClinicId }) {
       const medsList = fields.medications || record.prescriptions || record.medications || [];
 
       const clinicInfo = {
-        doctorName: doctorInfo?.doctor_name || 'د. أحمد محمد',
-        clinicName: doctorInfo?.clinic_name || 'عيادة MedVerse التخصصية',
-        specialty: doctorInfo?.specialty || 'استشاري أمراض القلب والباطنة',
+        doctorName: doctorInfo?.doctor_name || 'د. حسام المنفلوطي',
+        clinicName: doctorInfo?.clinic_name || 'عياده المنفلوطي',
+        specialty: doctorInfo?.specialty || 'استشاري أمراض الروماتيزم والروماتويد والأمراض المناعية',
         logoUrl: doctorInfo?.logo_url || '',
         stampUrl: doctorInfo?.stamp_url || '',
         phone: doctorInfo?.phone || '',
@@ -185,6 +189,44 @@ export default function PatientPortal({ onBackToDashboard, doctorClinicId }) {
 
   return (
     <ScrollView style={styles.container}>
+      {/* Lightbox Ultra-Zoom Modal لمعاينة الأشعة بدقة فائقة للمريض */}
+      <Modal visible={!!viewingScanModal} transparent animationType="fade">
+        <View style={styles.lightboxOverlay}>
+          <TouchableOpacity 
+            style={styles.lightboxCloseBtn} 
+            onPress={() => { setViewingScanModal(null); setZoomScale(1); }}
+          >
+            <Text style={styles.lightboxCloseText}>إغلاق ✕</Text>
+          </TouchableOpacity>
+
+          <View style={styles.lightboxControls}>
+            <TouchableOpacity style={styles.zoomBtn} onPress={() => setZoomScale(z => Math.min(z + 0.8, 5))}>
+              <Text style={styles.zoomBtnText}>🔍 تكبير عالي (+)</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.zoomBtn} onPress={() => setZoomScale(1)}>
+              <Text style={styles.zoomBtnText}>🔄 إعادة (1x)</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.zoomBtn} onPress={() => setZoomScale(z => Math.max(z - 0.4, 0.5))}>
+              <Text style={styles.zoomBtnText}>🔍 تصغير (-)</Text>
+            </TouchableOpacity>
+          </View>
+
+          {viewingScanModal && (
+            <ScrollView 
+              contentContainerStyle={{ alignItems: 'center', justifyContent: 'center', flexGrow: 1 }} 
+              maximumZoomScale={5} 
+              minimumZoomScale={0.5}
+            >
+              <Image 
+                source={{ uri: viewingScanModal.url }} 
+                style={{ width: 340 * zoomScale, height: 340 * zoomScale, borderRadius: 8, resizeMode: 'contain' }} 
+              />
+              <Text style={styles.lightboxTitle}>{viewingScanModal.title}</Text>
+            </ScrollView>
+          )}
+        </View>
+      </Modal>
+
       <View style={styles.header}>
         {doctorInfo?.logo_url ? (
           <Image source={{ uri: doctorInfo.logo_url }} style={styles.headerLogo} resizeMode="contain" />
@@ -201,7 +243,7 @@ export default function PatientPortal({ onBackToDashboard, doctorClinicId }) {
           <Text style={styles.label}>أدخل كود المريض الخاص بك (Patient ID):</Text>
           <TextInput
             style={styles.input}
-            placeholder="مثال: PAT-65630"
+            placeholder="مثال: PAT-83207"
             placeholderTextColor="#64748B"
             value={patientCode}
             onChangeText={setPatientCode}
@@ -249,8 +291,14 @@ export default function PatientPortal({ onBackToDashboard, doctorClinicId }) {
             </View>
           ) : (
             medicalRecords.map((item, idx) => {
-              const fields = item.dynamic_fields || {};
-              const scansList = fields.scans_list || (fields.scanUrl ? [{ url: fields.scanUrl, title: fields.scanTitle || 'أشعة طبية' }] : []);
+              let df = item.dynamic_fields;
+              if (typeof df === 'string') {
+                try { df = JSON.parse(df); } catch (e) { df = {}; }
+              } else {
+                df = df || {};
+              }
+
+              const scansList = df.scans_list || (df.scanUrl ? [{ url: df.scanUrl, title: df.scanTitle || 'أشعة طبية' }] : []);
 
               return (
                 <View key={item.id || idx} style={styles.recordCard}>
@@ -275,8 +323,18 @@ export default function PatientPortal({ onBackToDashboard, doctorClinicId }) {
 
                         return (
                           <View key={sIdx} style={styles.scanItemCard}>
-                            <Image source={{ uri: scanItem.url }} style={styles.scanImage} resizeMode="contain" />
+                            <TouchableOpacity onPress={() => { setViewingScanModal(scanItem); setZoomScale(1); }}>
+                              <Image source={{ uri: scanItem.url }} style={styles.scanImage} resizeMode="cover" />
+                            </TouchableOpacity>
+                            
                             <Text style={styles.scanTitle}>{scanItem.title || 'صورة أشعة عالية الدقة'}</Text>
+
+                            <TouchableOpacity 
+                              style={styles.previewBtn}
+                              onPress={() => { setViewingScanModal(scanItem); setZoomScale(1); }}
+                            >
+                              <Text style={styles.previewBtnText}>🔍 معاينة وتكبير الأشعة (Ultra Zoom)</Text>
+                            </TouchableOpacity>
 
                             {progress !== undefined && progress !== null && (
                               <View style={styles.downloadProgressBarBox}>
@@ -347,6 +405,8 @@ const styles = StyleSheet.create({
   scanItemCard: { backgroundColor: '#131C2E', padding: 10, borderRadius: 8, marginBottom: 12, alignItems: 'center', borderWidth: 1, borderColor: '#1E293B' },
   scanImage: { width: '100%', height: 220, borderRadius: 6, backgroundColor: '#000' },
   scanTitle: { fontSize: 12, fontWeight: 'bold', color: '#F8FAFC', marginTop: 6, textAlign: 'center' },
+  previewBtn: { backgroundColor: '#1E293B', padding: 8, borderRadius: 6, width: '100%', alignItems: 'center', marginTop: 6, borderWidth: 1, borderColor: '#0284C7' },
+  previewBtnText: { color: '#00F2FE', fontSize: 11, fontWeight: 'bold' },
   downloadScanBtn: { backgroundColor: '#10B981', padding: 10, borderRadius: 6, width: '100%', alignItems: 'center', marginTop: 8 },
   downloadScanBtnText: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 11 },
   downloadProgressBarBox: { width: '100%', height: 16, backgroundColor: '#090D16', borderRadius: 8, overflow: 'hidden', marginTop: 8, justifyContent: 'center', borderWidth: 1, borderColor: '#1E293B' },
@@ -355,6 +415,13 @@ const styles = StyleSheet.create({
   downloadPdfBtn: { backgroundColor: '#0284C7', padding: 12, borderRadius: 8, alignItems: 'center' },
   downloadPdfBtnText: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 13 },
   emptyBox: { padding: 20, alignItems: 'center' },
-  emptyText: { color: '#64748B', fontSize: 13 }
+  emptyText: { color: '#64748B', fontSize: 13 },
+  lightboxOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.95)', justifyContent: 'center', alignItems: 'center', padding: 20 },
+  lightboxCloseBtn: { position: 'absolute', top: 20, right: 20, backgroundColor: '#EF4444', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6, zIndex: 10 },
+  lightboxCloseText: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 12 },
+  lightboxControls: { position: 'absolute', bottom: 30, flexDirection: 'row-reverse', gap: 10, zIndex: 10 },
+  zoomBtn: { backgroundColor: '#0284C7', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 6 },
+  zoomBtnText: { color: '#FFFFFF', fontSize: 11, fontWeight: 'bold' },
+  lightboxTitle: { color: '#00F2FE', fontSize: 13, fontWeight: 'bold', marginTop: 12, textAlign: 'center' }
 });
  
