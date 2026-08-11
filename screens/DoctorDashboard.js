@@ -268,18 +268,22 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
         let df = r.dynamic_fields;
         if (typeof df === 'string') {
           try { df = JSON.parse(df); } catch (e) { df = {}; }
+        } else {
+          df = df || {};
         }
         
-        if (df && Array.isArray(df.scans_list)) {
+        if (Array.isArray(df.scans_list)) {
           df.scans_list.forEach(sc => {
-            allScans.push({ 
-              url: sc.url, 
-              title: sc.title || 'أشعة ومستند طبّي', 
-              recordId: r.id, 
-              date: r.created_at || r.visit_date 
-            });
+            if (sc.url) {
+              allScans.push({ 
+                url: sc.url, 
+                title: sc.title || 'أشعة ومستند طبّي', 
+                recordId: r.id, 
+                date: r.created_at || r.visit_date 
+              });
+            }
           });
-        } else if (df && df.scanUrl) {
+        } else if (df.scanUrl) {
           allScans.push({ 
             url: df.scanUrl, 
             title: df.scanTitle || 'أشعة طبية', 
