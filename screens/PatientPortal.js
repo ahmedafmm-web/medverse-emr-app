@@ -14,7 +14,7 @@ export default function PatientPortal({ onBackToDashboard, doctorClinicId }) {
   const [doctorInfo, setDoctorInfo] = useState(null);
   const [downloadProgressMap, setDownloadProgressMap] = useState({});
 
-  // حالات المعاينة والتكبير الفائق للأشعة (Lightbox & Zoom)
+  // حالات المعاينة والتكبير الفائق للأشعة (Lightbox & Zoom) للمريض
   const [viewingScanModal, setViewingScanModal] = useState(null);
   const [zoomScale, setZoomScale] = useState(1);
 
