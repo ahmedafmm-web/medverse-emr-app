@@ -217,10 +217,18 @@ export default function PatientPortal({ onBackToDashboard, doctorClinicId }) {
               maximumZoomScale={5} 
               minimumZoomScale={0.5}
             >
-              <Image 
-                source={{ uri: viewingScanModal.url }} 
-                style={{ width: 340 * zoomScale, height: 340 * zoomScale, borderRadius: 8, resizeMode: 'contain' }} 
-              />
+              {Platform.OS === 'web' ? (
+                <img 
+                  src={viewingScanModal.url} 
+                  alt={viewingScanModal.title} 
+                  style={{ width: 340 * zoomScale, height: 340 * zoomScale, borderRadius: '8px', objectFit: 'contain' }} 
+                />
+              ) : (
+                <Image 
+                  source={{ uri: viewingScanModal.url }} 
+                  style={{ width: 340 * zoomScale, height: 340 * zoomScale, borderRadius: 8, resizeMode: 'contain' }} 
+                />
+              )}
               <Text style={styles.lightboxTitle}>{viewingScanModal.title}</Text>
             </ScrollView>
           )}
@@ -319,19 +327,28 @@ export default function PatientPortal({ onBackToDashboard, doctorClinicId }) {
                       <Text style={styles.scansHeaderTitle}>🖼️ مرفقات صور الأشعة المرفوعة ({scansList.length}):</Text>
                       
                       {scansList.map((scanItem, sIdx) => {
-                        const progress = downloadProgressMap[scanItem.url];
+                        const scanUrl = scanItem.url || scanItem.publicUrl || scanItem.publicURL;
+                        const progress = downloadProgressMap[scanUrl];
 
                         return (
                           <View key={sIdx} style={styles.scanItemCard}>
-                            <TouchableOpacity onPress={() => { setViewingScanModal(scanItem); setZoomScale(1); }}>
-                              <Image source={{ uri: scanItem.url }} style={styles.scanImage} resizeMode="cover" />
+                            <TouchableOpacity onPress={() => { setViewingScanModal({ ...scanItem, url: scanUrl }); setZoomScale(1); }}>
+                              {Platform.OS === 'web' ? (
+                                <img 
+                                  src={scanUrl} 
+                                  alt={scanItem.title || 'صورة أشعة'} 
+                                  style={{ width: '100%', height: '220px', borderRadius: '6px', objectFit: 'cover', backgroundColor: '#1E293B' }} 
+                                />
+                              ) : (
+                                <Image source={{ uri: scanUrl }} style={styles.scanImage} resizeMode="cover" />
+                              )}
                             </TouchableOpacity>
                             
                             <Text style={styles.scanTitle}>{scanItem.title || 'صورة أشعة عالية الدقة'}</Text>
 
                             <TouchableOpacity 
                               style={styles.previewBtn}
-                              onPress={() => { setViewingScanModal(scanItem); setZoomScale(1); }}
+                              onPress={() => { setViewingScanModal({ ...scanItem, url: scanUrl }); setZoomScale(1); }}
                             >
                               <Text style={styles.previewBtnText}>🔍 معاينة وتكبير الأشعة (Ultra Zoom)</Text>
                             </TouchableOpacity>
@@ -345,7 +362,7 @@ export default function PatientPortal({ onBackToDashboard, doctorClinicId }) {
 
                             <TouchableOpacity
                               style={styles.downloadScanBtn}
-                              onPress={() => handleDownloadSingleScan(scanItem.url, scanItem.title)}
+                              onPress={() => handleDownloadSingleScan(scanUrl, scanItem.title)}
                             >
                               <Text style={styles.downloadScanBtnText}>⬇️ تنزيل الأشعة بجودة عالية (High-Res Image)</Text>
                             </TouchableOpacity>
@@ -403,7 +420,7 @@ const styles = StyleSheet.create({
   scansContainer: { backgroundColor: '#090D16', padding: 12, borderRadius: 10, marginBottom: 15, borderWidth: 1, borderColor: '#1E293B' },
   scansHeaderTitle: { fontSize: 12, fontWeight: 'bold', color: '#00F2FE', marginBottom: 10, textAlign: 'right' },
   scanItemCard: { backgroundColor: '#131C2E', padding: 10, borderRadius: 8, marginBottom: 12, alignItems: 'center', borderWidth: 1, borderColor: '#1E293B' },
-  scanImage: { width: '100%', height: 220, borderRadius: 6, backgroundColor: '#000' },
+  scanImage: { width: '100%', height: 220, borderRadius: 6, backgroundColor: '#1E293B' },
   scanTitle: { fontSize: 12, fontWeight: 'bold', color: '#F8FAFC', marginTop: 6, textAlign: 'center' },
   previewBtn: { backgroundColor: '#1E293B', padding: 8, borderRadius: 6, width: '100%', alignItems: 'center', marginTop: 6, borderWidth: 1, borderColor: '#0284C7' },
   previewBtnText: { color: '#00F2FE', fontSize: 11, fontWeight: 'bold' },
