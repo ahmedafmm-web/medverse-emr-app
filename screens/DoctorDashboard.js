@@ -204,7 +204,6 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
     return () => clearInterval(timer);
   }, [subscriptionAccess.expiryDate]);
 
-  // دالة ضغط محسنة خصيصاً لصور الأشعة بدقة 2400px وجودة 92% لضمان وضوح النصوص وقراءتها برمجياً
   const compressImage = (file, maxWidth = 2400, quality = 0.92) => {
     return new Promise((resolve) => {
       try {
@@ -274,9 +273,10 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
         
         if (Array.isArray(df.scans_list)) {
           df.scans_list.forEach(sc => {
-            if (sc.url) {
+            const scanUrl = sc.url || sc.publicUrl || sc.publicURL;
+            if (scanUrl) {
               allScans.push({ 
-                url: sc.url, 
+                url: scanUrl, 
                 title: sc.title || 'أشعة ومستند طبّي', 
                 recordId: r.id, 
                 date: r.created_at || r.visit_date 
@@ -363,7 +363,6 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
       let patientCode = selectedPatientCode;
       let patientId = currentPatientId;
 
-      // جلب رقم العيادة clinic_id الخاص بالطبيب لمنع خطأ NOT NULL
       let clinicId = null;
       let cQuery = supabase.from('clinics').select('id');
       if (userEmail) cQuery = cQuery.ilike('email', userEmail);
@@ -390,7 +389,7 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
         let publicUrl = '';
         if (!uploadErr) {
           const { data: urlData } = supabase.storage.from('clinic-assets').getPublicUrl(filePath);
-          publicUrl = urlData.publicUrl;
+          publicUrl = urlData?.publicUrl || urlData?.publicURL || `https://emynlqikbdwogijqfbfw.supabase.co/storage/v1/object/public/clinic-assets/${filePath}`;
         } else {
           publicUrl = item.previewUrl;
         }
@@ -405,7 +404,6 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
         setScanUploadProgress(Math.round(((i + 1) / total) * 100));
       }
 
-      // تمرير clinic_id و qr_verification_code لتفادي خطأ NOT NULL
       const { error: insertErr } = await supabase.from('medical_records').insert([{
         patient_id: patientId,
         clinic_id: clinicId,
