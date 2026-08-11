@@ -355,8 +355,20 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
 
     try {
       const userEmail = session?.user?.email?.toLowerCase();
+      const currentUserId = session?.user?.id;
       let patientCode = selectedPatientCode;
       let patientId = currentPatientId;
+
+      // جلب رقم العيادة clinic_id الخاص بالطبيب لمنع خطأ NOT NULL
+      let clinicId = null;
+      let cQuery = supabase.from('clinics').select('id');
+      if (userEmail) cQuery = cQuery.ilike('email', userEmail);
+      else if (currentUserId) cQuery = cQuery.eq('user_id', currentUserId);
+
+      const { data: existingClinic } = await cQuery.limit(1).maybeSingle();
+      if (existingClinic) {
+        clinicId = existingClinic.id;
+      }
 
       const uploadedList = [];
       const total = selectedScanFiles.length;
@@ -389,8 +401,10 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
         setScanUploadProgress(Math.round(((i + 1) / total) * 100));
       }
 
+      // تمرير clinic_id المجلوب لتفادي خطأ not-null constraint
       const { error: insertErr } = await supabase.from('medical_records').insert([{
         patient_id: patientId,
+        clinic_id: clinicId,
         doctor_email: userEmail,
         visit_date: new Date().toISOString().split('T')[0],
         diagnosis: scanGroupTitle ? `أشعة وفحوصات: ${scanGroupTitle}` : 'أشعة ومستندات مرفقة',
