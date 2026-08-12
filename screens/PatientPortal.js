@@ -6,8 +6,8 @@ import {
 import { supabase } from '../supabaseClient';
 import { generatePrescriptionPDF } from '../components/PDFGenerator';
 
-export default function PatientPortal({ onBackToDashboard, doctorClinicId }) {
-  const [patientCode, setPatientCode] = useState('');
+export default function PatientPortal({ onBackToDashboard, doctorClinicId, initialPatientCode }) {
+  const [patientCode, setPatientCode] = useState(initialPatientCode || '');
   const [loading, setLoading] = useState(false);
   const [patientData, setPatientData] = useState(null);
   const [medicalRecords, setMedicalRecords] = useState([]);
@@ -30,7 +30,7 @@ export default function PatientPortal({ onBackToDashboard, doctorClinicId }) {
     let cId = doctorClinicId;
     if (Platform.OS === 'web' && typeof window !== 'undefined') {
       const urlParams = new URLSearchParams(window.location.search);
-      const queryCode = urlParams.get('c');
+      const queryCode = urlParams.get('c') || urlParams.get('clinic') || urlParams.get('patient');
       if (queryCode) {
         cId = queryCode;
         if (queryCode.startsWith('PAT-')) {
@@ -40,19 +40,34 @@ export default function PatientPortal({ onBackToDashboard, doctorClinicId }) {
           fetchClinicHeader(queryCode);
         }
       }
+    } else if (cId) {
+      fetchClinicHeader(cId);
     }
-  }, [doctorClinicId]);
 
+    if (initialPatientCode) {
+      handleFetchRecords(initialPatientCode);
+    }
+  }, [doctorClinicId, initialPatientCode]);
+
+  // دالة جلب هيدر العيادة المحدثة لتقبل المعرف بكافة أشكاله (id, email, user_id)
   const fetchClinicHeader = async (identifier) => {
+    if (!identifier) return;
     try {
       let query = supabase
         .from('clinics')
         .select('doctor_name, clinic_name, specialty, logo_url, stamp_url, phone, address, email');
 
-      query = query.or(`id.eq.${identifier},user_id.eq.${identifier}`);
+      if (identifier.includes('@')) {
+        query = query.ilike('email', identifier.toLowerCase());
+      } else {
+        query = query.or(`id.eq.${identifier},user_id.eq.${identifier}`);
+      }
+
       const { data, error } = await query.limit(1).maybeSingle();
 
-      if (!error && data) setDoctorInfo(data);
+      if (!error && data) {
+        setDoctorInfo(data);
+      }
     } catch (err) {
       console.error('Fetch Clinic Header Error:', err);
     }
@@ -441,4 +456,3 @@ const styles = StyleSheet.create({
   zoomBtnText: { color: '#FFFFFF', fontSize: 11, fontWeight: 'bold' },
   lightboxTitle: { color: '#00F2FE', fontSize: 13, fontWeight: 'bold', marginTop: 12, textAlign: 'center' }
 });
- 
