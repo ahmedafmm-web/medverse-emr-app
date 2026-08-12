@@ -76,7 +76,6 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
   const [subscriptionAccess, setSubscriptionAccess] = useState({ allowed: true, daysLeft: null, expiryDate: null, message: '', showAlert: false });
   const [dynamicTimeLeftText, setDynamicTimeLeftText] = useState('');
 
-  // استرجاع التاب المفتوح سابقاً لحفظ الحالة عند الـ Refresh
   const [activeTab, setActiveTab] = useState(() => {
     if (Platform.OS === 'web' && typeof window !== 'undefined' && window.localStorage) {
       return localStorage.getItem('medverse_doctor_active_tab') || 'prescription';
@@ -545,7 +544,6 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
     setSession(null);
   };
 
-  // دالة نسخ رابط العيادة المخصص للمرضى بالاعتماد الصريح على معرف العيادة الحقيقي
   const handleCopyPortalLink = async () => {
     try {
       const userEmail = session?.user?.email?.toLowerCase();
@@ -1169,7 +1167,7 @@ Return JSON ONLY:
         </View>
       )}
 
-      {/* Header */}
+      {/* Header With Neon Glow & DEVEXT Branding */}
       <View style={styles.header}>
         <View style={styles.topUserRow}>
           <Text style={styles.userEmailText}>⚡ {clinicDoctorName} ({session?.user?.email})</Text>
@@ -1182,7 +1180,14 @@ Return JSON ONLY:
             <Text style={styles.signOutText}>خروج ✕</Text>
           </TouchableOpacity>
         </View>
+
         <Text style={styles.title}>MedVerse Smart EMR Suite</Text>
+
+        <View style={styles.brandRow}>
+          <Text style={styles.brandTag}>POWERED BY</Text>
+          <Text style={styles.brandSubtitle}>DEVEXT</Text>
+        </View>
+
         <Text style={styles.subtitle}>منظومة إدارة العيادات والأشعة الذكية ({specialty})</Text>
       </View>
 
@@ -1592,12 +1597,32 @@ Return JSON ONLY:
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#090D16', padding: 14 },
-  header: { marginBottom: 15, alignItems: 'center', marginTop: 10 },
-  title: { fontSize: 22, fontWeight: '900', color: '#00F2FE', letterSpacing: 0.5 },
-  subtitle: { fontSize: 12, color: '#94A3B8', marginTop: 3, fontWeight: '600' },
+  container: { flex: 1, backgroundColor: '#060911', padding: 14 },
+  header: { marginBottom: 20, alignItems: 'center', marginTop: 10 },
+  title: { 
+    fontSize: 26, 
+    fontWeight: '900', 
+    color: '#00F2FE', 
+    letterSpacing: 0.5,
+    textAlign: 'center',
+    textShadowColor: 'rgba(0, 242, 254, 0.4)',
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 15
+  },
+  brandRow: { flexDirection: 'row', alignItems: 'center', marginTop: 4, marginBottom: 4, gap: 6 },
+  brandTag: { fontSize: 10, color: '#64748B', fontWeight: 'bold', letterSpacing: 1 },
+  brandSubtitle: { 
+    fontSize: 13, 
+    fontWeight: '900', 
+    color: '#38BDF8', 
+    letterSpacing: 2.5, 
+    textShadowColor: 'rgba(56, 189, 248, 0.5)',
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 10 
+  },
+  subtitle: { fontSize: 12, color: '#94A3B8', marginTop: 3, fontWeight: '600', textAlign: 'center' },
 
-  topUserRow: { flexDirection: 'row-reverse', justifyContent: 'space-between', width: '100%', marginBottom: 10, alignItems: 'center' },
+  topUserRow: { flexDirection: 'row-reverse', justifyContent: 'space-between', width: '100%', marginBottom: 12, alignItems: 'center' },
   userEmailText: { color: '#38BDF8', fontSize: 11, fontWeight: 'bold' },
   signOutBtn: { backgroundColor: '#1E293B', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, borderWidth: 1, borderColor: '#334155' },
   signOutText: { color: '#EF4444', fontSize: 11, fontWeight: 'bold' },
@@ -1611,7 +1636,7 @@ const styles = StyleSheet.create({
   renewQuickBtn: { backgroundColor: '#10B981', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6 },
   renewQuickBtnText: { color: '#FFFFFF', fontSize: 11, fontWeight: 'bold' },
 
-  authCard: { backgroundColor: '#131C2E', padding: 20, borderRadius: 16, borderWidth: 1, borderColor: '#1E293B' },
+  authCard: { backgroundColor: '#0F172A', padding: 22, borderRadius: 18, borderWidth: 1, borderColor: '#1E293B', boxShadow: '0 8px 24px rgba(0,0,0,0.4)' },
   authTitle: { fontSize: 20, fontWeight: 'bold', color: '#00F2FE', textAlign: 'center', marginBottom: 5 },
   authSub: { fontSize: 13, color: '#94A3B8', textAlign: 'center', marginBottom: 20 },
   authSubmitBtn: { backgroundColor: '#0284C7', padding: 14, borderRadius: 10, alignItems: 'center', marginTop: 10 },
@@ -1619,11 +1644,11 @@ const styles = StyleSheet.create({
   authToggleBtn: { marginTop: 15, alignItems: 'center' },
   authToggleBtnText: { color: '#38BDF8', fontSize: 12 },
 
-  paywallCard: { backgroundColor: '#131C2E', padding: 20, borderRadius: 16, borderWidth: 1, borderColor: '#EF4444', alignItems: 'center' },
+  paywallCard: { backgroundColor: '#0F172A', padding: 20, borderRadius: 18, borderWidth: 1, borderColor: '#EF4444', alignItems: 'center' },
   paywallIcon: { fontSize: 40, marginBottom: 10 },
   paywallTitle: { fontSize: 20, fontWeight: 'bold', color: '#EF4444', marginBottom: 8 },
   paywallReason: { fontSize: 13, color: '#FCA5A5', textAlign: 'center', marginBottom: 20, lineHeight: 20 },
-  paywallInfoBox: { backgroundColor: '#090D16', padding: 15, borderRadius: 10, width: '100%', marginBottom: 15, borderWidth: 1, borderColor: '#1E293B' },
+  paywallInfoBox: { backgroundColor: '#060911', padding: 15, borderRadius: 10, width: '100%', marginBottom: 15, borderWidth: 1, borderColor: '#1E293B' },
   paywallInfoTitle: { fontSize: 13, fontWeight: 'bold', color: '#38BDF8', marginBottom: 10, textAlign: 'right' },
   paymentMethodRow: { marginBottom: 12 },
   paymentMethodText: { fontSize: 12, color: '#CBD5E1', textAlign: 'right', marginBottom: 4 },
@@ -1635,30 +1660,30 @@ const styles = StyleSheet.create({
   whatsappBtnText: { color: '#FFFFFF', fontSize: 13, fontWeight: 'bold' },
   paywallSignOutBtn: { marginTop: 5 },
 
-  navBar: { flexDirection: 'row-reverse', backgroundColor: '#131C2E', borderRadius: 12, padding: 4, marginBottom: 15, borderWidth: 1, borderColor: '#1E293B' },
+  navBar: { flexDirection: 'row-reverse', backgroundColor: '#0F172A', borderRadius: 12, padding: 4, marginBottom: 18, borderWidth: 1, borderColor: '#1E293B' },
   navBtn: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 8 },
   navBtnActive: { backgroundColor: '#0284C7' },
   navBtnText: { color: '#94A3B8', fontSize: 12, fontWeight: 'bold' },
   navBtnTextActive: { color: '#FFFFFF' },
 
-  card: { backgroundColor: '#131C2E', padding: 16, borderRadius: 16, marginBottom: 15, borderWidth: 1, borderColor: '#1E293B' },
+  card: { backgroundColor: '#0F172A', padding: 18, borderRadius: 18, marginBottom: 16, borderWidth: 1, borderColor: '#1E293B', boxShadow: '0 8px 24px rgba(0,0,0,0.3)' },
   cardHeaderRow: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
   dummyBtn: { backgroundColor: '#0284C7', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6 },
   dummyBtnText: { color: '#FFFFFF', fontSize: 11, fontWeight: 'bold' },
   sectionTitle: { fontSize: 15, fontWeight: 'bold', color: '#F8FAFC', marginBottom: 10, textAlign: 'right' },
   subSectionTitle: { fontSize: 13, fontWeight: 'bold', color: '#38BDF8', marginTop: 12, marginBottom: 8, textAlign: 'right' },
   label: { fontSize: 12, color: '#CBD5E1', marginBottom: 4, textAlign: 'right' },
-  input: { borderWidth: 1, borderColor: '#1E293B', borderRadius: 10, padding: 12, backgroundColor: '#090D16', marginBottom: 12, textAlign: 'right', color: '#FFFFFF', fontSize: 13 },
+  input: { borderWidth: 1, borderColor: '#1E293B', borderRadius: 10, padding: 12, backgroundColor: '#060911', marginBottom: 12, textAlign: 'right', color: '#FFFFFF', fontSize: 13 },
   inputDisabled: { opacity: 0.5, backgroundColor: '#1E293B' },
   rowInputs: { flexDirection: 'row-reverse' },
   textArea: { height: 70, textAlignVertical: 'top' },
   
-  specChip: { backgroundColor: '#090D16', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, marginRight: 8, borderWidth: 1, borderColor: '#1E293B' },
+  specChip: { backgroundColor: '#060911', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, marginRight: 8, borderWidth: 1, borderColor: '#1E293B' },
   specChipActive: { backgroundColor: '#0284C7', borderColor: '#00F2FE' },
   specChipText: { color: '#94A3B8', fontSize: 11 },
   specChipTextActive: { color: '#FFFFFF', fontWeight: 'bold' },
 
-  patientChip: { backgroundColor: '#090D16', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, marginRight: 6, borderWidth: 1, borderColor: '#1E293B' },
+  patientChip: { backgroundColor: '#060911', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, marginRight: 6, borderWidth: 1, borderColor: '#1E293B' },
   patientChipActive: { backgroundColor: '#0369A1', borderColor: '#00F2FE' },
   patientChipText: { color: '#CBD5E1', fontSize: 11 },
   patientChipTextActive: { color: '#FFFFFF', fontWeight: 'bold' },
@@ -1666,19 +1691,19 @@ const styles = StyleSheet.create({
   whatsappShareBtn: { backgroundColor: '#16A34A', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6, marginBottom: 10 },
   whatsappShareBtnText: { color: '#FFFFFF', fontSize: 11, fontWeight: 'bold' },
 
-  scanPreviewCard: { marginRight: 10, backgroundColor: '#090D16', padding: 6, borderRadius: 8, alignItems: 'center', borderWidth: 1, borderColor: '#1E293B' },
+  scanPreviewCard: { marginRight: 10, backgroundColor: '#060911', padding: 6, borderRadius: 8, alignItems: 'center', borderWidth: 1, borderColor: '#1E293B' },
   scanPreviewImg: { width: 100, height: 100, borderRadius: 6 },
   deleteScanBtn: { backgroundColor: '#991B1B', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4, marginTop: 4 },
   deleteScanBtnText: { color: '#FFFFFF', fontSize: 10, fontWeight: 'bold' },
 
   scansGridContainer: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 10, marginBottom: 15 },
-  scanGridCard: { width: '31%', backgroundColor: '#090D16', padding: 6, borderRadius: 10, alignItems: 'center', borderWidth: 1, borderColor: '#1E293B' },
+  scanGridCard: { width: '31%', backgroundColor: '#060911', padding: 6, borderRadius: 10, alignItems: 'center', borderWidth: 1, borderColor: '#1E293B' },
   scanGridImg: { width: '100%', height: 90, borderRadius: 8, backgroundColor: '#1E293B' },
   scanGridTitle: { color: '#94A3B8', fontSize: 10, marginTop: 4, textAlign: 'center' },
   scanGridDeleteBtn: { backgroundColor: '#991B1B', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, marginTop: 4, width: '100%', alignItems: 'center' },
   scanGridDeleteText: { color: '#FFFFFF', fontSize: 10 },
 
-  progressBarContainer: { height: 18, backgroundColor: '#090D16', borderRadius: 9, overflow: 'hidden', marginBottom: 12, justifyContent: 'center', borderWidth: 1, borderColor: '#1E293B' },
+  progressBarContainer: { height: 18, backgroundColor: '#060911', borderRadius: 9, overflow: 'hidden', marginBottom: 12, justifyContent: 'center', borderWidth: 1, borderColor: '#1E293B' },
   progressBarFill: { height: '100%', backgroundColor: '#059669', position: 'absolute' },
   progressText: { color: '#FFFFFF', fontSize: 10, fontWeight: 'bold', textAlign: 'center', zIndex: 1 },
 
@@ -1692,40 +1717,40 @@ const styles = StyleSheet.create({
   deleteImgBtn: { backgroundColor: '#991B1B', padding: 6, borderRadius: 6, marginTop: 6, alignItems: 'center' },
   deleteImgBtnText: { color: '#FFFFFF', fontSize: 11, fontWeight: 'bold' },
 
-  linkCardBox: { backgroundColor: '#090D16', padding: 12, borderRadius: 8, marginBottom: 15, borderWidth: 1, borderColor: '#0284C7' },
+  linkCardBox: { backgroundColor: '#060911', padding: 12, borderRadius: 8, marginBottom: 15, borderWidth: 1, borderColor: '#0284C7' },
   linkBoxTitle: { fontSize: 13, fontWeight: 'bold', color: '#00F2FE', textAlign: 'right' },
   linkBoxSub: { fontSize: 11, color: '#94A3B8', textAlign: 'right', marginTop: 2, marginBottom: 8 },
   copyLinkBtn: { backgroundColor: '#0284C7', padding: 10, borderRadius: 6, alignItems: 'center' },
   copyLinkBtnText: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 12 },
 
-  previewBox: { backgroundColor: '#090D16', padding: 10, borderRadius: 8, alignItems: 'center', marginBottom: 12, borderWidth: 1, borderColor: '#1E293B' },
+  previewBox: { backgroundColor: '#060911', padding: 10, borderRadius: 8, alignItems: 'center', marginBottom: 12, borderWidth: 1, borderColor: '#1E293B' },
   stampImage: { width: 120, height: 80, marginTop: 5 },
   saveProfileBtn: { backgroundColor: '#10B981', padding: 12, borderRadius: 8, alignItems: 'center', marginTop: 5 },
   saveProfileBtnText: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 13 },
 
-  patientListItem: { backgroundColor: '#090D16', padding: 12, borderRadius: 8, marginBottom: 8, borderWidth: 1, borderColor: '#1E293B' },
+  patientListItem: { backgroundColor: '#060911', padding: 12, borderRadius: 8, marginBottom: 8, borderWidth: 1, borderColor: '#1E293B' },
   patientItemName: { fontSize: 14, fontWeight: 'bold', color: '#FFFFFF' },
   patientItemCode: { fontSize: 12, color: '#00F2FE', fontWeight: 'bold' },
   patientItemSub: { fontSize: 11, color: '#94A3B8', textAlign: 'right', marginTop: 4 },
   emptyText: { color: '#64748B', fontSize: 12, textAlign: 'center', marginVertical: 10 },
 
-  historyRecordCard: { backgroundColor: '#090D16', padding: 12, borderRadius: 10, marginBottom: 8, borderWidth: 1, borderColor: '#1E293B' },
+  historyRecordCard: { backgroundColor: '#060911', padding: 12, borderRadius: 10, marginBottom: 8, borderWidth: 1, borderColor: '#1E293B' },
   historyDate: { color: '#38BDF8', fontSize: 11, fontWeight: 'bold', textAlign: 'right' },
   historyDiagnosis: { color: '#F8FAFC', fontSize: 13, marginTop: 4, textAlign: 'right' },
 
-  aiButton: { backgroundColor: '#0284C7', padding: 12, borderRadius: 8, alignItems: 'center', marginBottom: 12, marginTop: 5 },
+  aiButton: { backgroundColor: '#0284C7', padding: 14, borderRadius: 10, alignItems: 'center', marginBottom: 12, marginTop: 5 },
   aiButtonText: { color: '#FFFFFF', fontSize: 13, fontWeight: 'bold' },
   aiReportBox: { backgroundColor: 'rgba(3, 105, 161, 0.2)', padding: 12, borderRadius: 10, borderWidth: 1, borderColor: '#0284C7' },
   aiReportHeader: { fontSize: 12, fontWeight: 'bold', color: '#00F2FE', marginBottom: 6, textAlign: 'right' },
   warningBox: { backgroundColor: 'rgba(153, 27, 27, 0.4)', padding: 10, borderRadius: 6, borderWidth: 1, borderColor: '#EF4444', marginTop: 6, marginBottom: 6 },
   warningText: { color: '#FCA5A5', fontSize: 11, fontWeight: 'bold', textAlign: 'right' },
   aiDiagText: { fontSize: 12, color: '#F8FAFC', textAlign: 'right' },
-  medCard: { backgroundColor: '#090D16', padding: 12, borderRadius: 8, borderWidth: 1, borderColor: '#1E293B', marginBottom: 10 },
+  medCard: { backgroundColor: '#060911', padding: 12, borderRadius: 8, borderWidth: 1, borderColor: '#1E293B', marginBottom: 10 },
   medHeader: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
   medName: { fontSize: 13, fontWeight: 'bold', color: '#FFFFFF' },
   deleteText: { color: '#EF4444', fontSize: 11, fontWeight: 'bold' },
   medDetail: { fontSize: 11, color: '#94A3B8', textAlign: 'right', marginTop: 2 },
-  addMedBox: { backgroundColor: '#090D16', padding: 12, borderRadius: 8, marginTop: 10, borderWidth: 1, borderColor: '#1E293B' },
+  addMedBox: { backgroundColor: '#060911', padding: 12, borderRadius: 8, marginTop: 10, borderWidth: 1, borderColor: '#1E293B' },
   addMedBtn: { backgroundColor: '#1E293B', padding: 10, borderRadius: 6, alignItems: 'center', marginTop: 4 },
   addMedBtnText: { color: '#00F2FE', fontSize: 12, fontWeight: 'bold' },
   saveButton: { backgroundColor: '#10B981', padding: 16, borderRadius: 10, alignItems: 'center', marginBottom: 35 },
@@ -1741,7 +1766,7 @@ const styles = StyleSheet.create({
   lightboxTitle: { color: '#00F2FE', fontSize: 13, fontWeight: 'bold', marginTop: 12, textAlign: 'center' },
 
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', alignItems: 'center', padding: 20 },
-  modalContent: { backgroundColor: '#131C2E', padding: 20, borderRadius: 16, width: '100%', maxWidth: 450, borderWidth: 1, borderColor: '#EF4444' },
+  modalContent: { backgroundColor: '#0F172A', padding: 20, borderRadius: 16, width: '100%', maxWidth: 450, borderWidth: 1, borderColor: '#EF4444' },
   modalTitle: { fontSize: 16, fontWeight: 'bold', color: '#EF4444', marginBottom: 8, textAlign: 'right' },
   modalSub: { fontSize: 13, color: '#CBD5E1', marginBottom: 20, textAlign: 'right', lineHeight: 20 },
   modalButtonsRow: { flexDirection: 'row-reverse', justifyContent: 'space-between', gap: 10 },
