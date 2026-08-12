@@ -6,6 +6,7 @@ import {
 import { generatePrescriptionPDF } from '../components/PDFGenerator';
 import { supabase } from '../supabaseClient';
 import { verifyDoctorAccess } from '../src/services/subscriptionService';
+import PrivacyPolicy from './PrivacyPolicy';
 
 const GROQ_API_KEY = process.env.EXPO_PUBLIC_GROQ_API_KEY;
 
@@ -35,9 +36,7 @@ const isSpecialtyMatching = (selectedSpec, registeredSpec) => {
     .filter(word => word.length > 2 && !['استشاري', 'أخصائي', 'دكتور', 'طبيب', 'مركز', 'عيادة', 'الأمراض', 'وجراحة', 'جراحة'].includes(word));
 
   for (let word of registeredWords) {
-    if (cleanSelected.includes(word)) {
-      return true;
-    }
+    if (cleanSelected.includes(word)) return true;
   }
 
   return false;
@@ -77,7 +76,23 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
   const [subscriptionAccess, setSubscriptionAccess] = useState({ allowed: true, daysLeft: null, expiryDate: null, message: '', showAlert: false });
   const [dynamicTimeLeftText, setDynamicTimeLeftText] = useState('');
 
-  const [activeTab, setActiveTab] = useState('prescription');
+  // استرجاع التاب المفتوح سابقاً لحفظ الحالة عند الـ Refresh
+  const [activeTab, setActiveTab] = useState(() => {
+    if (Platform.OS === 'web' && typeof window !== 'undefined' && window.localStorage) {
+      return localStorage.getItem('medverse_doctor_active_tab') || 'prescription';
+    }
+    return 'prescription';
+  });
+
+  const handleTabChange = (tabName) => {
+    setActiveTab(tabName);
+    if (Platform.OS === 'web' && typeof window !== 'undefined' && window.localStorage) {
+      localStorage.setItem('medverse_doctor_active_tab', tabName);
+    }
+  };
+
+  const [showPrivacyModal, setShowPrivacyModal] = useState(false);
+
   const [clinicDoctorName, setClinicDoctorName] = useState('د. حسام المنفلوطي');
   const [clinicName, setClinicName] = useState('عياده المنفلوطي');
   const [specialty, setSpecialty] = useState(initialSpecialty || 'استشاري أمراض الروماتيزم والروماتويد والأمراض المناعية');
@@ -368,9 +383,7 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
       else if (currentUserId) cQuery = cQuery.eq('user_id', currentUserId);
 
       const { data: existingClinic } = await cQuery.limit(1).maybeSingle();
-      if (existingClinic) {
-        clinicId = existingClinic.id;
-      }
+      if (existingClinic) clinicId = existingClinic.id;
 
       const uploadedList = [];
       const total = selectedScanFiles.length;
@@ -558,9 +571,7 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
         
         if (clinic.specialty) {
           setRegisteredSpecialty(clinic.specialty);
-          
           const isMatched = isSpecialtyMatching(initialSpecialty, clinic.specialty);
-          
           if (!isMatched) {
             setShowMismatchModal(true);
           } else {
@@ -639,7 +650,7 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
     setGender(patient.gender || 'ذكر');
     setSelectedPatientCode(patient.patient_code || '');
     setCurrentPatientId(patient.id);
-    setActiveTab('prescription');
+    handleTabChange('prescription');
     fetchPatientScansByPatientId(patient.id);
   };
 
@@ -664,8 +675,6 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
 
     setAnalyzing(true);
     setAiReport(null);
-
-    const activeApiKey = GROQ_API_KEY;
 
     const systemPrompt = `You are an AI Clinical Assistant for a doctor in specialty: ${specialty}.
 Analyze the patient case and respond ONLY with a clean JSON object without Markdown formatting or triple backticks.
@@ -693,7 +702,7 @@ Doctor Notes: ${doctorNotes || 'لا يوجد'}`;
       const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
         method: "POST",
         headers: {
-          "Authorization": `Bearer ${activeApiKey}`,
+          "Authorization": `Bearer ${GROQ_API_KEY}`,
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
@@ -1005,7 +1014,15 @@ Return JSON ONLY:
               {isSigningUp ? 'لديك حساب بالفعل؟ سجل دخولك' : 'ليس لديك حساب؟ أنشئ حساب جديد الآن'}
             </Text>
           </TouchableOpacity>
+
+          <TouchableOpacity onPress={() => setShowPrivacyModal(true)} style={{ marginTop: 20, alignItems: 'center' }}>
+            <Text style={{ color: '#38BDF8', fontSize: 12 }}>🛡️ سياسة الخصوصية وشروط الاستخدام</Text>
+          </TouchableOpacity>
         </View>
+
+        <Modal visible={showPrivacyModal} animationType="slide">
+          <PrivacyPolicy onBack={() => setShowPrivacyModal(false)} />
+        </Modal>
       </ScrollView>
     );
   }
@@ -1082,6 +1099,11 @@ Return JSON ONLY:
         </View>
       </Modal>
 
+      {/* Privacy Policy Modal */}
+      <Modal visible={showPrivacyModal} animationType="slide">
+        <PrivacyPolicy onBack={() => setShowPrivacyModal(false)} />
+      </Modal>
+
       {/* Specialty Mismatch Modal */}
       <Modal visible={showMismatchModal} transparent animationType="slide">
         <View style={styles.modalOverlay}>
@@ -1144,13 +1166,13 @@ Return JSON ONLY:
 
       {/* Navigation Bar */}
       <View style={styles.navBar}>
-        <TouchableOpacity style={[styles.navBtn, activeTab === 'prescription' && styles.navBtnActive]} onPress={() => setActiveTab('prescription')}>
+        <TouchableOpacity style={[styles.navBtn, activeTab === 'prescription' && styles.navBtnActive]} onPress={() => handleTabChange('prescription')}>
           <Text style={[styles.navBtnText, activeTab === 'prescription' && styles.navBtnTextActive]}>🩺 الكشف والأشعة</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={[styles.navBtn, activeTab === 'patients' && styles.navBtnActive]} onPress={() => { setActiveTab('patients'); fetchAllPatients(); }}>
+        <TouchableOpacity style={[styles.navBtn, activeTab === 'patients' && styles.navBtnActive]} onPress={() => { handleTabChange('patients'); fetchAllPatients(); }}>
           <Text style={[styles.navBtnText, activeTab === 'patients' && styles.navBtnTextActive]}>📂 قائمة المرضى</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={[styles.navBtn, activeTab === 'profile' && styles.navBtnActive]} onPress={() => setActiveTab('profile')}>
+        <TouchableOpacity style={[styles.navBtn, activeTab === 'profile' && styles.navBtnActive]} onPress={() => handleTabChange('profile')}>
           <Text style={[styles.navBtnText, activeTab === 'profile' && styles.navBtnTextActive]}>⚙️ بروفايل العيادة</Text>
         </TouchableOpacity>
       </View>
@@ -1224,6 +1246,10 @@ Return JSON ONLY:
 
           <TouchableOpacity style={styles.saveProfileBtn} onPress={handleSaveProfile} disabled={loading}>
             {loading ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.saveProfileBtnText}>💾 حفظ وإعتماد بيانات الملف الشخصي</Text>}
+          </TouchableOpacity>
+
+          <TouchableOpacity onPress={() => setShowPrivacyModal(true)} style={{ marginTop: 20, alignItems: 'center' }}>
+            <Text style={{ color: '#38BDF8', fontSize: 12, fontWeight: 'bold' }}>🛡️ سياسة الخصوصية وشروط الاستخدام</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -1702,4 +1728,3 @@ const styles = StyleSheet.create({
   modalGoBtn: { flex: 1.2, backgroundColor: '#0284C7', padding: 10, borderRadius: 8, alignItems: 'center' },
   modalGoBtnText: { color: '#FFFFFF', fontSize: 11, fontWeight: 'bold' }
 });
- 
