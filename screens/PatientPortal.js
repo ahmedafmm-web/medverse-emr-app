@@ -49,7 +49,6 @@ export default function PatientPortal({ onBackToDashboard, doctorClinicId, initi
     }
   }, [doctorClinicId, initialPatientCode]);
 
-  // دالة جلب هيدر العيادة المحدثة لتقبل المعرف بكافة أشكاله (id, email, user_id)
   const fetchClinicHeader = async (identifier) => {
     if (!identifier) return;
     try {
@@ -250,11 +249,19 @@ export default function PatientPortal({ onBackToDashboard, doctorClinicId, initi
         </View>
       </Modal>
 
+      {/* Header With Neon Glow & DEVEXT Branding */}
       <View style={styles.header}>
         {doctorInfo?.logo_url ? (
           <Image source={{ uri: doctorInfo.logo_url }} style={styles.headerLogo} resizeMode="contain" />
         ) : null}
+        
         <Text style={styles.title}>{doctorInfo?.clinic_name || 'MedVerse Patient Portal'}</Text>
+        
+        <View style={styles.brandRow}>
+          <Text style={styles.brandTag}>POWERED BY</Text>
+          <Text style={styles.brandSubtitle}>DEVEXT</Text>
+        </View>
+
         <Text style={styles.doctorSub}>
           {doctorInfo?.doctor_name ? `${doctorInfo.doctor_name} - ${doctorInfo.specialty}` : 'بوابة استعراض السجلات والروشتات والأشعات الطبية المعتمدة'}
         </Text>
@@ -352,7 +359,7 @@ export default function PatientPortal({ onBackToDashboard, doctorClinicId, initi
                                 <img 
                                   src={scanUrl} 
                                   alt={scanItem.title || 'صورة أشعة'} 
-                                  style={{ width: '100%', height: '220px', borderRadius: '6px', objectFit: 'cover', backgroundColor: '#1E293B' }} 
+                                  style={{ width: '100%', height: '220px', borderRadius: '6px', objectFit: 'cover', backgroundColor: '#060911' }} 
                                 />
                               ) : (
                                 <Image source={{ uri: scanUrl }} style={styles.scanImage} resizeMode="cover" />
@@ -404,50 +411,78 @@ export default function PatientPortal({ onBackToDashboard, doctorClinicId, initi
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#090D16', padding: 14 },
+  container: { flex: 1, backgroundColor: '#060911', padding: 14 },
   header: { marginBottom: 20, alignItems: 'center', marginTop: 15 },
-  headerLogo: { width: 70, height: 70, marginBottom: 8 },
-  title: { fontSize: 22, fontWeight: '900', color: '#00F2FE', textAlign: 'center', letterSpacing: 0.5 },
-  doctorSub: { fontSize: 12, color: '#94A3B8', marginTop: 4, textAlign: 'center' },
-  card: { backgroundColor: '#131C2E', padding: 20, borderRadius: 16, borderWidth: 1, borderColor: '#1E293B' },
+  headerLogo: { width: 75, height: 75, marginBottom: 8 },
+  title: { 
+    fontSize: 26, 
+    fontWeight: '900', 
+    color: '#00F2FE', 
+    textAlign: 'center', 
+    letterSpacing: 0.5,
+    textShadowColor: 'rgba(0, 242, 254, 0.4)',
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 15
+  },
+  brandRow: { flexDirection: 'row', alignItems: 'center', marginTop: 4, marginBottom: 4, gap: 6 },
+  brandTag: { fontSize: 10, color: '#64748B', fontWeight: 'bold', letterSpacing: 1 },
+  brandSubtitle: { 
+    fontSize: 13, 
+    fontWeight: '900', 
+    color: '#38BDF8', 
+    letterSpacing: 2.5, 
+    textShadowColor: 'rgba(56, 189, 248, 0.5)',
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 10 
+  },
+  doctorSub: { fontSize: 12, color: '#94A3B8', marginTop: 4, textAlign: 'center', fontWeight: '600' },
+
+  card: { backgroundColor: '#0F172A', padding: 22, borderRadius: 18, borderWidth: 1, borderColor: '#1E293B', boxShadow: '0 8px 24px rgba(0,0,0,0.4)' },
   sectionTitle: { fontSize: 16, fontWeight: 'bold', color: '#F8FAFC', marginBottom: 15, textAlign: 'right' },
   sectionTitleHeader: { fontSize: 15, fontWeight: 'bold', color: '#F8FAFC', marginVertical: 15, textAlign: 'right' },
   label: { fontSize: 13, color: '#CBD5E1', marginBottom: 8, textAlign: 'right' },
-  input: { borderWidth: 1, borderColor: '#1E293B', borderRadius: 10, padding: 12, backgroundColor: '#090D16', color: '#FFFFFF', fontSize: 15, textAlign: 'center', marginBottom: 15 },
+  input: { borderWidth: 1, borderColor: '#1E293B', borderRadius: 10, padding: 12, backgroundColor: '#060911', color: '#FFFFFF', fontSize: 15, textAlign: 'center', marginBottom: 15 },
   btn: { backgroundColor: '#0284C7', padding: 14, borderRadius: 10, alignItems: 'center' },
   btnDisabled: { opacity: 0.6 },
   btnText: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 14 },
   backBtn: { marginTop: 18, alignItems: 'center', padding: 6 },
   backBtnText: { color: '#00F2FE', fontSize: 13, fontWeight: 'bold' },
-  patientCard: { backgroundColor: '#131C2E', padding: 16, borderRadius: 12, borderRightWidth: 4, borderRightColor: '#00F2FE', marginBottom: 10, borderWidth: 1, borderColor: '#1E293B' },
+
+  patientCard: { backgroundColor: '#0F172A', padding: 16, borderRadius: 12, borderRightWidth: 4, borderRightColor: '#00F2FE', marginBottom: 10, borderWidth: 1, borderColor: '#1E293B' },
   row: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center' },
   patientName: { fontSize: 16, fontWeight: 'bold', color: '#FFFFFF' },
   logoutText: { color: '#EF4444', fontSize: 12, fontWeight: 'bold' },
   patientCodeText: { color: '#00F2FE', fontSize: 12, marginTop: 4, textAlign: 'right', fontFamily: 'monospace' },
   sharePassBtn: { backgroundColor: '#0284C7', padding: 10, borderRadius: 8, marginTop: 10, alignItems: 'center' },
   sharePassBtnText: { color: '#FFFFFF', fontSize: 11, fontWeight: 'bold' },
-  recordCard: { backgroundColor: '#131C2E', padding: 16, borderRadius: 12, marginBottom: 15, borderWidth: 1, borderColor: '#1E293B' },
+
+  recordCard: { backgroundColor: '#0F172A', padding: 16, borderRadius: 14, marginBottom: 15, borderWidth: 1, borderColor: '#1E293B', boxShadow: '0 8px 24px rgba(0,0,0,0.3)' },
   recordDate: { fontSize: 12, color: '#94A3B8' },
   verifiedBadge: { backgroundColor: 'rgba(16, 185, 129, 0.2)', color: '#10B981', fontSize: 10, fontWeight: 'bold', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 12, borderWidth: 1, borderColor: '#10B981' },
   divider: { height: 1, backgroundColor: '#1E293B', marginVertical: 10 },
   recordLabel: { fontSize: 12, color: '#94A3B8', textAlign: 'right', marginBottom: 4 },
   recordValue: { fontSize: 14, color: '#F8FAFC', textAlign: 'right', marginBottom: 12 },
-  scansContainer: { backgroundColor: '#090D16', padding: 12, borderRadius: 10, marginBottom: 15, borderWidth: 1, borderColor: '#1E293B' },
+
+  scansContainer: { backgroundColor: '#060911', padding: 12, borderRadius: 10, marginBottom: 15, borderWidth: 1, borderColor: '#1E293B' },
   scansHeaderTitle: { fontSize: 12, fontWeight: 'bold', color: '#00F2FE', marginBottom: 10, textAlign: 'right' },
-  scanItemCard: { backgroundColor: '#131C2E', padding: 10, borderRadius: 8, marginBottom: 12, alignItems: 'center', borderWidth: 1, borderColor: '#1E293B' },
-  scanImage: { width: '100%', height: 220, borderRadius: 6, backgroundColor: '#1E293B' },
+  scanItemCard: { backgroundColor: '#0F172A', padding: 10, borderRadius: 8, marginBottom: 12, alignItems: 'center', borderWidth: 1, borderColor: '#1E293B' },
+  scanImage: { width: '100%', height: 220, borderRadius: 6, backgroundColor: '#060911' },
   scanTitle: { fontSize: 12, fontWeight: 'bold', color: '#F8FAFC', marginTop: 6, textAlign: 'center' },
+
   previewBtn: { backgroundColor: '#1E293B', padding: 8, borderRadius: 6, width: '100%', alignItems: 'center', marginTop: 6, borderWidth: 1, borderColor: '#0284C7' },
   previewBtnText: { color: '#00F2FE', fontSize: 11, fontWeight: 'bold' },
   downloadScanBtn: { backgroundColor: '#10B981', padding: 10, borderRadius: 6, width: '100%', alignItems: 'center', marginTop: 8 },
   downloadScanBtnText: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 11 },
-  downloadProgressBarBox: { width: '100%', height: 16, backgroundColor: '#090D16', borderRadius: 8, overflow: 'hidden', marginTop: 8, justifyContent: 'center', borderWidth: 1, borderColor: '#1E293B' },
+
+  downloadProgressBarBox: { width: '100%', height: 16, backgroundColor: '#060911', borderRadius: 8, overflow: 'hidden', marginTop: 8, justifyContent: 'center', borderWidth: 1, borderColor: '#1E293B' },
   downloadProgressBarFill: { height: '100%', backgroundColor: '#0284C7', position: 'absolute' },
   downloadProgressText: { color: '#FFFFFF', fontSize: 10, fontWeight: 'bold', textAlign: 'center', zIndex: 1 },
+
   downloadPdfBtn: { backgroundColor: '#0284C7', padding: 12, borderRadius: 8, alignItems: 'center' },
   downloadPdfBtnText: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 13 },
   emptyBox: { padding: 20, alignItems: 'center' },
   emptyText: { color: '#64748B', fontSize: 13 },
+
   lightboxOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.95)', justifyContent: 'center', alignItems: 'center', padding: 20 },
   lightboxCloseBtn: { position: 'absolute', top: 20, right: 20, backgroundColor: '#EF4444', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6, zIndex: 10 },
   lightboxCloseText: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 12 },
@@ -456,3 +491,4 @@ const styles = StyleSheet.create({
   zoomBtnText: { color: '#FFFFFF', fontSize: 11, fontWeight: 'bold' },
   lightboxTitle: { color: '#00F2FE', fontSize: 13, fontWeight: 'bold', marginTop: 12, textAlign: 'center' }
 });
+ 
