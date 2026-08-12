@@ -545,14 +545,34 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
     setSession(null);
   };
 
-  const handleCopyPortalLink = () => {
-    const currentUserId = session?.user?.id;
-    if (!currentUserId) return;
-    const baseUrl = Platform.OS === 'web' && typeof window !== 'undefined' ? window.location.origin.split('?')[0] : 'https://medverse-emr-suite.vercel.app';
-    const portalUrl = `${baseUrl}?c=${currentUserId}`;
-    if (Platform.OS === 'web' && navigator.clipboard) {
-      navigator.clipboard.writeText(portalUrl);
-      showAlert('تم النسخ! 📋', portalUrl);
+  // دالة نسخ رابط العيادة المخصص للمرضى بالاعتماد الصريح على معرف العيادة الحقيقي
+  const handleCopyPortalLink = async () => {
+    try {
+      const userEmail = session?.user?.email?.toLowerCase();
+      const currentUserId = session?.user?.id;
+
+      let query = supabase.from('clinics').select('id');
+      if (userEmail) query = query.ilike('email', userEmail);
+      else if (currentUserId) query = query.eq('user_id', currentUserId);
+
+      const { data: clinic } = await query.limit(1).maybeSingle();
+
+      const clinicIdentifier = clinic?.id || userEmail || currentUserId;
+      const baseUrl = Platform.OS === 'web' && typeof window !== 'undefined' 
+        ? window.location.origin.split('?')[0] 
+        : 'https://medverse-emr-suite.vercel.app';
+
+      const portalUrl = `${baseUrl}?c=${encodeURIComponent(clinicIdentifier)}`;
+
+      if (Platform.OS === 'web' && navigator.clipboard) {
+        await navigator.clipboard.writeText(portalUrl);
+        showAlert('تم النسخ بنجاح! 📋', `رابط عيادتك المخصص للمرضى:\n${portalUrl}`);
+      } else {
+        showAlert('رابط عيادتك المخصص', portalUrl);
+      }
+    } catch (err) {
+      console.error('Copy Link Error:', err);
+      showAlert('خطأ', 'تعذر نسخ الرابط.');
     }
   };
 
@@ -675,6 +695,8 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
 
     setAnalyzing(true);
     setAiReport(null);
+
+    const activeApiKey = GROQ_API_KEY;
 
     const systemPrompt = `You are an AI Clinical Assistant for a doctor in specialty: ${specialty}.
 Analyze the patient case and respond ONLY with a clean JSON object without Markdown formatting or triple backticks.
