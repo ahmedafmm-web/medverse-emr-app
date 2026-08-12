@@ -86,7 +86,7 @@ export default function App() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#090D16" />
+      <StatusBar barStyle="light-content" backgroundColor="#060911" />
 
       {currentStep !== 'landing' && (
         <View style={styles.topBar}>
@@ -104,27 +104,53 @@ export default function App() {
 
       {currentStep === 'landing' && (
         <ScrollView contentContainerStyle={styles.landingContainer}>
-          <Text style={styles.mainTitle}>MedVerse EMR Suite</Text>
-          <Text style={styles.subTitle}>منظومة السجلات الطبية الإلكترونية الذكية</Text>
+          {/* Header & Branding Zone */}
+          <View style={styles.headerGlowBox}>
+            <Text style={styles.mainTitle}>MedVerse EMR Suite</Text>
+            
+            {/* DEVEXT Brand Badge */}
+            <View style={styles.brandRow}>
+              <Text style={styles.brandTag}>POWERED BY</Text>
+              <Text style={styles.brandSubtitle}>DEVEXT</Text>
+            </View>
+
+            <Text style={styles.subTitle}>منظومة السجلات الطبية الإلكترونية الذكية</Text>
+          </View>
+
           <Text style={styles.selectPrompt}>الرجاء اختيار البوابة لدخول النظام:</Text>
 
+          {/* Portal Cards */}
           <View style={styles.portalCardsContainer}>
             <TouchableOpacity 
               style={[styles.portalCard, styles.doctorCard]} 
               onPress={() => updateStep('specialty')}
+              activeOpacity={0.8}
             >
-              <Text style={styles.portalIcon}>🩺</Text>
+              <View style={styles.portalHeaderRow}>
+                <Text style={styles.portalIcon}>🩺</Text>
+                <Text style={styles.badgeTagDoc}>SPECIALIST</Text>
+              </View>
               <Text style={styles.portalTitle}>بوابة الطبيب</Text>
-              <Text style={styles.portalDesc}>إدارة المرضى، الاستشارات الإكلينيكية الذكية، وإصدار الروشتات</Text>
+              <Text style={styles.portalDesc}>إدارة المرضى، الاستشارات الإكلينيكية الذكية بـ LLaMA AI، وإصدار الروشتات المعتمدة</Text>
+              <View style={styles.cardActionRow}>
+                <Text style={styles.actionText}>الدخول للوحة التحكم ←</Text>
+              </View>
             </TouchableOpacity>
 
             <TouchableOpacity 
               style={[styles.portalCard, styles.patientCard]} 
               onPress={() => updateStep('patient')}
+              activeOpacity={0.8}
             >
-              <Text style={styles.portalIcon}>👤</Text>
+              <View style={styles.portalHeaderRow}>
+                <Text style={styles.portalIcon}>👤</Text>
+                <Text style={styles.badgeTagPat}>PATIENT PORTAL</Text>
+              </View>
               <Text style={styles.portalTitle}>بوابة المريض</Text>
-              <Text style={styles.portalDesc}>متابعة السجل الطبي، الروشتات المعتمدة، والمواعيد</Text>
+              <Text style={styles.portalDesc}>متابعة السجل الطبي، معاينة وتكبير صور الأشعة بدقة عالية Ultra Zoom، الروشتات والمواعيد</Text>
+              <View style={styles.cardActionRow}>
+                <Text style={styles.actionTextPatient}>استعراض الملف الطبي ←</Text>
+              </View>
             </TouchableOpacity>
           </View>
         </ScrollView>
@@ -141,6 +167,7 @@ export default function App() {
                 key={item.id} 
                 style={styles.specialtyCard}
                 onPress={() => handleSpecialtySelect(item.name)}
+                activeOpacity={0.7}
               >
                 <Text style={styles.specialtyText}>{item.name}</Text>
               </TouchableOpacity>
@@ -173,31 +200,77 @@ export default function App() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#090D16', paddingTop: Platform.OS === 'web' ? 0 : 0 },
+  container: { flex: 1, backgroundColor: '#060911', paddingTop: Platform.OS === 'web' ? 0 : 0 },
   topBar: {
     flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center',
-    backgroundColor: '#131C2E', paddingHorizontal: 15, paddingVertical: 10,
+    backgroundColor: '#0F172A', paddingHorizontal: 15, paddingVertical: 12,
     borderBottomWidth: 1, borderBottomColor: '#1E293B'
   },
   backButton: { backgroundColor: '#1E293B', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: '#334155' },
   backButtonText: { color: '#00F2FE', fontSize: 13, fontWeight: 'bold' },
-  specialtyBadge: { color: '#FFFFFF', backgroundColor: '#0284C7', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, fontSize: 12, fontWeight: 'bold' },
+  specialtyBadge: { color: '#FFFFFF', backgroundColor: '#0284C7', paddingHorizontal: 12, paddingVertical: 5, borderRadius: 12, fontSize: 12, fontWeight: 'bold' },
+  
   landingContainer: { padding: 20, alignItems: 'center', justifyContent: 'center' },
-  mainTitle: { fontSize: 28, fontWeight: '900', color: '#00F2FE', marginTop: 30, textAlign: 'center', letterSpacing: 0.5 },
-  subTitle: { fontSize: 15, color: '#94A3B8', marginTop: 8, marginBottom: 30, textAlign: 'center' },
-  selectPrompt: { fontSize: 17, color: '#F8FAFC', marginBottom: 20, fontWeight: '600' },
-  portalCardsContainer: { width: '100%', maxWidth: 500, gap: 20 },
-  portalCard: { padding: 25, borderRadius: 16, alignItems: 'center', borderWidth: 1, borderColor: '#1E293B' },
-  doctorCard: { backgroundColor: '#131C2E' },
-  patientCard: { backgroundColor: '#0C1929' },
-  portalIcon: { fontSize: 40, marginBottom: 10 },
-  portalTitle: { fontSize: 22, fontWeight: 'bold', color: '#FFFFFF', marginBottom: 8 },
-  portalDesc: { fontSize: 13, color: '#94A3B8', textAlign: 'center', lineHeight: 20 },
+  headerGlowBox: { alignItems: 'center', marginTop: 20, marginBottom: 25 },
+  mainTitle: { 
+    fontSize: 32, 
+    fontWeight: '900', 
+    color: '#00F2FE', 
+    textAlign: 'center', 
+    letterSpacing: 0.5,
+    textShadowColor: 'rgba(0, 242, 254, 0.4)',
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 15
+  },
+  brandRow: { flexDirection: 'row', alignItems: 'center', marginTop: 6, marginBottom: 6, gap: 6 },
+  brandTag: { fontSize: 10, color: '#64748B', fontWeight: 'bold', letterSpacing: 1 },
+  brandSubtitle: { 
+    fontSize: 14, 
+    fontWeight: '900', 
+    color: '#38BDF8', 
+    letterSpacing: 2.5, 
+    textShadowColor: 'rgba(56, 189, 248, 0.5)',
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 10 
+  },
+  subTitle: { fontSize: 14, color: '#94A3B8', marginTop: 4, textAlign: 'center', fontWeight: '600' },
+  selectPrompt: { fontSize: 16, color: '#F8FAFC', marginBottom: 20, fontWeight: '700' },
+  
+  portalCardsContainer: { width: '100%', maxWidth: 480, gap: 18 },
+  portalCard: { 
+    padding: 22, 
+    borderRadius: 18, 
+    borderWidth: 1, 
+    borderColor: '#1E293B',
+    boxShadow: '0 8px 24px rgba(0,0,0,0.4)'
+  },
+  doctorCard: { 
+    backgroundColor: '#0F172A',
+    borderRightWidth: 4,
+    borderRightColor: '#00F2FE'
+  },
+  patientCard: { 
+    backgroundColor: '#0B132B',
+    borderRightWidth: 4,
+    borderRightColor: '#38BDF8'
+  },
+  portalHeaderRow: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
+  portalIcon: { fontSize: 36 },
+  badgeTagDoc: { backgroundColor: 'rgba(0, 242, 254, 0.12)', color: '#00F2FE', fontSize: 10, fontWeight: 'bold', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, borderWidth: 1, borderColor: '#00F2FE' },
+  badgeTagPat: { backgroundColor: 'rgba(56, 189, 248, 0.12)', color: '#38BDF8', fontSize: 10, fontWeight: 'bold', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, borderWidth: 1, borderColor: '#38BDF8' },
+  portalTitle: { fontSize: 21, fontWeight: 'bold', color: '#FFFFFF', marginBottom: 6, textAlign: 'right' },
+  portalDesc: { fontSize: 12.5, color: '#94A3B8', textAlign: 'right', lineHeight: 20, marginBottom: 15 },
+  
+  cardActionRow: { borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.06)', paddingTop: 10, alignItems: 'flex-start' },
+  actionText: { color: '#00F2FE', fontSize: 12, fontWeight: 'bold' },
+  actionTextPatient: { color: '#38BDF8', fontSize: 12, fontWeight: 'bold' },
+
   specialtyContainer: { padding: 20, alignItems: 'center' },
-  sectionTitle: { fontSize: 24, fontWeight: 'bold', color: '#FFFFFF', marginTop: 20 },
-  sectionSub: { fontSize: 13, color: '#94A3B8', marginBottom: 25, textAlign: 'center' },
-  grid: { width: '100%', maxWidth: 500, gap: 12 },
-  specialtyCard: { backgroundColor: '#131C2E', padding: 18, borderRadius: 12, borderWidth: 1, borderColor: '#1E293B', alignItems: 'center' },
-  specialtyText: { color: '#F8FAFC', fontSize: 15, fontWeight: 'bold' },
+  sectionTitle: { fontSize: 22, fontWeight: 'bold', color: '#FFFFFF', marginTop: 15 },
+  sectionSub: { fontSize: 13, color: '#94A3B8', marginBottom: 20, textAlign: 'center' },
+  grid: { width: '100%', maxWidth: 480, gap: 10 },
+  specialtyCard: { backgroundColor: '#0F172A', padding: 16, borderRadius: 12, borderWidth: 1, borderColor: '#1E293B', alignItems: 'center' },
+  specialtyText: { color: '#F8FAFC', fontSize: 14, fontWeight: 'bold' },
   body: { flex: 1 }
 });
+ 
