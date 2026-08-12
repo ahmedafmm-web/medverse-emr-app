@@ -4,8 +4,21 @@ import DoctorDashboard from './screens/DoctorDashboard';
 import PatientPortal from './screens/PatientPortal';
 
 export default function App() {
-  const [currentStep, setCurrentStep] = useState('landing');
-  const [selectedSpecialty, setSelectedSpecialty] = useState('');
+  // 1. قراءة واسترجاع الحالة السابقة من الـ localStorage لمنع الخروج عند الـ Refresh
+  const [currentStep, setCurrentStep] = useState(() => {
+    if (Platform.OS === 'web' && typeof window !== 'undefined' && window.localStorage) {
+      return localStorage.getItem('medverse_current_step') || 'landing';
+    }
+    return 'landing';
+  });
+
+  const [selectedSpecialty, setSelectedSpecialty] = useState(() => {
+    if (Platform.OS === 'web' && typeof window !== 'undefined' && window.localStorage) {
+      return localStorage.getItem('medverse_selected_specialty') || '';
+    }
+    return '';
+  });
+
   const [encryptedClinicId, setEncryptedClinicId] = useState(null);
   const [directPatientCode, setDirectPatientCode] = useState(null);
 
@@ -19,6 +32,7 @@ export default function App() {
     { id: 'dermatology', name: '✨ الجلدية والتجميل' },
   ];
 
+  // 2. معالجة روابط الـ URL الخارجية المباشرة (روابط المشاركة للعيادة أو المريض)
   useEffect(() => {
     if (Platform.OS === 'web' && typeof window !== 'undefined') {
       const urlParams = new URLSearchParams(window.location.search);
@@ -32,20 +46,42 @@ export default function App() {
           setEncryptedClinicId(queryParam);
           setDirectPatientCode(null);
         }
-        setCurrentStep('patient');
+        updateStep('patient');
       }
     }
   }, []);
 
+  // 3. دالة تحديث الشاشات والحفظ التلقائي في الـ LocalStorage
+  const updateStep = (newStep) => {
+    setCurrentStep(newStep);
+    if (Platform.OS === 'web' && typeof window !== 'undefined' && window.localStorage) {
+      localStorage.setItem('medverse_current_step', newStep);
+    }
+  };
+
+  const updateSpecialty = (newSpec) => {
+    setSelectedSpecialty(newSpec || '');
+    if (Platform.OS === 'web' && typeof window !== 'undefined' && window.localStorage) {
+      localStorage.setItem('medverse_selected_specialty', newSpec || '');
+    }
+  };
+
   const handleSpecialtySelect = (specialtyName) => {
-    setSelectedSpecialty(specialtyName || '');
-    setCurrentStep('doctor');
+    updateSpecialty(specialtyName);
+    updateStep('doctor');
   };
 
   const handleResetToLanding = () => {
-    setSelectedSpecialty('');
+    updateSpecialty('');
     setDirectPatientCode(null);
-    setCurrentStep('landing');
+    setEncryptedClinicId(null);
+    updateStep('landing');
+
+    if (Platform.OS === 'web' && typeof window !== 'undefined' && window.localStorage) {
+      localStorage.removeItem('medverse_current_step');
+      localStorage.removeItem('medverse_selected_specialty');
+      localStorage.removeItem('medverse_doctor_active_tab');
+    }
   };
 
   return (
@@ -75,7 +111,7 @@ export default function App() {
           <View style={styles.portalCardsContainer}>
             <TouchableOpacity 
               style={[styles.portalCard, styles.doctorCard]} 
-              onPress={() => setCurrentStep('specialty')}
+              onPress={() => updateStep('specialty')}
             >
               <Text style={styles.portalIcon}>🩺</Text>
               <Text style={styles.portalTitle}>بوابة الطبيب</Text>
@@ -84,7 +120,7 @@ export default function App() {
 
             <TouchableOpacity 
               style={[styles.portalCard, styles.patientCard]} 
-              onPress={() => setCurrentStep('patient')}
+              onPress={() => updateStep('patient')}
             >
               <Text style={styles.portalIcon}>👤</Text>
               <Text style={styles.portalTitle}>بوابة المريض</Text>
@@ -118,7 +154,7 @@ export default function App() {
           <DoctorDashboard 
             specialty={selectedSpecialty} 
             onSwitchPortal={handleResetToLanding}
-            onUpdateSpecialty={(newSpec) => setSelectedSpecialty(newSpec)}
+            onUpdateSpecialty={(newSpec) => updateSpecialty(newSpec)}
           />
         </View>
       )}
