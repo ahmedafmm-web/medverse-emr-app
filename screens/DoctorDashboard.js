@@ -726,7 +726,7 @@ Doctor Notes: ${doctorNotes || 'لا يوجد'}`;
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
-          model: "qwen-2.5-32b",
+          model: "gpt-oss-120b",
           messages: [
             { role: "system", content: systemPrompt },
             { role: "user", content: userPrompt }
@@ -797,7 +797,7 @@ Return JSON ONLY:
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
-          model: "qwen-2.5-32b",
+          model: "gpt-oss-120b",
           messages: [
             { role: "system", content: systemPrompt },
             { role: "user", content: userPrompt }
@@ -1775,3 +1775,4 @@ const styles = StyleSheet.create({
   modalGoBtn: { flex: 1.2, backgroundColor: '#0284C7', padding: 10, borderRadius: 8, alignItems: 'center' },
   modalGoBtnText: { color: '#FFFFFF', fontSize: 11, fontWeight: 'bold' }
 });
+ 
