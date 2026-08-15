@@ -694,8 +694,6 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
     setAnalyzing(true);
     setAiReport(null);
 
-    const activeApiKey = GROQ_API_KEY;
-
     const systemPrompt = `You are an AI Clinical Assistant for a doctor in specialty: ${specialty}.
 Analyze the patient case and respond ONLY with a clean JSON object without Markdown formatting or triple backticks.
 
@@ -726,7 +724,7 @@ Doctor Notes: ${doctorNotes || 'لا يوجد'}`;
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
-          model: "llama-3.3-70b-versatile",
+          model: "qwen-2.5-72b-instruct",
           messages: [
             { role: "system", content: systemPrompt },
             { role: "user", content: userPrompt }
@@ -797,7 +795,7 @@ Return JSON ONLY:
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
-          model: "llama-3.3-70b-versatile",
+          model: "qwen-2.5-72b-instruct",
           messages: [
             { role: "system", content: systemPrompt },
             { role: "user", content: userPrompt }
@@ -1532,7 +1530,7 @@ Return JSON ONLY:
             <TextInput style={[styles.input, styles.textArea]} placeholder="اكتب نتائج تحاليل RF, Anti-CCP أو الأشعة..." placeholderTextColor="#64748B" multiline numberOfLines={2} value={doctorNotes} onChangeText={setDoctorNotes} />
 
             <TouchableOpacity style={styles.aiButton} onPress={handleClinicalAnalysis} disabled={analyzing}>
-              {analyzing ? <ActivityIndicator color="#FFFFFF" size="small" /> : <Text style={styles.aiButtonText}>✨ تحليل الحالة بـ LLaMA 3.3 70B AI ({specialty})</Text>}
+              {analyzing ? <ActivityIndicator color="#FFFFFF" size="small" /> : <Text style={styles.aiButtonText}>✨ تحليل الحالة بـ AI ({specialty})</Text>}
             </TouchableOpacity>
 
             {aiReport && (
