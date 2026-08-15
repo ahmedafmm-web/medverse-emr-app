@@ -726,7 +726,7 @@ Doctor Notes: ${doctorNotes || 'لا يوجد'}`;
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
-          model: "mixtral-8x7b-32768",
+          model: "openai/gpt-oss-120b",
           messages: [
             { role: "system", content: systemPrompt },
             { role: "user", content: userPrompt }
@@ -775,7 +775,7 @@ Doctor Notes: ${doctorNotes || 'لا يوجد'}`;
     setCheckingMed(true);
     setMedCheckError(null);
 
-    const systemPrompt = `You are a Clinical Pharmacologist for specialty: ${specialty}. Check if إضافة this new medication is safe for the patient based on age, chronic conditions, and current prescribed list.
+    const systemPrompt = `You are a Clinical Pharmacologist for specialty: ${specialty}. Check if adding this new medication is safe for the patient based on age, chronic conditions, and current prescribed list.
 Return JSON ONLY:
 {
   "safe": true/false,
@@ -797,7 +797,7 @@ Return JSON ONLY:
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
-          model: "mixtral-8x7b-32768",
+          model: "openai/gpt-oss-120b",
           messages: [
             { role: "system", content: systemPrompt },
             { role: "user", content: userPrompt }
@@ -1775,3 +1775,4 @@ const styles = StyleSheet.create({
   modalGoBtn: { flex: 1.2, backgroundColor: '#0284C7', padding: 10, borderRadius: 8, alignItems: 'center' },
   modalGoBtnText: { color: '#FFFFFF', fontSize: 11, fontWeight: 'bold' }
 });
+ 
