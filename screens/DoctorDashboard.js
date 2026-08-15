@@ -694,6 +694,8 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
     setAnalyzing(true);
     setAiReport(null);
 
+    const activeApiKey = GROQ_API_KEY;
+
     const systemPrompt = `You are an AI Clinical Assistant for a doctor in specialty: ${specialty}.
 Analyze the patient case and respond ONLY with a clean JSON object without Markdown formatting or triple backticks.
 
@@ -724,7 +726,7 @@ Doctor Notes: ${doctorNotes || 'لا يوجد'}`;
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
-          model: "qwen-2.5-72b-instruct",
+          model: "qwen-2.5-32b",
           messages: [
             { role: "system", content: systemPrompt },
             { role: "user", content: userPrompt }
@@ -795,7 +797,7 @@ Return JSON ONLY:
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
-          model: "qwen-2.5-72b-instruct",
+          model: "qwen-2.5-32b",
           messages: [
             { role: "system", content: systemPrompt },
             { role: "user", content: userPrompt }
@@ -1710,7 +1712,7 @@ const styles = StyleSheet.create({
 
   saveScansBtn: { backgroundColor: '#10B981', padding: 14, borderRadius: 10, alignItems: 'center' },
   saveScansBtnDisabled: { backgroundColor: '#334155', opacity: 0.6 },
-  saveScansBtnText: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 13 },
+  saveScansBtnText: { color: '#FFFFFF', fontWeight: 'bold' , fontSize: 13 },
 
   deleteImgBtn: { backgroundColor: '#991B1B', padding: 6, borderRadius: 6, marginTop: 6, alignItems: 'center' },
   deleteImgBtnText: { color: '#FFFFFF', fontSize: 11, fontWeight: 'bold' },
