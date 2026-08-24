@@ -231,6 +231,7 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
   const [checkingMed, setCheckingMed] = useState(false);
   const [aiReport, setAiReport] = useState(null);
   const [medCheckError, setMedCheckError] = useState(null);
+  const [pendingMed, setPendingMed] = useState(null);
 
   const [finalDiagnosis, setFinalDiagnosis] = useState('');
   const [prescribedMeds, setPrescribedMeds] = useState([]);
@@ -912,6 +913,7 @@ Doctor Additional Notes: ${doctorNotes || 'لا يوجد'}`;
 
     setCheckingMed(true);
     setMedCheckError(null);
+    setPendingMed(null);
 
     const systemPrompt = `You are a Clinical Pharmacologist for specialty: ${specialty}. Check if adding this new medication is safe for the patient based on age, chronic conditions, and current prescribed list.
 Return JSON ONLY:
@@ -955,7 +957,13 @@ Return JSON ONLY:
         setNewMedDose('');
         setNewMedReason('');
       } else {
-        setMedCheckError(sanitizeText(parsed.reason) || 'قد يتعارض هذا الدواء مع الحالة الحالية.');
+        const conflictReason = sanitizeText(parsed.reason) || 'قد يتعارض هذا الدواء مع الحالة الحالية للمريض أو الأدوية المسجلة.';
+        setMedCheckError(conflictReason);
+        setPendingMed({
+          name: newMedName,
+          dose: newMedDose,
+          reason: newMedReason || 'إضافة مباشرة على مسؤولية الطبيب'
+        });
       }
     } catch (e) {
       setPrescribedMeds(prev => [...prev, { name: newMedName, dose: newMedDose, reason: newMedReason || 'إضافة مباشرة من الطبيب' }]);
@@ -964,6 +972,21 @@ Return JSON ONLY:
       setNewMedReason('');
     } finally {
       setCheckingMed(false);
+    }
+  };
+
+  const handleDismissConflict = () => {
+    setMedCheckError(null);
+    setPendingMed(null);
+    setNewMedName('');
+    setNewMedDose('');
+    setNewMedReason('');
+  };
+
+  const handleForceAddMed = () => {
+    if (pendingMed) {
+      setPrescribedMeds(prev => [...prev, pendingMed]);
+      handleDismissConflict();
     }
   };
 
@@ -1871,6 +1894,22 @@ Return JSON ONLY:
               {medCheckError && (
                 <View style={styles.warningBox}>
                   <Text style={styles.warningText}>🚨 تحذير تعارض: {medCheckError}</Text>
+                  
+                  <View style={styles.overrideButtonsRow}>
+                    <TouchableOpacity 
+                      style={styles.forceAddBtn} 
+                      onPress={handleForceAddMed}
+                    >
+                      <Text style={styles.forceAddBtnText}>⚠️ أعلم مدى الخطورة وأضف على مسؤوليتي</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity 
+                      style={styles.cancelAddBtn} 
+                      onPress={handleDismissConflict}
+                    >
+                      <Text style={styles.cancelAddBtnText}>✕ إلغاء وعدم الإضافة</Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
               )}
             </View>
@@ -2020,7 +2059,6 @@ const styles = StyleSheet.create({
   copyLinkBtnText: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 12 },
 
   previewBox: { backgroundColor: '#060911', padding: 10, borderRadius: 8, alignItems: 'center', marginBottom: 12, borderWidth: 1, borderColor: '#1E293B' },
-  stampImage: { width: 120, height: 80, marginTop: 5 },
   saveProfileBtn: { backgroundColor: '#10B981', padding: 12, borderRadius: 8, alignItems: 'center', marginTop: 5 },
   saveProfileBtnText: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 13 },
 
@@ -2038,8 +2076,14 @@ const styles = StyleSheet.create({
   aiButtonText: { color: '#FFFFFF', fontSize: 13, fontWeight: 'bold' },
   aiReportBox: { backgroundColor: 'rgba(3, 105, 161, 0.2)', padding: 12, borderRadius: 10, borderWidth: 1, borderColor: '#0284C7' },
   aiReportHeader: { fontSize: 12, fontWeight: 'bold', color: '#00F2FE', marginBottom: 6, textAlign: 'right' },
-  warningBox: { backgroundColor: 'rgba(153, 27, 27, 0.4)', padding: 10, borderRadius: 6, borderWidth: 1, borderColor: '#EF4444', marginTop: 6, marginBottom: 6 },
-  warningText: { color: '#FCA5A5', fontSize: 11, fontWeight: 'bold', textAlign: 'right' },
+  warningBox: { backgroundColor: 'rgba(153, 27, 27, 0.4)', padding: 12, borderRadius: 8, borderWidth: 1, borderColor: '#EF4444', marginTop: 6, marginBottom: 6 },
+  warningText: { color: '#FCA5A5', fontSize: 11, fontWeight: 'bold', textAlign: 'right', lineHeight: 18 },
+  overrideButtonsRow: { flexDirection: 'row-reverse', gap: 8, marginTop: 10 },
+  forceAddBtn: { flex: 1.4, backgroundColor: '#DC2626', paddingVertical: 8, paddingHorizontal: 6, borderRadius: 6, alignItems: 'center' },
+  forceAddBtnText: { color: '#FFFFFF', fontSize: 11, fontWeight: 'bold', textAlign: 'center' },
+  cancelAddBtn: { flex: 1, backgroundColor: '#334155', paddingVertical: 8, paddingHorizontal: 6, borderRadius: 6, alignItems: 'center' },
+  cancelAddBtnText: { color: '#CBD5E1', fontSize: 11, fontWeight: 'bold', textAlign: 'center' },
+
   aiDiagText: { fontSize: 12, color: '#F8FAFC', textAlign: 'right' },
   medCard: { backgroundColor: '#060911', padding: 12, borderRadius: 8, borderWidth: 1, borderColor: '#1E293B', marginBottom: 10 },
   medHeader: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
