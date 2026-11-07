@@ -18,53 +18,31 @@ const SPECIALITIES_LIST = [
   "استشاري أمراض الباطنة والسكر"
 ];
 
-// --- مفاصل الجسم المتاحة للنقر البصري على الهيكل العظمي ---
-const SKELETON_JOINTS = [
-  { id: 'skull', label: 'الرأس والجمجمة', top: '5%', left: '46%' },
-  { id: 'shoulder_r', label: 'الكتف الأيمن', top: '18%', left: '30%' },
-  { id: 'shoulder_l', label: 'الكتف الأيسر', top: '18%', left: '65%' },
-  { id: 'elbow_r', label: 'الكوع الأيمن', top: '30%', left: '23%' },
-  { id: 'elbow_l', label: 'الكوع الأيسر', top: '30%', left: '72%' },
-  { id: 'wrist_r', label: 'الرسغ/اليد اليمنى', top: '42%', left: '18%' },
-  { id: 'wrist_l', label: 'الرسغ/اليد اليسرى', top: '42%', left: '77%' },
-  { id: 'spine', label: 'العمود الفقري والظهر', top: '28%', left: '48%' },
-  { id: 'hip_r', label: 'الحوض الأيمن', top: '45%', left: '40%' },
-  { id: 'hip_l', label: 'الحوض الأيسر', top: '45%', left: '57%' },
-  { id: 'knee_r', label: 'الركبة اليمنى', top: '65%', left: '38%' },
-  { id: 'knee_l', label: 'الركبة اليسرى', top: '65%', left: '59%' },
-  { id: 'ankle_r', label: 'الكاحل/القدم اليمنى', top: '85%', left: '36%' },
-  { id: 'ankle_l', label: 'الكاحل/القدم اليسرى', top: '85%', left: '61%' },
+// --- إحداثيات النقاط التفاعلية فوق صورة الهيكل العظمي الحقيقي ---
+const SKELETON_HOTSPOTS = [
+  { id: 'skull', label: 'الرأس', x: '49%', y: '8%' },
+  { id: 'neck', label: 'الرقبة', x: '49%', y: '16%' },
+  { id: 'shoulder_r', label: 'الكتف الأيمن', x: '35%', y: '22%' },
+  { id: 'shoulder_l', label: 'الكتف الأيسر', x: '63%', y: '22%' },
+  { id: 'elbow_r', label: 'الكوع الأيمن', x: '27%', y: '36%' },
+  { id: 'elbow_l', label: 'الكوع الأيسر', x: '71%', y: '36%' },
+  { id: 'wrist_r', label: 'الرسغ/اليد اليمنى', x: '21%', y: '48%' },
+  { id: 'wrist_l', label: 'الرسغ/اليد اليسرى', x: '77%', y: '48%' },
+  { id: 'spine', label: 'العمود الفقري', x: '49%', y: '32%' },
+  { id: 'hip_r', label: 'الحوض الأيمن', x: '42%', y: '50%' },
+  { id: 'hip_l', label: 'الحوض الأيسر', x: '56%', y: '50%' },
+  { id: 'knee_r', label: 'الركبة اليمنى', x: '40%', y: '70%' },
+  { id: 'knee_l', label: 'الركبة اليسرى', x: '58%', y: '70%' },
+  { id: 'ankle_r', label: 'الكاحل/القدم اليمنى', x: '37%', y: '89%' },
+  { id: 'ankle_l', label: 'الكاحل/القدم اليسرى', x: '61%', y: '89%' },
 ];
 
 const RHEUMA_OPTIONS = {
-  morningStiffnessDuration: [
-    "دقائق",
-    "نصف ساعة أو أكثر"
-  ],
-  esrCrp: [
-    "طبيعي (Normal)",
-    "مرتفع بدرجة متوسطة (Moderate)",
-    "مرتفع جداً (High Active Flare)"
-  ],
-  rf: [
-    "غير متوفر",
-    "سلبي (Negative)",
-    "إيجابي ضعيف (+)",
-    "إيجابي مرتفع (+++)"
-  ],
-  antiCCP: [
-    "غير متوفر",
-    "سلبي (Negative)",
-    "إيجابي (+) < 3x",
-    "إيجابي مرتفع (+++) > 3x"
-  ],
-  ana: [
-    "غير متوفر",
-    "سلبي (Negative)",
-    "إيجابي Homogeneous",
-    "إيجابي Speckled",
-    "إيجابي Nucleolar"
-  ],
+  morningStiffnessDuration: ["دقائق", "نصف ساعة أو أكثر"],
+  esrCrp: ["طبيعي (Normal)", "مرتفع بدرجة متوسطة (Moderate)", "مرتفع جداً (High Active Flare)"],
+  rf: ["غير متوفر", "سلبي (Negative)", "إيجابي ضعيف (+)", "إيجابي مرتفع (+++)"],
+  antiCCP: ["غير متوفر", "سلبي (Negative)", "إيجابي (+) < 3x", "إيجابي مرتفع (+++) > 3x"],
+  ana: ["غير متوفر", "سلبي (Negative)", "إيجابي Homogeneous", "إيجابي Speckled", "إيجابي Nucleolar"],
   clinicalStage: [
     "حالة روماتويد أولي حديث التشخيص (Early RA - Treatment Naive)",
     "روماتويد مفصلي مزمن مستقر (Established RA in Remission/Low)",
@@ -73,8 +51,7 @@ const RHEUMA_OPTIONS = {
     "التهاب فقار لاصق / روماتيزم صدفي (Spondyloarthritis / PsA)",
     "متلازمة الجفاف المناعية (Sjögren's Syndrome)",
     "روماتيزم العضلات الليفي (Fibromyalgia with No Synovitis)",
-    "خشونة مفاصل والتهاب أوتار ثانوي (Osteoarthritis / Tendinitis)",
-    "تشخيص محتمل حتى الآن (Query Diagnosis)"
+    "خشونة مفاصل والتهاب أوتار ثانوي (Osteoarthritis / Tendinitis)"
   ]
 };
 
@@ -101,10 +78,10 @@ const getExactTimeLeftMessage = (expiryDateString) => {
   const expiry = new Date(expiryDateString);
   const diffMs = expiry.getTime() - now.getTime();
   if (diffMs <= 0) return 'منتهي الآن';
-  const totalMinutes = Math.floor(diffMs / (1000 * 60));
-  const days = Math.floor(totalMinutes / (60 * 24));
-  const hours = Math.floor((totalMinutes % (60 * 24)) / 60);
-  const minutes = totalMinutes % 60;
+  const totalMins = Math.floor(diffMs / (1000 * 60));
+  const days = Math.floor(totalMins / (60 * 24));
+  const hours = Math.floor((totalMins % (60 * 24)) / 60);
+  const minutes = totalMins % 60;
   if (days > 0) return `متبقي ${days} يوم و ${hours} ساعة و ${minutes} دقيقة`;
   else if (hours > 0) return `متبقي ${hours} ساعة و ${minutes} دقيقة فقط!`;
   else return `متبقي ${minutes} دقيقة فقط!`;
@@ -138,7 +115,7 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
 
   const [clinicDoctorName, setClinicDoctorName] = useState('د. طاهر عبد الفتاح');
-  const [clinicName, setClinicName] = useState('عيادة الروماتيزم والمفاصل');
+  const [clinicName, setClinicName] = useState('عيادة الروماتيزم والمفاصل والمناعة');
   const [specialty, setSpecialty] = useState(initialSpecialty || 'استشاري أمراض الروماتيزم والروماتويد والأمراض المناعية');
   const [registeredSpecialty, setRegisteredSpecialty] = useState('');
   const [clinicLogoUrl, setClinicLogoUrl] = useState('https://cdn-icons-png.flaticon.com/512/387/387561.png');
@@ -146,7 +123,6 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
   const [clinicPhone, setClinicPhone] = useState('');
   const [clinicAddress, setClinicAddress] = useState('');
 
-  const [logoUploadProgress, setLogoUploadProgress] = useState(0);
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [showMismatchModal, setShowMismatchModal] = useState(false);
 
@@ -154,7 +130,6 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
   const [scanUploadProgress, setScanUploadProgress] = useState(0);
   const [uploadingScans, setUploadingScans] = useState(false);
   const [viewingImageModal, setViewingImageModal] = useState(null);
-  const [zoomScale, setZoomScale] = useState(1);
 
   // --- بيانات المريض الأساسية ---
   const [patientName, setPatientName] = useState('');
@@ -166,17 +141,18 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
   const [selectedPatientCode, setSelectedPatientCode] = useState('');
   const [currentPatientId, setCurrentPatientId] = useState(null);
 
-  // --- خريطة الهيكل العظمي التفاعلية (الصورة الحقيقية المضمنة بالنقر) ---
-  const [skeletonJointStates, setSkeletonJointStates] = useState({}); // { jointId: 'red' | 'blue' | null }
+  // --- خريطة الهيكل العظمي البصرية التفاعلية الفعلية ---
+  // تخزين حالات المفاصل: { jointId: 'red' (التهاب) | 'blue' (ألم) | null }
+  const [skeletonJointStates, setSkeletonJointStates] = useState({});
   const [rheumaStiffness, setRheumaStiffness] = useState('دقائق');
 
-  const handleSkeletonPointClick = (jointId) => {
+  const handleSkeletonHotspotClick = (jointId) => {
     setSkeletonJointStates(prev => {
       const current = prev[jointId];
-      if (!current) return { ...prev, [jointId]: 'red' };        // نقرة 1: أحمر (التهاب / تورم)
-      if (current === 'red') return { ...prev, [jointId]: 'blue' }; // نقرة 2: أزرق (ألم فقط)
+      if (!current) return { ...prev, [jointId]: 'red' };        // نقرة 1: أحمر (التهاب/تورم Arthritis)
+      if (current === 'red') return { ...prev, [jointId]: 'blue' }; // نقرة 2: أزرق (ألم فقط Arthralgia)
       const updated = { ...prev };
-      delete updated[jointId];                                    // نقرة 3: إلغاء التحديد
+      delete updated[jointId];                                    // نقرة 3: إلغاء
       return updated;
     });
   };
@@ -186,34 +162,17 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
     generalized: false, acute: false, chronic: false, progressive: false, mechanical: false, inflammatory: false, arthralgia: false, arthritis: false
   });
 
-  // --- الأعراض الإضافية والأنظمة ---
-  const [symptomsFlags, setSymptomsFlags] = useState({
-    lbpMech: false, lbpInfl: false, rashes: false, oralUlcers: false, eye: false,
-    dysphagia: false, recurrentDiarrhea: false, bloodyDiarrhea: false, abdominalPain: false,
-    constipation: false, cyanosis: false, tightSkin: false, skinNailChanges: false,
-    dysuria: false, menstrRegular: true, recurrentAbortions: false, recurrentFever: false,
-    weightLoss: false, lossOfAppetite: false, lymphNodes: false
-  });
-
-  const [familyHistory, setFamilyHistory] = useState({ consang: false, autoimDs: false, chemother: false, tb: false, feverHospital: false });
-
-  // --- التحاليل ---
+  // --- الأعراض والتحاليل ---
   const [rheumaEsrCrp, setRheumaEsrCrp] = useState('مرتفع جداً (High Active Flare)');
   const [rheumaAntiCCP, setRheumaAntiCCP] = useState('إيجابي مرتفع (+++) > 3x');
   const [rheumaRF, setRheumaRF] = useState('إيجابي مرتفع (+++)');
   const [rheumaANA, setRheumaANA] = useState('غير متوفر');
-  const [rheumaClinicalStage, setRheumaClinicalStage] = useState('حالة روماتويد أولي حديث التشخيص (Early RA - Treatment Naive)');
 
   const [symptomsInput, setSymptomsInput] = useState('');
-  const [doctorNotes, setDoctorNotes] = useState('');
   const [scanGroupTitle, setScanGroupTitle] = useState('');
 
   const [analyzing, setAnalyzing] = useState(false);
-  const [checkingMed, setCheckingMed] = useState(false);
   const [aiReport, setAiReport] = useState(null);
-  const [medCheckError, setMedCheckError] = useState(null);
-  const [pendingMed, setPendingMed] = useState(null);
-
   const [finalDiagnosis, setFinalDiagnosis] = useState('');
   const [prescribedMeds, setPrescribedMeds] = useState([]);
   const [newMedName, setNewMedName] = useState('');
@@ -227,7 +186,6 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
   const [allDoctorPatients, setAllDoctorPatients] = useState([]);
   const [loadingPatientsList, setLoadingPatientsList] = useState(false);
 
-  // إحصائيات المرضى
   const [patientSearchQuery, setPatientSearchQuery] = useState('');
   const [monthlyPatientsCount, setMonthlyPatientsCount] = useState(0);
   const [totalPatientsCount, setTotalPatientsCount] = useState(0);
@@ -257,12 +215,6 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
     const baseUrl = Platform.OS === 'web' && typeof window !== 'undefined' ? window.location.origin.split('?')[0] : 'https://medverse-emr-suite.vercel.app';
     const message = `مرحباً ${patientName}،\nإليك رابط سجلـك الطبي وتقرير الأشعة الخاص بك لدى ${clinicDoctorName}:\n${baseUrl}?c=${selectedPatientCode}`;
     const url = `https://wa.me/${phoneWithCountry}?text=${encodeURIComponent(message)}`;
-    if (Platform.OS === 'web') window.open(url, '_blank');
-    else Linking.openURL(url);
-  };
-
-  const handleOpenInstaPay = () => {
-    const url = 'https://ipn.eg/S/eg2400020548054885193/instapay/5xBjGv';
     if (Platform.OS === 'web') window.open(url, '_blank');
     else Linking.openURL(url);
   };
@@ -298,15 +250,6 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
     }
   };
 
-  useEffect(() => {
-    if (!subscriptionAccess.expiryDate) return;
-    setDynamicTimeLeftText(getExactTimeLeftMessage(subscriptionAccess.expiryDate));
-    const timer = setInterval(() => {
-      setDynamicTimeLeftText(getExactTimeLeftMessage(subscriptionAccess.expiryDate));
-    }, 30000);
-    return () => clearInterval(timer);
-  }, [subscriptionAccess.expiryDate]);
-
   const compressImage = (file, maxWidth = 2400, quality = 0.92) => {
     return new Promise((resolve) => {
       try {
@@ -326,8 +269,6 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
           canvas.width = width;
           canvas.height = height;
           const ctx = canvas.getContext('2d');
-          ctx.imageSmoothingEnabled = true;
-          ctx.imageSmoothingQuality = 'high';
           ctx.drawImage(img, 0, 0, width, height);
           canvas.toBlob((blob) => resolve(blob || file), 'image/jpeg', quality);
         };
@@ -336,19 +277,6 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
     });
   };
 
-  const handleSelectMultipleScans = (event) => {
-    const files = Array.from(event.target.files);
-    if (!files || files.length === 0) return;
-    const newFiles = files.map((file, idx) => ({
-      id: Date.now() + '_' + idx,
-      file: file,
-      previewUrl: URL.createObjectURL(file),
-      title: scanGroupTitle || file.name,
-    }));
-    setSelectedScanFiles(prev => [...prev, ...newFiles]);
-  };
-
-  // --- كاميرا الأشعة والمرفقات المباشرة ---
   const handleDirectCameraCapture = async (event) => {
     const file = event.target.files[0];
     if (!file) return;
@@ -363,10 +291,7 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
       const compressed = await compressImage(file, 2400, 0.92);
       const filePath = `patient_scans/${selectedPatientCode}/${Date.now()}_camera_direct.jpg`;
 
-      const { error: uploadErr } = await supabase.storage
-        .from('clinic-assets')
-        .upload(filePath, compressed, { upsert: true });
-
+      const { error: uploadErr } = await supabase.storage.from('clinic-assets').upload(filePath, compressed, { upsert: true });
       let publicUrl = '';
       if (!uploadErr) {
         const { data: urlData } = supabase.storage.from('clinic-assets').getPublicUrl(filePath);
@@ -401,34 +326,21 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
     if (!pId) return;
     setSearchingHistory(true);
     try {
-      const { data: records, error } = await supabase
-        .from('medical_records')
-        .select('*')
-        .eq('patient_id', pId)
-        .order('created_at', { ascending: false });
-
+      const { data: records, error } = await supabase.from('medical_records').select('*').eq('patient_id', pId).order('created_at', { ascending: false });
       if (error) throw error;
       setPatientHistory(records || []);
 
       let allScans = [];
       (records || []).forEach(r => {
         let df = r.dynamic_fields;
-        if (typeof df === 'string') {
-          try { df = JSON.parse(df); } catch (e) { df = {}; }
-        } else {
-          df = df || {};
-        }
+        if (typeof df === 'string') { try { df = JSON.parse(df); } catch (e) { df = {}; } }
+        else { df = df || {}; }
         
         if (Array.isArray(df.scans_list)) {
           df.scans_list.forEach(sc => {
-            const rawUrl = sc.url || sc.publicUrl || sc.publicURL;
+            const rawUrl = sc.url || sc.publicUrl;
             if (rawUrl) {
-              allScans.push({ 
-                url: String(rawUrl), 
-                title: sc.title || 'تحاليل وأشعة ومرفقات المريض', 
-                recordId: r.id, 
-                date: r.created_at || r.visit_date 
-              });
+              allScans.push({ url: String(rawUrl), title: sc.title || 'أشعة وتحاليل', recordId: r.id, date: r.created_at });
             }
           });
         }
@@ -453,12 +365,7 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
 
     try {
       const userEmail = session?.user?.email?.toLowerCase();
-      const { data: patient } = await supabase
-        .from('patients')
-        .select('id, patient_code, phone, age, gender')
-        .ilike('full_name', `%${name.trim()}%`)
-        .ilike('doctor_email', userEmail)
-        .maybeSingle();
+      const { data: patient } = await supabase.from('patients').select('id, patient_code, phone, age, gender').ilike('full_name', `%${name.trim()%}`).ilike('doctor_email', userEmail).maybeSingle();
 
       if (patient) {
         setSelectedPatientCode(patient.patient_code);
@@ -475,149 +382,6 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
       }
     } catch (e) {
       console.error(e);
-    }
-  };
-
-  const handleSaveScansToPatientFile = async () => {
-    if (!patientName.trim()) {
-      showAlert('تنبيه', 'يرجى إدخال اسم المريض أولاً.');
-      return;
-    }
-    if (!currentPatientId && !selectedPatientCode) {
-      showAlert('تنبيه هام', 'يجب حفظ بيانات المريض وتأكيد كوده أولاً قبل إضافة الأشعات.');
-      return;
-    }
-    if (selectedScanFiles.length === 0) {
-      showAlert('تنبيه', 'يرجى اختيار صور الأشعة.');
-      return;
-    }
-
-    setUploadingScans(true);
-    setScanUploadProgress(10);
-
-    try {
-      const userEmail = session?.user?.email?.toLowerCase();
-      let patientCode = selectedPatientCode;
-      let patientId = currentPatientId;
-      let clinicId = null;
-
-      const { data: existingClinic } = await supabase.from('clinics').select('id').ilike('email', userEmail).limit(1).maybeSingle();
-      if (existingClinic) clinicId = existingClinic.id;
-
-      const uploadedList = [];
-      for (let i = 0; i < selectedScanFiles.length; i++) {
-        const item = selectedScanFiles[i];
-        const compressed = await compressImage(item.file, 2400, 0.92);
-        const filePath = `patient_scans/${patientCode}/${Date.now()}_${i}.jpg`;
-
-        const { error: uploadErr } = await supabase.storage.from('clinic-assets').upload(filePath, compressed, { upsert: true });
-        let publicUrl = uploadErr ? item.previewUrl : supabase.storage.from('clinic-assets').getPublicUrl(filePath).data.publicUrl;
-
-        uploadedList.push({
-          id: Date.now() + '_' + i,
-          title: item.title || scanGroupTitle || 'تحاليل وأشعة ومرفقات المريض',
-          url: publicUrl,
-          created_at: new Date().toISOString()
-        });
-        setScanUploadProgress(Math.round(((i + 1) / selectedScanFiles.length) * 100));
-      }
-
-      await supabase.from('medical_records').insert([{
-        patient_id: patientId,
-        clinic_id: clinicId,
-        doctor_email: userEmail,
-        visit_date: new Date().toISOString().split('T')[0],
-        diagnosis: scanGroupTitle ? `أشعة وفحوصات: ${scanGroupTitle}` : 'تحاليل وأشعة ومرفقات المريض',
-        qr_verification_code: 'VERIFY-' + patientCode,
-        dynamic_fields: { scans_list: uploadedList }
-      }]);
-
-      showAlert('تم الحفظ بنجاح ✅', `تم حفظ (${uploadedList.length}) صورة في ملف المريض.`);
-      setSelectedScanFiles([]);
-      setScanGroupTitle('');
-      await fetchPatientScansByPatientId(patientId);
-    } catch (err) {
-      showAlert('خطأ', err.message);
-    } finally {
-      setUploadingScans(false);
-    }
-  };
-
-  const handleDeleteSavedScanFromRecord = async (recordId, scanUrl) => {
-    if (Platform.OS === 'web' && !window.confirm("هل أنت متأكد من حذف الصورة؟")) return;
-    try {
-      const record = patientHistory.find(r => r.id === recordId);
-      if (!record || !record.dynamic_fields) return;
-      const df = typeof record.dynamic_fields === 'string' ? JSON.parse(record.dynamic_fields) : record.dynamic_fields;
-      const updatedScans = (df.scans_list || []).filter(s => s.url !== scanUrl);
-      
-      await supabase.from('medical_records').update({ dynamic_fields: { ...df, scans_list: updatedScans } }).eq('id', recordId);
-      showAlert('تم الحذف', 'تم حذف الصورة من السجل.');
-      if (currentPatientId) fetchPatientScansByPatientId(currentPatientId);
-    } catch (err) {
-      showAlert('خطأ', err.message);
-    }
-  };
-
-  const handleUploadLogoFile = async (event) => {
-    const file = event.target.files[0];
-    if (!file) return;
-    setUploadingLogo(true);
-    setLogoUploadProgress(10);
-    try {
-      const compressedBlob = await compressImage(file, 1000, 0.9);
-      const filePath = `logos/${Date.now()}_${file.name}`;
-      const { error } = await supabase.storage.from('clinic-assets').upload(filePath, compressedBlob, { upsert: true });
-      if (!error) {
-        setClinicLogoUrl(supabase.storage.from('clinic-assets').getPublicUrl(filePath).data.publicUrl);
-      }
-    } catch (err) {
-      showAlert('خطأ', err.message);
-    } finally {
-      setUploadingLogo(false);
-      setLogoUploadProgress(100);
-    }
-  };
-
-  const handleAuth = async () => {
-    if (!email.trim() || !password.trim()) {
-      showAlert('تنبيه', 'يرجى إدخال البريد الإلكتروني وكلمة السر.');
-      return;
-    }
-    setAuthSubmitting(true);
-    try {
-      if (isSigningUp) {
-        await supabase.auth.signUp({ email: email.trim(), password: password.trim() });
-        await supabase.auth.signInWithPassword({ email: email.trim(), password: password.trim() });
-      } else {
-        const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password: password.trim() });
-        if (error) throw error;
-      }
-    } catch (err) {
-      showAlert('خطأ', err.message);
-    } finally {
-      setAuthSubmitting(false);
-    }
-  };
-
-  const handleSignOut = async () => {
-    await supabase.auth.signOut();
-    setSession(null);
-  };
-
-  const handleCopyPortalLink = async () => {
-    try {
-      const userEmail = session?.user?.email?.toLowerCase();
-      const { data: clinic } = await supabase.from('clinics').select('id').ilike('email', userEmail).limit(1).maybeSingle();
-      const portalUrl = `https://medverse-emr-suite.vercel.app?c=${encodeURIComponent(clinic?.id || userEmail)}`;
-      if (Platform.OS === 'web' && navigator.clipboard) {
-        await navigator.clipboard.writeText(portalUrl);
-        showAlert('تم النسخ بنجاح! 📋', portalUrl);
-      } else {
-        showAlert('رابط العيادة', portalUrl);
-      }
-    } catch (err) {
-      showAlert('خطأ', 'تعذر النسخ.');
     }
   };
 
@@ -638,23 +402,6 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
         if (clinic.address) setClinicAddress(clinic.address);
       }
     } catch (e) { console.error(e); }
-  };
-
-  const handleSaveProfile = async () => {
-    setLoading(true);
-    try {
-      const userEmail = session?.user?.email?.toLowerCase();
-      const { data: existing } = await supabase.from('clinics').select('id').ilike('email', userEmail).limit(1).maybeSingle();
-      const payload = { doctor_name: clinicDoctorName, clinic_name: clinicName, specialty, logo_url: clinicLogoUrl, phone: clinicPhone, address: clinicAddress, email: userEmail };
-      if (existing) await supabase.from('clinics').update(payload).eq('id', existing.id);
-      else await supabase.from('clinics').insert([payload]);
-      setShowMismatchModal(false);
-      showAlert('تم الحفظ', 'تم حفظ وتحديث البروفايل بنجاح!');
-    } catch (err) {
-      showAlert('خطأ', err.message);
-    } finally {
-      setLoading(false);
-    }
   };
 
   const fetchAllPatients = async () => {
@@ -687,7 +434,7 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
     setPatientPhone('01098765432');
     setAge('52');
     setGender('ذكر');
-    setOccupation('محاسب');
+    setOccupation('مهندس');
     setChronicDiseases('روماتويد مفصلي');
     setRheumaStiffness('نصف ساعة أو أكثر');
     setRheumaAntiCCP('إيجابي مرتفع (+++) > 3x');
@@ -696,7 +443,6 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
     handleSearchPatientByName('محمود عبد الفتاح');
   };
 
-  // --- التحليل الإكلينيكي بالذكاء الاصطناعي ---
   const handleClinicalAnalysis = async () => {
     if (!patientName.trim()) {
       showAlert('تنبيه', 'يرجى إدخال اسم المريض أولاً.');
@@ -705,19 +451,19 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
     setAnalyzing(true);
     setAiReport(null);
 
-    const affectedJointsList = Object.keys(skeletonJointStates).map(id => {
-      const j = SKELETON_JOINTS.find(item => item.id === id);
-      return `${j?.label} (${skeletonJointStates[id] === 'red' ? 'ملتهب/تورم' : 'ألم فقط'})`;
+    const affectedJoints = Object.keys(skeletonJointStates).map(id => {
+      const item = SKELETON_HOTSPOTS.find(h => h.id === id);
+      return `${item?.label} (${skeletonJointStates[id] === 'red' ? 'ملتهب/تورم' : 'ألم فقط'})`;
     });
 
-    const systemPrompt = `You are an expert AI Clinical Rheumatologist and Immunologist. Analyze the case according to ACR/EULAR guidelines and respond ONLY with clean JSON:
+    const systemPrompt = `You are an expert AI Clinical Rheumatologist and Immunologist. Analyze case according to ACR/EULAR guidelines and return ONLY clean JSON:
 {
   "diagnosis": "English Diagnosis - الشرح بالعربي",
   "warnings": ["تحذيرات إكلينيكية بالعربي"],
   "medications": [{"name": "Drug Name", "dose": "الجرعة", "reason": "دواعي الاستعمال"}]
 }`;
 
-    const userPrompt = `Patient: ${patientName}, Age: ${age}, Gender: ${gender}. Affected Joints from map: ${affectedJointsList.join(', ') || 'None'}. Stiffness: ${rheumaStiffness}. ESR/CRP: ${rheumaEsrCrp}, RF: ${rheumaRF}, Anti-CCP: ${rheumaAntiCCP}.`;
+    const userPrompt = `Patient: ${patientName}, Age: ${age}. Affected Joints from skeleton map: ${affectedJoints.join(', ') || 'None'}. Stiffness: ${rheumaStiffness}. ESR/CRP: ${rheumaEsrCrp}, RF: ${rheumaRF}, Anti-CCP: ${rheumaAntiCCP}.`;
 
     try {
       const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
@@ -735,19 +481,6 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
     } finally {
       setAnalyzing(false);
     }
-  };
-
-  const handleCheckAndAddManualMed = async () => {
-    if (!newMedName.trim() || !newMedDose.trim()) {
-      showAlert('تنبيه', 'أدخل اسم الدواء والجرعة.');
-      return;
-    }
-    setPrescribedMeds(prev => [...prev, { name: newMedName, dose: newMedDose, reason: newMedReason || 'إضافة مباشرة' }]);
-    setNewMedName(''); setNewMedDose(''); setNewMedReason('');
-  };
-
-  const handleRemoveMed = (index) => {
-    setPrescribedMeds(prev => prev.filter((_, i) => i !== index));
   };
 
   const executeSaveAndPrint = async () => {
@@ -785,15 +518,6 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
     }
   };
 
-  const handleSaveAndPrint = () => {
-    if (!patientName.trim()) {
-      showAlert('تنبيه', 'يرجى إدخال اسم المريض أولاً.');
-      return;
-    }
-    executeSaveAndPrint();
-  };
-
-  const isPatientSavedInDb = Boolean(currentPatientId || selectedPatientCode);
   const filteredPatients = allDoctorPatients.filter(p => p.full_name?.toLowerCase().includes(patientSearchQuery.toLowerCase()) || p.patient_code?.toLowerCase().includes(patientSearchQuery.toLowerCase()));
 
   if (authLoading) return <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}><ActivityIndicator size="large" color="#00F2FE" /></View>;
@@ -803,33 +527,14 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
       <ScrollView style={styles.container} contentContainerStyle={{ justifyContent: 'center', minHeight: '80%' }}>
         <View style={styles.authCard}>
           <Text style={styles.authTitle}>MedVerse Doctor Portal 🔒</Text>
-          <Text style={styles.authSub}>{isSigningUp ? 'إنشاء حساب طبيب جديد' : 'تسجيل دخول الطبيب'}</Text>
+          <Text style={styles.authSub}>تسجيل دخول الطبيب</Text>
           <Text style={styles.label}>البريد الإلكتروني (Gmail)</Text>
           <TextInput style={styles.input} placeholder="doctor@gmail.com" placeholderTextColor="#94A3B8" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
           <Text style={styles.label}>كلمة السر</Text>
           <TextInput style={styles.input} placeholder="••••••••" placeholderTextColor="#94A3B8" value={password} onChangeText={setPassword} secureTextEntry />
-          <TouchableOpacity style={styles.authSubmitBtn} onPress={handleAuth} disabled={authSubmitting}>
-            {authSubmitting ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.authSubmitBtnText}>{isSigningUp ? 'إنشاء حساب جديد ✨' : 'تسجيل الدخول 🔐'}</Text>}
+          <TouchableOpacity style={styles.authSubmitBtn} onPress={() => supabase.auth.signInWithPassword({ email: email.trim(), password: password.trim() })}>
+            <Text style={styles.authSubmitBtnText}>تسجيل الدخول 🔐</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.authToggleBtn} onPress={() => setIsSigningUp(!isSigningUp)}>
-            <Text style={styles.authToggleBtnText}>{isSigningUp ? 'لديك حساب بالفعل؟ سجل دخولك' : 'ليس لديك حساب؟ أنشئ حساب جديد'}</Text>
-          </TouchableOpacity>
-        </View>
-      </ScrollView>
-    );
-  }
-
-  if (!subscriptionAccess.allowed) {
-    return (
-      <ScrollView style={styles.container} contentContainerStyle={{ justifyContent: 'center', paddingVertical: 20 }}>
-        <View style={styles.paywallCard}>
-          <Text style={styles.paywallIcon}>🔒</Text>
-          <Text style={styles.paywallTitle}>تنبيه اشتراك التطبيق</Text>
-          <Text style={styles.paywallReason}>{subscriptionAccess.message}</Text>
-          <TouchableOpacity style={styles.whatsappBtn} onPress={handleOpenWhatsApp}>
-            <Text style={styles.whatsappBtnText}>💬 التواصل مع الدعم عبر الواتساب لتفعيل الحساب</Text>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={handleSignOut}><Text style={{ color: '#EF4444', textAlign: 'center', marginTop: 10 }}>تسجيل الخروج ✕</Text></TouchableOpacity>
         </View>
       </ScrollView>
     );
@@ -849,69 +554,40 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
       <View style={styles.header}>
         <View style={styles.topUserRow}>
           <Text style={styles.userEmailText}>⚡ {clinicDoctorName} ({session?.user?.email})</Text>
-          <TouchableOpacity onPress={handleSignOut} style={styles.signOutBtn}><Text style={styles.signOutText}>خروج ✕</Text></TouchableOpacity>
+          <TouchableOpacity onPress={() => supabase.auth.signOut()} style={styles.signOutBtn}><Text style={styles.signOutText}>خروج ✕</Text></TouchableOpacity>
         </View>
         <Text style={styles.title}>MedVerse Smart EMR Suite</Text>
-        <Text style={styles.subtitle}>عيادة المفاصل والروماتيزم والمناعة (نموذج د. طاهر عبد الفتاح)</Text>
+        <Text style={styles.subtitle}>عيادة الروماتيزم والمناعة - خريطة الهيكل التفاعلية الفعلية</Text>
       </View>
 
       {/* Navigation */}
       <View style={styles.navBar}>
         <TouchableOpacity style={[styles.navBtn, activeTab === 'prescription' && styles.navBtnActive]} onPress={() => handleTabChange('prescription')}>
-          <Text style={[styles.navBtnText, activeTab === 'prescription' && styles.navBtnTextActive]}>🩺 الكشف والفحص الإكلينيكي</Text>
+          <Text style={[styles.navBtnText, activeTab === 'prescription' && styles.navBtnTextActive]}>🩺 الكشف والفحص</Text>
         </TouchableOpacity>
         <TouchableOpacity style={[styles.navBtn, activeTab === 'patients' && styles.navBtnActive]} onPress={() => { handleTabChange('patients'); fetchAllPatients(); }}>
           <Text style={[styles.navBtnText, activeTab === 'patients' && styles.navBtnTextActive]}>📂 قائمة المرضى ({totalPatientsCount})</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={[styles.navBtn, activeTab === 'profile' && styles.navBtnActive]} onPress={() => handleTabChange('profile')}>
-          <Text style={[styles.navBtnText, activeTab === 'profile' && styles.navBtnTextActive]}>⚙️ بروفايل العيادة</Text>
-        </TouchableOpacity>
       </View>
 
-      {/* TAB 1: PROFILE */}
-      {activeTab === 'profile' && (
-        <View style={styles.card}>
-          <Text style={styles.sectionTitle}>⚙️ بيانات الطبيب والعيادة</Text>
-          <TouchableOpacity style={styles.copyLinkBtn} onPress={handleCopyPortalLink}><Text style={styles.copyLinkBtnText}>📋 نسخ رابط العيادة للمرضى</Text></TouchableOpacity>
-          <Text style={styles.label}>اسم الطبيب</Text>
-          <TextInput style={styles.input} value={clinicDoctorName} onChangeText={setClinicDoctorName} />
-          <Text style={styles.label}>اسم العيادة</Text>
-          <TextInput style={styles.input} value={clinicName} onChangeText={setClinicName} />
-          <Text style={styles.label}>التخصص</Text>
-          <TextInput style={styles.input} value={specialty} onChangeText={setSpecialty} />
-          <Text style={styles.label}>الهاتف</Text>
-          <TextInput style={styles.input} value={clinicPhone} onChangeText={setClinicPhone} />
-          <Text style={styles.label}>العنوان</Text>
-          <TextInput style={styles.input} value={clinicAddress} onChangeText={setClinicAddress} />
-          <TouchableOpacity style={styles.saveProfileBtn} onPress={handleSaveProfile}><Text style={styles.saveProfileBtnText}>💾 حفظ البروفايل</Text></TouchableOpacity>
-        </View>
-      )}
-
-      {/* TAB 2: PATIENTS */}
       {activeTab === 'patients' && (
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>📂 قائمة مرضى العيادة</Text>
-          <View style={styles.statsContainer}>
-            <View style={styles.statCard}><Text style={styles.statNumber}>{monthlyPatientsCount}</Text><Text style={styles.statLabel}>مرضى الشهر</Text></View>
-            <View style={styles.statCard}><Text style={styles.statNumber}>{totalPatientsCount}</Text><Text style={styles.statLabel}>إجمالي المرضى</Text></View>
-          </View>
-          <Text style={styles.label}>🔍 بحث منفصل باسم المريض أو الكود:</Text>
-          <TextInput style={styles.input} placeholder="اكتب اسم المريض للبحث..." placeholderTextColor="#64748B" value={patientSearchQuery} onChangeText={setPatientSearchQuery} />
+          <TextInput style={styles.input} placeholder="بحث بالاسم أو الكود..." placeholderTextColor="#64748B" value={patientSearchQuery} onChangeText={setPatientSearchQuery} />
           {loadingPatientsList ? <ActivityIndicator color="#00F2FE" /> : filteredPatients.map(item => (
             <TouchableOpacity key={item.id} style={styles.patientListItem} onPress={() => selectPatientFromList(item)}>
               <Text style={styles.patientItemName}>👤 {item.full_name} ({item.patient_code})</Text>
-              <Text style={styles.patientItemSub}>السن: {item.age || 'غير محدد'} | الهاتف: {item.phone || 'لا يوجد'}</Text>
+              <Text style={styles.patientItemSub}>السن: {item.age || 'غير محدد'} | هاتف: {item.phone || 'لا يوجد'}</Text>
             </TouchableOpacity>
           ))}
         </View>
       )}
 
-      {/* TAB 3: PRESCRIPTION & CLINICAL EXAMINATION */}
       {activeTab === 'prescription' && (
         <>
           <View style={styles.card}>
             <View style={styles.cardHeaderRow}>
-              <Text style={styles.sectionTitle}>👤 البيانات الأساسية (Personal Hx)</Text>
+              <Text style={styles.sectionTitle}>👤 بيانات المريض الأساسية</Text>
               <TouchableOpacity style={styles.dummyBtn} onPress={handleFillDummyData}><Text style={styles.dummyBtnText}>🧪 بيانات تجريبية</Text></TouchableOpacity>
             </View>
             <Text style={styles.label}>اسم المريض بالكامل *</Text>
@@ -925,54 +601,42 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
                   <TouchableOpacity style={[styles.genderChip, gender === 'أنثى' && styles.genderChipActive]} onPress={() => setGender('أنثى')}><Text style={{ color: '#FFF', fontSize: 11 }}>أنثى</Text></TouchableOpacity>
                 </View>
               </View>
-              <View style={{ flex: 1 }}><Text style={styles.label}>الوظيفة</Text><TextInput style={styles.input} placeholder="الوظيفة" placeholderTextColor="#64748B" value={occupation} onChangeText={setOccupation} /></View>
-            </View>
-            <Text style={styles.label}>الأمراض المزمنة</Text>
-            <TextInput style={styles.input} placeholder="الأمراض المزمنة..." placeholderTextColor="#64748B" value={chronicDiseases} onChangeText={setChronicDiseases} />
-          </View>
-
-          {/* C/o */}
-          <View style={styles.card}>
-            <Text style={styles.sectionTitle}>🩺 الشكوى الرئيسية (Chief Complaint C/o)</Text>
-            <View style={styles.chipsContainer}>
-              {['Generalized', 'Acute', 'Chronic', 'Progressive', 'Mechanical', 'Inflammatory', 'Arthralgia', 'Arthritis'].map(item => (
-                <TouchableOpacity key={item} style={[styles.selectChip, coState[item.toLowerCase()] && styles.selectChipActive]} onPress={() => setCoState(p => ({ ...p, [item.toLowerCase()]: !p[item.toLowerCase()] }))}>
-                  <Text style={[styles.selectChipText, coState[item.toLowerCase()] && styles.selectChipTextActive]}>{item}</Text>
-                </TouchableOpacity>
-              ))}
             </View>
           </View>
 
-          {/* 🦴 خريطة الهيكل العظمي التفاعلية (البصرية الفعلية) */}
+          {/* 🦴 الخريطة البصرية التفاعلية لصورة الهيكل العظمي */}
           {isRheumaSpecialty && (
             <View style={styles.card}>
-              <Text style={styles.sectionTitle}>🦴 خريطة مفاصل الجسم التفاعلية (اضغط على المفصل لتحديد مكان الألم/الالتهاب)</Text>
-              <Text style={styles.legendTitle}>🔴 نقرة أولى = ملتهب ومتورم (Arthritis) | 🔵 نقرة ثانية = ألم فقط (Arthralgia) | ⚪ نقرة ثالثة = إلغاء</Text>
+              <Text style={styles.sectionTitle}>🦴 خريطة الهيكل العظمي التفاعلية (اضغط على المفصل في الصورة)</Text>
+              <Text style={styles.legendTitle}>🔴 نقرة أولى = ملتهب ومتورم (Arthritis) | 🔵 نقرة ثانية = ألم فقط (Arthralgia) | ⚪ نقرة ثالثة = إلغاء التحديد</Text>
 
-              <View style={styles.visualSkeletonBox}>
-                <Text style={styles.skeletonGenderLabel}>هيكل المريض ({gender}): اضغط على أي نقطة أدناه لتمييزها:</Text>
-                
-                {/* شبكة النقاط التفاعلية التوجيهية فوق شكل الهيكل */}
-                <View style={styles.skeletonInteractiveContainer}>
-                  {SKELETON_JOINTS.map(joint => {
-                    const status = skeletonJointStates[joint.id];
-                    return (
-                      <TouchableOpacity
-                        key={joint.id}
-                        style={[
-                          styles.skeletonMarkerBtn,
-                          { top: joint.top, left: joint.left },
-                          status === 'red' && styles.markerRed,
-                          status === 'blue' && styles.markerBlue
-                        ]}
-                        onPress={() => handleSkeletonPointClick(joint.id)}
-                      >
-                        <Text style={styles.markerText}>{status === 'red' ? '🔴' : status === 'blue' ? '🔵' : '⚪'}</Text>
-                        <Text style={styles.markerLabel}>{joint.label}</Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
+              <View style={styles.skeletonContainerBox}>
+                {/* صورة الهيكل العظمي الأصلية كخلفية تفاعلية */}
+                <Image 
+                  source={{ uri: 'https://emynlqikbdwogijqfbfw.supabase.co/storage/v1/object/public/clinic-assets/skeleton_template.png' }} 
+                  style={styles.skeletonBackgroundImage} 
+                  resizeMode="contain"
+                />
+
+                {/* طبقة النقاط التفاعلية (Hotspots) فوق أماكن المفاصل في الصورة */}
+                {SKELETON_HOTSPOTS.map(joint => {
+                  const state = skeletonJointStates[joint.id];
+                  return (
+                    <TouchableOpacity
+                      key={joint.id}
+                      style={[
+                        styles.hotspotBadge,
+                        { top: joint.y, left: joint.x },
+                        state === 'red' && styles.hotspotRed,
+                        state === 'blue' && styles.hotspotBlue
+                      ]}
+                      onPress={() => handleSkeletonHotspotClick(joint.id)}
+                    >
+                      <Text style={styles.hotspotText}>{state === 'red' ? '🔴' : state === 'blue' ? '🔵' : '➕'}</Text>
+                      <Text style={styles.hotspotLabel}>{joint.label}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
 
               <Text style={styles.subSectionTitle}>⏱️ مدة التيبس الصباحي (Morning Stiffness):</Text>
@@ -986,32 +650,14 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
             </View>
           )}
 
-          {/* الأعراض والتحاليل */}
+          {/* التحاليل والمرفقات */}
           <View style={styles.card}>
-            <Text style={styles.sectionTitle}>📸 تحاليل وأشعة ومرفقات المريض</Text>
-            <Text style={styles.label}>1. سرعة الترسيب والبروتين الالتهابي (ESR / CRP):</Text>
+            <Text style={styles.sectionTitle}>📸 التحاليل والأشعة والمرفقات</Text>
+            <Text style={styles.label}>سرعة الترسيب والبروتين (ESR / CRP):</Text>
             <View style={styles.chipsContainer}>
               {RHEUMA_OPTIONS.esrCrp.map(opt => (
                 <TouchableOpacity key={opt} style={[styles.selectChip, rheumaEsrCrp === opt && styles.selectChipActive]} onPress={() => setRheumaEsrCrp(opt)}>
                   <Text style={[styles.selectChipText, rheumaEsrCrp === opt && styles.selectChipTextActive]}>{opt}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            <Text style={styles.label}>2. Rheumatoid Factor (RF):</Text>
-            <View style={styles.chipsContainer}>
-              {RHEUMA_OPTIONS.rf.map(opt => (
-                <TouchableOpacity key={opt} style={[styles.selectChip, rheumaRF === opt && styles.selectChipActive]} onPress={() => setRheumaRF(opt)}>
-                  <Text style={[styles.selectChipText, rheumaRF === opt && styles.selectChipTextActive]}>{opt}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            <Text style={styles.label}>3. Anti-CCP:</Text>
-            <View style={styles.chipsContainer}>
-              {RHEUMA_OPTIONS.antiCCP.map(opt => (
-                <TouchableOpacity key={opt} style={[styles.selectChip, rheumaAntiCCP === opt && styles.selectChipActive]} onPress={() => setRheumaAntiCCP(opt)}>
-                  <Text style={[styles.selectChipText, rheumaAntiCCP === opt && styles.selectChipTextActive]}>{opt}</Text>
                 </TouchableOpacity>
               ))}
             </View>
@@ -1024,7 +670,6 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
                 {patientScansGrid.map((sc, idx) => (
                   <View key={idx} style={styles.scanGridCard}>
                     <TouchableOpacity onPress={() => setViewingImageModal(sc)}><Image source={{ uri: sc.url }} style={{ width: 70, height: 70, borderRadius: 6 }} /></TouchableOpacity>
-                    <TouchableOpacity onPress={() => handleDeleteSavedScanFromRecord(sc.recordId, sc.url)}><Text style={{ color: '#EF4444', fontSize: 10, marginTop: 4 }}>حذف</Text></TouchableOpacity>
                   </View>
                 ))}
               </View>
@@ -1044,7 +689,7 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
             <Text style={styles.subSectionTitle}>💊 الأدوية ({prescribedMeds.length}):</Text>
             {prescribedMeds.map((med, idx) => (
               <View key={idx} style={styles.medCard}>
-                <View style={styles.medHeader}><Text style={styles.medName}>💊 {med.name} - {med.dose}</Text><TouchableOpacity onPress={() => handleRemoveMed(idx)}><Text style={{ color: '#EF4444' }}>إزالة</Text></TouchableOpacity></View>
+                <Text style={styles.medName}>💊 {med.name} - {med.dose}</Text>
                 <Text style={styles.medDetail}>{med.reason}</Text>
               </View>
             ))}
@@ -1053,11 +698,11 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
               <Text style={styles.label}>إضافة دواء يدوي:</Text>
               <TextInput style={styles.input} placeholder="اسم الدواء..." placeholderTextColor="#64748B" value={newMedName} onChangeText={setNewMedName} />
               <TextInput style={styles.input} placeholder="الجرعة..." placeholderTextColor="#64748B" value={newMedDose} onChangeText={setNewMedDose} />
-              <TouchableOpacity style={styles.addMedBtn} onPress={handleCheckAndAddManualMed}><Text style={styles.addMedBtnText}>➕ إضافة للروشتة</Text></TouchableOpacity>
+              <TouchableOpacity style={styles.addMedBtn} onPress={() => { setPrescribedMeds(p => [...p, { name: newMedName, dose: newMedDose, reason: newMedReason || 'إضافة مباشرة' }]); setNewMedName(''); setNewMedDose(''); }}><Text style={styles.addMedBtnText}>➕ إضافة للروشتة</Text></TouchableOpacity>
             </View>
           </View>
 
-          <TouchableOpacity style={styles.saveButton} onPress={handleSaveAndPrint} disabled={loading}>
+          <TouchableOpacity style={styles.saveButton} onPress={executeSaveAndPrint} disabled={loading}>
             {loading ? <ActivityIndicator color="#FFF" /> : <Text style={styles.saveButtonText}>اعتماد التقرير وتنزيل الروشتة PDF 🖨️</Text>}
           </TouchableOpacity>
         </>
@@ -1069,9 +714,9 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#060911', padding: 14 },
   header: { marginBottom: 15, alignItems: 'center' },
-  title: { fontSize: 22, fontWeight: '900', color: '#00F2FE', textAlign: 'center' },
+  title: { fontSize: 20, fontWeight: '900', color: '#00F2FE', textAlign: 'center' },
   subtitle: { fontSize: 11, color: '#94A3B8', textAlign: 'center', marginTop: 4 },
-  topUserRow: { flexDirection: 'row-reverse', justifyContent: 'space-between', width: '100%', marginBottom: 8 },
+  topUserRow: { flexDirection: 'row-reverse', justifyContent: 'space-width', width: '100%', marginBottom: 8 },
   userEmailText: { color: '#38BDF8', fontSize: 11, fontWeight: 'bold' },
   signOutBtn: { backgroundColor: '#1E293B', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
   signOutText: { color: '#EF4444', fontSize: 10, fontWeight: 'bold' },
@@ -1098,24 +743,22 @@ const styles = StyleSheet.create({
   dummyBtn: { backgroundColor: '#0284C7', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
   dummyBtnText: { color: '#FFF', fontSize: 10, fontWeight: 'bold' },
   selectedCodeBadge: { color: '#10B981', fontSize: 11, fontWeight: 'bold', textAlign: 'right', marginBottom: 10 },
-  
-  /* خريطة الهيكل التفاعلية البصرية */
-  visualSkeletonBox: { backgroundColor: '#060911', padding: 14, borderRadius: 12, borderWidth: 1, borderColor: '#0284C7', alignItems: 'center', minHeight: 280, position: 'relative' },
-  skeletonGenderLabel: { color: '#94A3B8', fontSize: 11, marginBottom: 10, textAlign: 'center' },
+
+  /* تنسيق خريطة الهيكل العظمي البصرية الفعلية */
+  skeletonContainerBox: { width: '100%', height: 380, backgroundColor: '#FFFFFF', borderRadius: 12, position: 'relative', overflow: 'hidden', borderWidth: 1, borderColor: '#0284C7', marginBottom: 10 },
+  skeletonBackgroundImage: { width: '100%', height: '100%', position: 'absolute' },
   legendTitle: { color: '#CBD5E1', fontSize: 10, textAlign: 'right', marginBottom: 8 },
-  skeletonInteractiveContainer: { width: '100%', height: 240, position: 'relative', backgroundColor: 'rgba(15, 23, 42, 0.6)', borderRadius: 8, borderWidth: 1, borderColor: '#1E293B' },
-  skeletonMarkerBtn: { position: 'absolute', transform: [{ translateX: -15 }, { translateY: -15 }], backgroundColor: '#1E293B', paddingHorizontal: 6, paddingVertical: 3, borderRadius: 12, borderWidth: 1, borderColor: '#475569', alignItems: 'center', zIndex: 10 },
-  markerRed: { backgroundColor: 'rgba(239, 68, 68, 0.4)', borderColor: '#EF4444' },
-  markerBlue: { backgroundColor: 'rgba(59, 130, 246, 0.4)', borderColor: '#3B82F6' },
-  markerText: { fontSize: 10 },
-  markerLabel: { fontSize: 9, color: '#FFF', marginTop: 1, fontWeight: 'bold' },
+  hotspotBadge: { position: 'absolute', transform: [{ translateX: -14 }, { translateY: -14 }], backgroundColor: 'rgba(15, 23, 42, 0.85)', paddingHorizontal: 5, paddingVertical: 2, borderRadius: 10, borderWidth: 1, borderColor: '#38BDF8', alignItems: 'center', zIndex: 10 },
+  hotspotRed: { backgroundColor: 'rgba(239, 68, 68, 0.9)', borderColor: '#F87171' },
+  hotspotBlue: { backgroundColor: 'rgba(59, 130, 246, 0.9)', borderColor: '#60A5FA' },
+  hotspotText: { fontSize: 9 },
+  hotspotLabel: { fontSize: 8, color: '#FFF', fontWeight: 'bold', marginTop: 1 },
 
   scansGridContainer: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 8, marginTop: 10 },
   scanGridCard: { backgroundColor: '#060911', padding: 6, borderRadius: 8, alignItems: 'center', borderWidth: 1, borderColor: '#1E293B' },
   aiButton: { backgroundColor: '#0284C7', padding: 12, borderRadius: 10, alignItems: 'center', marginBottom: 10 },
   aiButtonText: { color: '#FFF', fontWeight: 'bold', fontSize: 12 },
   medCard: { backgroundColor: '#060911', padding: 10, borderRadius: 8, marginBottom: 6, borderWidth: 1, borderColor: '#1E293B' },
-  medHeader: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center' },
   medName: { color: '#FFF', fontWeight: 'bold', fontSize: 12 },
   medDetail: { color: '#94A3B8', fontSize: 11, textAlign: 'right', marginTop: 2 },
   addMedBox: { backgroundColor: '#060911', padding: 10, borderRadius: 8, marginTop: 10, borderWidth: 1, borderColor: '#1E293B' },
@@ -1135,18 +778,6 @@ const styles = StyleSheet.create({
   authSub: { fontSize: 12, color: '#94A3B8', textAlign: 'center', marginBottom: 15 },
   authSubmitBtn: { backgroundColor: '#0284C7', padding: 12, borderRadius: 8, alignItems: 'center', marginTop: 10 },
   authSubmitBtnText: { color: '#FFF', fontWeight: 'bold', fontSize: 12 },
-  authToggleBtn: { marginTop: 12, alignItems: 'center' },
-  authToggleBtnText: { color: '#38BDF8', fontSize: 11 },
-  paywallCard: { backgroundColor: '#0F172A', padding: 20, borderRadius: 16, borderWidth: 1, borderColor: '#EF4444', alignItems: 'center' },
-  paywallIcon: { fontSize: 30, marginBottom: 8 },
-  paywallTitle: { fontSize: 16, fontWeight: 'bold', color: '#EF4444', marginBottom: 6 },
-  paywallReason: { fontSize: 11, color: '#FCA5A5', textAlign: 'center', marginBottom: 15 },
-  whatsappBtn: { backgroundColor: '#16A34A', padding: 12, borderRadius: 8, width: '100%', alignItems: 'center' },
-  whatsappBtnText: { color: '#FFF', fontSize: 11, fontWeight: 'bold' },
-  copyLinkBtn: { backgroundColor: '#0284C7', padding: 10, borderRadius: 8, alignItems: 'center', marginBottom: 12 },
-  copyLinkBtnText: { color: '#FFF', fontSize: 11, fontWeight: 'bold' },
-  saveProfileBtn: { backgroundColor: '#10B981', padding: 12, borderRadius: 8, alignItems: 'center', marginTop: 10 },
-  saveProfileBtnText: { color: '#FFF', fontSize: 12, fontWeight: 'bold' },
   lightboxOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.9)', justifyContent: 'center', alignItems: 'center' },
   lightboxCloseBtn: { position: 'absolute', top: 20, right: 20, backgroundColor: '#EF4444', padding: 8, borderRadius: 6 }
 });
