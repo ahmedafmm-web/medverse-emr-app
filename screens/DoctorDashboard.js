@@ -18,39 +18,33 @@ const SPECIALITIES_LIST = [
   "استشاري أمراض الباطنة والسكر"
 ];
 
-// --- قائمة المفاصل الخريطة التفاعلية ---
-const JOINTS_LIST = [
-  { id: 'shoulder_r', label: 'الكتف الأيمن (Shoulder R)' },
-  { id: 'shoulder_l', label: 'الكتف الأيسر (Shoulder L)' },
-  { id: 'elbow_r', label: 'الكوع الأيمن (Elbow R)' },
-  { id: 'elbow_l', label: 'الكوع الأيسر (Elbow L)' },
-  { id: 'wrist_r', label: 'الرسغ الأيمن (Wrist R)' },
-  { id: 'wrist_l', label: 'الرسغ الأيسر (Wrist L)' },
-  { id: 'hand_mcps_r', label: 'أصابع اليد اليمنى (MCPs/PIPs R)' },
-  { id: 'hand_mcps_l', label: 'أصابع اليد اليسرى (MCPs/PIPs L)' },
-  { id: 'hip_r', label: 'الحوض الأيمن (Hip R)' },
-  { id: 'hip_l', label: 'الحوض الأيسر (Hip L)' },
-  { id: 'spine_neck', label: 'الرقبة (Cervical Spine)' },
-  { id: 'spine_back', label: 'الظهر والفقرات (Lumbar Spine)' },
-  { id: 'knee_r', label: 'الركبة اليمنى (Knee R)' },
-  { id: 'knee_l', label: 'الركبة اليسرى (Knee L)' },
-  { id: 'ankle_r', label: 'الكاحل الأيمن (Ankle R)' },
-  { id: 'ankle_l', label: 'الكاحل الأيسر (Ankle L)' },
-  { id: 'feet_r', label: 'أصابع القدم اليمنى (MTPs R)' },
-  { id: 'feet_l', label: 'أصابع القدم اليسرى (MTPs L)' },
+// --- مفاصل الجسم المتاحة للنقر البصري على الهيكل العظمي ---
+const SKELETON_JOINTS = [
+  { id: 'skull', label: 'الرأس والجمجمة', top: '5%', left: '46%' },
+  { id: 'shoulder_r', label: 'الكتف الأيمن', top: '18%', left: '30%' },
+  { id: 'shoulder_l', label: 'الكتف الأيسر', top: '18%', left: '65%' },
+  { id: 'elbow_r', label: 'الكوع الأيمن', top: '30%', left: '23%' },
+  { id: 'elbow_l', label: 'الكوع الأيسر', top: '30%', left: '72%' },
+  { id: 'wrist_r', label: 'الرسغ/اليد اليمنى', top: '42%', left: '18%' },
+  { id: 'wrist_l', label: 'الرسغ/اليد اليسرى', top: '42%', left: '77%' },
+  { id: 'spine', label: 'العمود الفقري والظهر', top: '28%', left: '48%' },
+  { id: 'hip_r', label: 'الحوض الأيمن', top: '45%', left: '40%' },
+  { id: 'hip_l', label: 'الحوض الأيسر', top: '45%', left: '57%' },
+  { id: 'knee_r', label: 'الركبة اليمنى', top: '65%', left: '38%' },
+  { id: 'knee_l', label: 'الركبة اليسرى', top: '65%', left: '59%' },
+  { id: 'ankle_r', label: 'الكاحل/القدم اليمنى', top: '85%', left: '36%' },
+  { id: 'ankle_l', label: 'الكاحل/القدم اليسرى', top: '85%', left: '61%' },
 ];
 
-// --- خيارات الروماتيزم المحدثة حسب استمارة د. طاهر ---
 const RHEUMA_OPTIONS = {
   morningStiffnessDuration: [
     "دقائق",
     "نصف ساعة أو أكثر"
   ],
-  antiCCP: [
-    "غير متوفر",
-    "سلبي (Negative)",
-    "إيجابي (+) < 3x",
-    "إيجابي مرتفع (+++) > 3x"
+  esrCrp: [
+    "طبيعي (Normal)",
+    "مرتفع بدرجة متوسطة (Moderate)",
+    "مرتفع جداً (High Active Flare)"
   ],
   rf: [
     "غير متوفر",
@@ -58,32 +52,18 @@ const RHEUMA_OPTIONS = {
     "إيجابي ضعيف (+)",
     "إيجابي مرتفع (+++)"
   ],
+  antiCCP: [
+    "غير متوفر",
+    "سلبي (Negative)",
+    "إيجابي (+) < 3x",
+    "إيجابي مرتفع (+++) > 3x"
+  ],
   ana: [
     "غير متوفر",
     "سلبي (Negative)",
     "إيجابي Homogeneous",
     "إيجابي Speckled",
     "إيجابي Nucleolar"
-  ],
-  antiDsDNA: [
-    "غير متوفر",
-    "سلبي (Negative)",
-    "إيجابي مرتفع (Positive)"
-  ],
-  esrCrp: [
-    "طبيعي (Normal)",
-    "مرتفع بدرجة متوسطة (Moderate)",
-    "مرتفع جداً (High Active Flare)"
-  ],
-  organSafety: [
-    "طبيعي وآمن للعلاج",
-    "ارتفاع طفيف في إنزيمات الكبد",
-    "قصور كلوي / كبدي"
-  ],
-  tbScreening: [
-    "سلبي وجاهز للعلاج البيولوجي",
-    "إيجابي / غير مكتمل",
-    "لم يتم الفحص بعد"
   ],
   clinicalStage: [
     "حالة روماتويد أولي حديث التشخيص (Early RA - Treatment Naive)",
@@ -105,44 +85,29 @@ const sanitizeText = (str) => {
 
 const isSpecialtyMatching = (selectedSpec, registeredSpec) => {
   if (!selectedSpec || !registeredSpec) return true;
-
   const cleanSelected = selectedSpec.replace(/[^\u0600-\u06FF a-zA-Z]/g, '').trim().toLowerCase();
   const cleanRegistered = registeredSpec.replace(/[^\u0600-\u06FF a-zA-Z]/g, '').trim().toLowerCase();
-
   if (cleanSelected === cleanRegistered) return true;
-
-  const registeredWords = cleanRegistered
-    .split(/\s+/)
-    .filter(word => word.length > 2 && !['استشاري', 'أخصائي', 'دكتور', 'طبيب', 'مركز', 'عيادة', 'الأمراض', 'وجراحة', 'جراحة'].includes(word));
-
+  const registeredWords = cleanRegistered.split(/\s+/).filter(word => word.length > 2 && !['استشاري', 'أخصائي', 'دكتور', 'طبيب', 'مركز', 'عيادة', 'الأمراض', 'وجراحة', 'جراحة'].includes(word));
   for (let word of registeredWords) {
     if (cleanSelected.includes(word)) return true;
   }
-
   return false;
 };
 
 const getExactTimeLeftMessage = (expiryDateString) => {
   if (!expiryDateString) return '';
-
   const now = new Date();
   const expiry = new Date(expiryDateString);
   const diffMs = expiry.getTime() - now.getTime();
-
   if (diffMs <= 0) return 'منتهي الآن';
-
   const totalMinutes = Math.floor(diffMs / (1000 * 60));
   const days = Math.floor(totalMinutes / (60 * 24));
   const hours = Math.floor((totalMinutes % (60 * 24)) / 60);
   const minutes = totalMinutes % 60;
-
-  if (days > 0) {
-    return `متبقي ${days} يوم و ${hours} ساعة و ${minutes} دقيقة`;
-  } else if (hours > 0) {
-    return `متبقي ${hours} ساعة و ${minutes} دقيقة فقط!`;
-  } else {
-    return `متبقي ${minutes} دقيقة فقط!`;
-  }
+  if (days > 0) return `متبقي ${days} يوم و ${hours} ساعة و ${minutes} دقيقة`;
+  else if (hours > 0) return `متبقي ${hours} ساعة و ${minutes} دقيقة فقط!`;
+  else return `متبقي ${minutes} دقيقة فقط!`;
 };
 
 export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchPortal, onUpdateSpecialty }) {
@@ -173,7 +138,7 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
 
   const [clinicDoctorName, setClinicDoctorName] = useState('د. طاهر عبد الفتاح');
-  const [clinicName, setClinicName] = useState('عيادة الروماتيزم والمناعة');
+  const [clinicName, setClinicName] = useState('عيادة الروماتيزم والمفاصل');
   const [specialty, setSpecialty] = useState(initialSpecialty || 'استشاري أمراض الروماتيزم والروماتويد والأمراض المناعية');
   const [registeredSpecialty, setRegisteredSpecialty] = useState('');
   const [clinicLogoUrl, setClinicLogoUrl] = useState('https://cdn-icons-png.flaticon.com/512/387/387561.png');
@@ -183,12 +148,11 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
 
   const [logoUploadProgress, setLogoUploadProgress] = useState(0);
   const [uploadingLogo, setUploadingLogo] = useState(false);
-
   const [showMismatchModal, setShowMismatchModal] = useState(false);
+
   const [selectedScanFiles, setSelectedScanFiles] = useState([]);
   const [scanUploadProgress, setScanUploadProgress] = useState(0);
   const [uploadingScans, setUploadingScans] = useState(false);
-
   const [viewingImageModal, setViewingImageModal] = useState(null);
   const [zoomScale, setZoomScale] = useState(1);
 
@@ -202,27 +166,27 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
   const [selectedPatientCode, setSelectedPatientCode] = useState('');
   const [currentPatientId, setCurrentPatientId] = useState(null);
 
-  // --- خريطة المفاصل التفاعلية والتيبس (Rheumatology Interactive States) ---
-  const [jointStates, setJointStates] = useState({}); // { joint_id: 'red' | 'blue' | null }
+  // --- خريطة الهيكل العظمي التفاعلية (الصورة الحقيقية المضمنة بالنقر) ---
+  const [skeletonJointStates, setSkeletonJointStates] = useState({}); // { jointId: 'red' | 'blue' | null }
   const [rheumaStiffness, setRheumaStiffness] = useState('دقائق');
 
-  const handleJointClick = (jointId) => {
-    setJointStates(prev => {
+  const handleSkeletonPointClick = (jointId) => {
+    setSkeletonJointStates(prev => {
       const current = prev[jointId];
-      if (!current) return { ...prev, [jointId]: 'red' };        // نقرة 1: أحمر (التهاب/تورم)
-      if (current === 'red') return { ...prev, [jointId]: 'blue' }; // نقرة 2: أزرق (ألم)
+      if (!current) return { ...prev, [jointId]: 'red' };        // نقرة 1: أحمر (التهاب / تورم)
+      if (current === 'red') return { ...prev, [jointId]: 'blue' }; // نقرة 2: أزرق (ألم فقط)
       const updated = { ...prev };
-      delete updated[jointId];                                    // نقرة 3: إلغاء
+      delete updated[jointId];                                    // نقرة 3: إلغاء التحديد
       return updated;
     });
   };
 
-  // --- الشكوى الرئيسية (C/o Checkboxes) ---
+  // --- الشكوى الرئيسية C/o ---
   const [coState, setCoState] = useState({
     generalized: false, acute: false, chronic: false, progressive: false, mechanical: false, inflammatory: false, arthralgia: false, arthritis: false
   });
 
-  // --- الأعراض الإضافية والأنظمة الأخرى (Symptoms & Systems) ---
+  // --- الأعراض الإضافية والأنظمة ---
   const [symptomsFlags, setSymptomsFlags] = useState({
     lbpMech: false, lbpInfl: false, rashes: false, oralUlcers: false, eye: false,
     dysphagia: false, recurrentDiarrhea: false, bloodyDiarrhea: false, abdominalPain: false,
@@ -231,22 +195,14 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
     weightLoss: false, lossOfAppetite: false, lymphNodes: false
   });
 
-  // --- التاريخ المرضي والعائلي (Past & Family Hx) ---
-  const [pastHistory, setPastHistory] = useState({ currentTTT: '', hypersensitivity: '', pregnancy: '', lactation: '', externalDrugs: '', sameSystem: '' });
-  const [familyHistory, setFamilyHistory] = useState({ consang: false, autoimDs: false, chemother: false, tb: false, feverHospital: false, note: '' });
+  const [familyHistory, setFamilyHistory] = useState({ consang: false, autoimDs: false, chemother: false, tb: false, feverHospital: false });
 
-  // --- التحاليل ودلالات الالتهاب ---
+  // --- التحاليل ---
   const [rheumaEsrCrp, setRheumaEsrCrp] = useState('مرتفع جداً (High Active Flare)');
   const [rheumaAntiCCP, setRheumaAntiCCP] = useState('إيجابي مرتفع (+++) > 3x');
   const [rheumaRF, setRheumaRF] = useState('إيجابي مرتفع (+++)');
   const [rheumaANA, setRheumaANA] = useState('غير متوفر');
-  const [rheumaAntiDsDNA, setRheumaAntiDsDNA] = useState('غير متوفر');
-  const [rheumaOrganSafety, setRheumaOrganSafety] = useState('طبيعي وآمن للعلاج');
-  const [rheumaTbScreening, setRheumaTbScreening] = useState('سلبي وجاهز للعلاج البيولوجي');
   const [rheumaClinicalStage, setRheumaClinicalStage] = useState('حالة روماتويد أولي حديث التشخيص (Early RA - Treatment Naive)');
-
-  // --- الفحص السريري (O/E) ---
-  const [oeExam, setOeExam] = useState({ mcpsSqueeze: false, mtpsSqueeze: false, strLegRaise: false, femoralStretch: false, crossedStrLeg: false, knee: '', siFaber: false, tenderness: '' });
 
   const [symptomsInput, setSymptomsInput] = useState('');
   const [doctorNotes, setDoctorNotes] = useState('');
@@ -271,27 +227,16 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
   const [allDoctorPatients, setAllDoctorPatients] = useState([]);
   const [loadingPatientsList, setLoadingPatientsList] = useState(false);
 
-  // إحصائيات صفحة المرضى والبحث
+  // إحصائيات المرضى
   const [patientSearchQuery, setPatientSearchQuery] = useState('');
   const [monthlyPatientsCount, setMonthlyPatientsCount] = useState(0);
   const [totalPatientsCount, setTotalPatientsCount] = useState(0);
 
   const isRheumaSpecialty = specialty.includes("الروماتيزم") || specialty.includes("الروماتويد") || specialty.includes("المناعية");
 
-  const toggleMultiSelect = (item, currentList, setter) => {
-    if (currentList.includes(item)) {
-      setter(currentList.filter(i => i !== item));
-    } else {
-      setter([...currentList, item]);
-    }
-  };
-
   const showAlert = (title, message) => {
-    if (Platform.OS === 'web') {
-      window.alert(`${title}\n${message}`);
-    } else {
-      Alert.alert(title, message);
-    }
+    if (Platform.OS === 'web') window.alert(`${title}\n${message}`);
+    else Alert.alert(title, message);
   };
 
   const handleOpenWhatsApp = () => {
@@ -403,13 +348,13 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
     setSelectedScanFiles(prev => [...prev, ...newFiles]);
   };
 
-  // --- التقاط صور الكاميرا المباشرة للأشعة والتحاليل ---
+  // --- كاميرا الأشعة والمرفقات المباشرة ---
   const handleDirectCameraCapture = async (event) => {
     const file = event.target.files[0];
     if (!file) return;
 
     if (!currentPatientId && !selectedPatientCode) {
-      showAlert('تنبيه هام', 'يجب حفظ بيانات المريض وتأكيد كوده أولاً قبل إضافة صور الأشعة بالكاميرا.');
+      showAlert('تنبيه هام', 'يجب حفظ بيانات المريض وتأكيد كوده أولاً قبل التقاط الأشعة بالكاميرا.');
       return;
     }
 
@@ -430,7 +375,7 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
 
       const newScanObj = {
         id: Date.now(),
-        title: scanGroupTitle || 'صورة أشعة/تحليل (لقطة كاميرا)',
+        title: scanGroupTitle || 'تحاليل وأشعة ومرفقات المريض (لقطة كاميرا)',
         url: publicUrl,
         created_at: new Date().toISOString()
       };
@@ -450,10 +395,6 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
     } finally {
       setUploadingScans(false);
     }
-  };
-
-  const handleRemoveSingleScan = (id) => {
-    setSelectedScanFiles(prev => prev.filter(item => item.id !== id));
   };
 
   const fetchPatientScansByPatientId = async (pId) => {
@@ -490,19 +431,11 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
               });
             }
           });
-        } else if (df.scanUrl) {
-          allScans.push({ 
-            url: String(df.scanUrl), 
-            title: df.scanTitle || 'أشعة طبية', 
-            recordId: r.id, 
-            date: r.created_at || r.visit_date 
-          });
         }
       });
-
       setPatientScansGrid(allScans);
     } catch (e) {
-      console.error('Fetch Scans Error:', e);
+      console.error(e);
     } finally {
       setSearchingHistory(false);
     }
@@ -550,12 +483,10 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
       showAlert('تنبيه', 'يرجى إدخال اسم المريض أولاً.');
       return;
     }
-
     if (!currentPatientId && !selectedPatientCode) {
       showAlert('تنبيه هام', 'يجب حفظ بيانات المريض وتأكيد كوده أولاً قبل إضافة الأشعات.');
       return;
     }
-
     if (selectedScanFiles.length === 0) {
       showAlert('تنبيه', 'يرجى اختيار صور الأشعة.');
       return;
@@ -566,38 +497,21 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
 
     try {
       const userEmail = session?.user?.email?.toLowerCase();
-      const currentUserId = session?.user?.id;
       let patientCode = selectedPatientCode;
       let patientId = currentPatientId;
-
       let clinicId = null;
-      let cQuery = supabase.from('clinics').select('id');
-      if (userEmail) cQuery = cQuery.ilike('email', userEmail);
-      else if (currentUserId) cQuery = cQuery.eq('user_id', currentUserId);
 
-      const { data: existingClinic } = await cQuery.limit(1).maybeSingle();
+      const { data: existingClinic } = await supabase.from('clinics').select('id').ilike('email', userEmail).limit(1).maybeSingle();
       if (existingClinic) clinicId = existingClinic.id;
 
       const uploadedList = [];
-      const total = selectedScanFiles.length;
-
-      for (let i = 0; i < total; i++) {
+      for (let i = 0; i < selectedScanFiles.length; i++) {
         const item = selectedScanFiles[i];
         const compressed = await compressImage(item.file, 2400, 0.92);
-        const uniqueId = Math.random().toString(36).substring(2, 9);
-        const filePath = `patient_scans/${patientCode}/${Date.now()}_${uniqueId}_${i}.jpg`;
+        const filePath = `patient_scans/${patientCode}/${Date.now()}_${i}.jpg`;
 
-        const { error: uploadErr } = await supabase.storage
-          .from('clinic-assets')
-          .upload(filePath, compressed, { upsert: true });
-
-        let publicUrl = '';
-        if (!uploadErr) {
-          const { data: urlData } = supabase.storage.from('clinic-assets').getPublicUrl(filePath);
-          publicUrl = urlData?.publicUrl || (urlData?.data ? urlData.data.publicUrl : null) || `https://emynlqikbdwogijqfbfw.supabase.co/storage/v1/object/public/clinic-assets/${filePath}`;
-        } else {
-          publicUrl = item.previewUrl;
-        }
+        const { error: uploadErr } = await supabase.storage.from('clinic-assets').upload(filePath, compressed, { upsert: true });
+        let publicUrl = uploadErr ? item.previewUrl : supabase.storage.from('clinic-assets').getPublicUrl(filePath).data.publicUrl;
 
         uploadedList.push({
           id: Date.now() + '_' + i,
@@ -605,11 +519,10 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
           url: publicUrl,
           created_at: new Date().toISOString()
         });
-
-        setScanUploadProgress(Math.round(((i + 1) / total) * 100));
+        setScanUploadProgress(Math.round(((i + 1) / selectedScanFiles.length) * 100));
       }
 
-      const { error: insertErr } = await supabase.from('medical_records').insert([{
+      await supabase.from('medical_records').insert([{
         patient_id: patientId,
         clinic_id: clinicId,
         doctor_email: userEmail,
@@ -619,38 +532,27 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
         dynamic_fields: { scans_list: uploadedList }
       }]);
 
-      if (insertErr) throw insertErr;
-
-      showAlert('تم الحفظ بنجاح ✅', `تم حفظ (${uploadedList.length}) صورة بنجاح في ملف المريض [${patientCode}].`);
+      showAlert('تم الحفظ بنجاح ✅', `تم حفظ (${uploadedList.length}) صورة في ملف المريض.`);
       setSelectedScanFiles([]);
       setScanGroupTitle('');
       await fetchPatientScansByPatientId(patientId);
-
     } catch (err) {
-      showAlert('خطأ', 'فشل حفظ الأشعات: ' + err.message);
+      showAlert('خطأ', err.message);
     } finally {
       setUploadingScans(false);
     }
   };
 
   const handleDeleteSavedScanFromRecord = async (recordId, scanUrl) => {
-    if (Platform.OS === 'web') {
-      if (!window.confirm("هل أنت متأكد من حذف صورة الأشعة هذه نهائياً؟")) return;
-    }
-
+    if (Platform.OS === 'web' && !window.confirm("هل أنت متأكد من حذف الصورة؟")) return;
     try {
       const record = patientHistory.find(r => r.id === recordId);
       if (!record || !record.dynamic_fields) return;
-
       const df = typeof record.dynamic_fields === 'string' ? JSON.parse(record.dynamic_fields) : record.dynamic_fields;
       const updatedScans = (df.scans_list || []).filter(s => s.url !== scanUrl);
       
-      await supabase
-        .from('medical_records')
-        .update({ dynamic_fields: { ...df, scans_list: updatedScans } })
-        .eq('id', recordId);
-
-      showAlert('تم الحذف', 'تم حذف الصورة من ملف المريض.');
+      await supabase.from('medical_records').update({ dynamic_fields: { ...df, scans_list: updatedScans } }).eq('id', recordId);
+      showAlert('تم الحذف', 'تم حذف الصورة من السجل.');
       if (currentPatientId) fetchPatientScansByPatientId(currentPatientId);
     } catch (err) {
       showAlert('خطأ', err.message);
@@ -660,38 +562,20 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
   const handleUploadLogoFile = async (event) => {
     const file = event.target.files[0];
     if (!file) return;
-
     setUploadingLogo(true);
     setLogoUploadProgress(10);
-
     try {
       const compressedBlob = await compressImage(file, 1000, 0.9);
-      setLogoUploadProgress(50);
-
-      const filePath = `logos/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
-      const { data, error } = await supabase.storage
-        .from('clinic-assets')
-        .upload(filePath, compressedBlob, { upsert: true });
-
-      setLogoUploadProgress(85);
-
-      if (error) {
-        const reader = new FileReader();
-        reader.onload = () => {
-          setClinicLogoUrl(reader.result);
-          setLogoUploadProgress(100);
-          setUploadingLogo(false);
-        };
-        reader.readAsDataURL(compressedBlob);
-      } else {
-        const { data: publicUrlData } = supabase.storage.from('clinic-assets').getPublicUrl(filePath);
-        setClinicLogoUrl(publicUrlData.publicUrl);
-        setLogoUploadProgress(100);
-        setUploadingLogo(false);
+      const filePath = `logos/${Date.now()}_${file.name}`;
+      const { error } = await supabase.storage.from('clinic-assets').upload(filePath, compressedBlob, { upsert: true });
+      if (!error) {
+        setClinicLogoUrl(supabase.storage.from('clinic-assets').getPublicUrl(filePath).data.publicUrl);
       }
     } catch (err) {
-      showAlert('خطأ في الرفع', err.message || 'تعذر رفع وتصغير الصورة');
+      showAlert('خطأ', err.message);
+    } finally {
       setUploadingLogo(false);
+      setLogoUploadProgress(100);
     }
   };
 
@@ -703,31 +587,14 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
     setAuthSubmitting(true);
     try {
       if (isSigningUp) {
-        const { error } = await supabase.auth.signUp({
-          email: email.trim(),
-          password: password.trim(),
-        });
-        if (error) throw error;
-
-        const { error: signInErr } = await supabase.auth.signInWithPassword({
-          email: email.trim(),
-          password: password.trim(),
-        });
-
-        if (!signInErr) {
-          showAlert('تم إنشاء الحساب 🎉', 'تم إنشاء الحساب وتسجيل الدخول بنجاح!');
-        } else {
-          showAlert('تم إنشاء الحساب 🎉', 'تم إنشاء الحساب بنجاح!');
-        }
+        await supabase.auth.signUp({ email: email.trim(), password: password.trim() });
+        await supabase.auth.signInWithPassword({ email: email.trim(), password: password.trim() });
       } else {
-        const { error } = await supabase.auth.signInWithPassword({
-          email: email.trim(),
-          password: password.trim(),
-        });
+        const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password: password.trim() });
         if (error) throw error;
       }
     } catch (err) {
-      showAlert('خطأ في الحساب', err.message || 'فشل عملية تسجيل الدخول.');
+      showAlert('خطأ', err.message);
     } finally {
       setAuthSubmitting(false);
     }
@@ -741,59 +608,32 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
   const handleCopyPortalLink = async () => {
     try {
       const userEmail = session?.user?.email?.toLowerCase();
-      const currentUserId = session?.user?.id;
-
-      let query = supabase.from('clinics').select('id');
-      if (userEmail) query = query.ilike('email', userEmail);
-      else if (currentUserId) query = query.eq('user_id', currentUserId);
-
-      const { data: clinic } = await query.limit(1).maybeSingle();
-
-      const clinicIdentifier = clinic?.id || userEmail || currentUserId;
-      const baseUrl = Platform.OS === 'web' && typeof window !== 'undefined' 
-        ? window.location.origin.split('?')[0] 
-        : 'https://medverse-emr-suite.vercel.app';
-
-      const portalUrl = `${baseUrl}?c=${encodeURIComponent(clinicIdentifier)}`;
-
+      const { data: clinic } = await supabase.from('clinics').select('id').ilike('email', userEmail).limit(1).maybeSingle();
+      const portalUrl = `https://medverse-emr-suite.vercel.app?c=${encodeURIComponent(clinic?.id || userEmail)}`;
       if (Platform.OS === 'web' && navigator.clipboard) {
         await navigator.clipboard.writeText(portalUrl);
-        showAlert('تم النسخ بنجاح! 📋', `رابط عيادتك المخصص للمرضى:\n${portalUrl}`);
+        showAlert('تم النسخ بنجاح! 📋', portalUrl);
       } else {
-        showAlert('رابط عيادتك المخصص', portalUrl);
+        showAlert('رابط العيادة', portalUrl);
       }
     } catch (err) {
-      console.error('Copy Link Error:', err);
-      showAlert('خطأ', 'تعذر نسخ الرابط.');
+      showAlert('خطأ', 'تعذر النسخ.');
     }
   };
 
   const fetchDoctorProfile = async (user) => {
     try {
       const userEmail = user?.email?.toLowerCase();
-      let query = supabase.from('clinics').select('*');
-      if (userEmail) query = query.ilike('email', userEmail);
-      else if (user?.id) query = query.eq('user_id', user.id);
-      
-      const { data: clinic, error } = await query.limit(1).maybeSingle();
-
-      if (clinic && !error) {
+      const { data: clinic } = await supabase.from('clinics').select('*').ilike('email', userEmail).limit(1).maybeSingle();
+      if (clinic) {
         if (clinic.doctor_name) setClinicDoctorName(clinic.doctor_name);
         if (clinic.clinic_name) setClinicName(clinic.clinic_name);
-        
         if (clinic.specialty) {
           setRegisteredSpecialty(clinic.specialty);
-          const isMatched = isSpecialtyMatching(initialSpecialty, clinic.specialty);
-          if (!isMatched) {
-            setShowMismatchModal(true);
-          } else {
-            setSpecialty(clinic.specialty);
-          }
-
-          if (onUpdateSpecialty) onUpdateSpecialty(clinic.specialty);
+          if (!isSpecialtyMatching(initialSpecialty, clinic.specialty)) setShowMismatchModal(true);
+          else setSpecialty(clinic.specialty);
         }
         if (clinic.logo_url) setClinicLogoUrl(clinic.logo_url);
-        if (clinic.stamp_url) setDigitalStampUrl(clinic.stamp_url);
         if (clinic.phone) setClinicPhone(clinic.phone);
         if (clinic.address) setClinicAddress(clinic.address);
       }
@@ -803,38 +643,15 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
   const handleSaveProfile = async () => {
     setLoading(true);
     try {
-      const currentUserId = session?.user?.id;
       const userEmail = session?.user?.email?.toLowerCase();
-      let query = supabase.from('clinics').select('id');
-      if (userEmail) query = query.ilike('email', userEmail);
-      else if (currentUserId) query = query.eq('user_id', currentUserId);
-
-      const { data: existingClinic } = await query.limit(1).maybeSingle();
-
-      const profilePayload = {
-        doctor_name: clinicDoctorName,
-        clinic_name: clinicName,
-        specialty: specialty,
-        logo_url: clinicLogoUrl,
-        stamp_url: digitalStampUrl,
-        phone: clinicPhone,
-        address: clinicAddress,
-        email: userEmail || null,
-        user_id: currentUserId || null
-      };
-
-      if (existingClinic) {
-        await supabase.from('clinics').update(profilePayload).eq('id', existingClinic.id);
-      } else {
-        await supabase.from('clinics').insert([profilePayload]);
-      }
-
-      setRegisteredSpecialty(specialty);
+      const { data: existing } = await supabase.from('clinics').select('id').ilike('email', userEmail).limit(1).maybeSingle();
+      const payload = { doctor_name: clinicDoctorName, clinic_name: clinicName, specialty, logo_url: clinicLogoUrl, phone: clinicPhone, address: clinicAddress, email: userEmail };
+      if (existing) await supabase.from('clinics').update(payload).eq('id', existing.id);
+      else await supabase.from('clinics').insert([payload]);
       setShowMismatchModal(false);
-      if (onUpdateSpecialty) onUpdateSpecialty(specialty);
-      showAlert('تم الحفظ', 'تم حفظ وتحديث التخصص بنجاح!');
+      showAlert('تم الحفظ', 'تم حفظ وتحديث البروفايل بنجاح!');
     } catch (err) {
-      showAlert('خطأ', 'فشل الحفظ: ' + err.message);
+      showAlert('خطأ', err.message);
     } finally {
       setLoading(false);
     }
@@ -844,25 +661,14 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
     setLoadingPatientsList(true);
     try {
       const userEmail = session?.user?.email?.toLowerCase();
-      const { data, error } = await supabase
-        .from('patients')
-        .select('*')
-        .ilike('doctor_email', userEmail)
-        .order('created_at', { ascending: false });
-
-      if (!error && data) {
+      const { data } = await supabase.from('patients').select('*').ilike('doctor_email', userEmail).order('created_at', { ascending: false });
+      if (data) {
         setAllDoctorPatients(data);
         setTotalPatientsCount(data.length);
-        const currentMonth = new Date().getMonth();
-        const currentYear = new Date().getFullYear();
-        const thisMonth = data.filter(p => {
-          const pDate = new Date(p.created_at);
-          return pDate.getMonth() === currentMonth && pDate.getFullYear() === currentYear;
-        });
-        setMonthlyPatientsCount(thisMonth.length);
+        const curM = new Date().getMonth(), curY = new Date().getFullYear();
+        setMonthlyPatientsCount(data.filter(p => new Date(p.created_at).getMonth() === curM && new Date(p.created_at).getFullYear() === curY).length);
       }
-    } catch (e) { console.error(e); } 
-    finally { setLoadingPatientsList(false); }
+    } catch (e) { console.error(e); } finally { setLoadingPatientsList(false); }
   };
 
   const selectPatientFromList = (patient) => {
@@ -877,118 +683,55 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
   };
 
   const handleFillDummyData = () => {
-    const dummyName = 'أحمد علي حسين';
-    setPatientName(dummyName);
-    setPatientPhone('01012345678');
-    setAge('54');
+    setPatientName('محمود عبد الفتاح');
+    setPatientPhone('01098765432');
+    setAge('52');
     setGender('ذكر');
-    setOccupation('مهندس');
-    setChronicDiseases('روماتويد مفصلي، ضغط دم');
+    setOccupation('محاسب');
+    setChronicDiseases('روماتويد مفصلي');
     setRheumaStiffness('نصف ساعة أو أكثر');
     setRheumaAntiCCP('إيجابي مرتفع (+++) > 3x');
     setRheumaRF('إيجابي مرتفع (+++)');
     setRheumaEsrCrp('مرتفع جداً (High Active Flare)');
-    setRheumaClinicalStage('حالة روماتويد أولي حديث التشخيص (Early RA - Treatment Naive)');
-    handleSearchPatientByName(dummyName);
+    handleSearchPatientByName('محمود عبد الفتاح');
   };
 
-  // --- التحليل الإكلينيكي وقراءة المرفقات بالذكاء الاصطناعي ---
+  // --- التحليل الإكلينيكي بالذكاء الاصطناعي ---
   const handleClinicalAnalysis = async () => {
     if (!patientName.trim()) {
       showAlert('تنبيه', 'يرجى إدخال اسم المريض أولاً.');
       return;
     }
-
     setAnalyzing(true);
     setAiReport(null);
 
-    const inflamedJoints = Object.keys(jointStates).filter(k => jointStates[k] === 'red').map(k => JOINTS_LIST.find(j => j.id === k)?.label);
-    const painfulJoints = Object.keys(jointStates).filter(k => jointStates[k] === 'blue').map(k => JOINTS_LIST.find(j => j.id === k)?.label);
+    const affectedJointsList = Object.keys(skeletonJointStates).map(id => {
+      const j = SKELETON_JOINTS.find(item => item.id === id);
+      return `${j?.label} (${skeletonJointStates[id] === 'red' ? 'ملتهب/تورم' : 'ألم فقط'})`;
+    });
 
-    const systemPrompt = `You are an expert AI Clinical Rheumatologist and Immunologist.
-Analyze the structured rheumatology clinical data and patient case carefully according to ACR/EULAR guidelines.
-Respond ONLY with a clean JSON object without Markdown formatting or triple backticks.
-
-Expected JSON Structure:
+    const systemPrompt = `You are an expert AI Clinical Rheumatologist and Immunologist. Analyze the case according to ACR/EULAR guidelines and respond ONLY with clean JSON:
 {
   "diagnosis": "English Diagnosis - الشرح بالعربي",
-  "warnings": ["تحذير إكلينيكي بالعربي عن ضغط الدم، متابعة الكبد، والتحاليل الدورية"],
-  "medications": [
-    {
-      "name": "Exact Drug Name",
-      "dose": "الجرعة والتوقيت بالعربي بدقة",
-      "reason": "دواعي الاستعمال الإكلينيكية بالعربي"
-    }
-  ]
+  "warnings": ["تحذيرات إكلينيكية بالعربي"],
+  "medications": [{"name": "Drug Name", "dose": "الجرعة", "reason": "دواعي الاستعمال"}]
 }`;
 
-    let clinicalDetails = '';
-    if (isRheumaSpecialty) {
-      clinicalDetails = `
-- Morning Stiffness Duration: ${rheumaStiffness}
-- Inflamed Joints (Red): ${inflamedJoints.join(', ') || 'None'}
-- Painful Joints (Blue): ${painfulJoints.join(', ') || 'None'}
-- Anti-CCP: ${rheumaAntiCCP} | Rheumatoid Factor (RF): ${rheumaRF}
-- ANA: ${rheumaANA} | Anti-dsDNA: ${rheumaAntiDsDNA}
-- Inflammatory Markers (ESR/CRP): ${rheumaEsrCrp}
-- Organ Safety (LFTs/Kidney): ${rheumaOrganSafety}
-- TB Screening: ${rheumaTbScreening}
-- Clinical Stage: ${rheumaClinicalStage}
-- Attached Patient Scans & Reports Count: ${patientScansGrid.length}
-      `;
-    }
-
-    const userPrompt = `
-Specialty: ${specialty}
-Patient Name: ${patientName} | Age: ${age || 'غير محدد'} | Gender: ${gender} | Work: ${occupation}
-Chronic Diseases: ${chronicDiseases || 'لا يوجد'}
-${clinicalDetails}
-Additional Symptoms: ${symptomsInput || 'لا يوجد'}
-Doctor Additional Notes: ${doctorNotes || 'لا يوجد'}`;
+    const userPrompt = `Patient: ${patientName}, Age: ${age}, Gender: ${gender}. Affected Joints from map: ${affectedJointsList.join(', ') || 'None'}. Stiffness: ${rheumaStiffness}. ESR/CRP: ${rheumaEsrCrp}, RF: ${rheumaRF}, Anti-CCP: ${rheumaAntiCCP}.`;
 
     try {
-      const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
         method: "POST",
-        headers: {
-          "Authorization": `Bearer ${GROQ_API_KEY}`,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          model: "openai/gpt-oss-120b",
-          messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: userPrompt }
-          ],
-          temperature: 0.2
-        })
+        headers: { "Authorization": `Bearer ${GROQ_API_KEY}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ model: "openai/gpt-oss-120b", messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userPrompt }], temperature: 0.2 })
       });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData?.error?.message || `خطأ في استجابة السيرفر (${response.status})`);
-      }
-
-      const data = await response.json();
-      const rawContent = data?.choices?.[0]?.message?.content;
-
-      if (!rawContent) throw new Error('استجابة فارغة من خادم الذكاء الاصطناعي');
-
-      const cleanJsonString = rawContent.replace(/```json/g, '').replace(/```/g, '').trim();
-      const parsedResult = JSON.parse(cleanJsonString);
-
-      if (parsedResult.warnings) {
-        parsedResult.warnings = parsedResult.warnings.map(w => sanitizeText(w));
-      }
-
-      setAiReport(parsedResult);
-      if (parsedResult.diagnosis) setFinalDiagnosis(parsedResult.diagnosis);
-      if (parsedResult.medications && Array.isArray(parsedResult.medications)) {
-        setPrescribedMeds(parsedResult.medications);
-      }
-
-    } catch (error) {
-      console.error("Groq Analysis Error:", error);
-      showAlert('تنبيه الذكاء الاصطناعي', `تعذر التحليل التلقائي: ${error.message}\nيمكنك كتابة التشخيص والأدوية يدوياً والاستمرار بشكل طبيعي.`);
+      const data = await res.json();
+      const parsed = JSON.parse(data?.choices?.[0]?.message?.content?.replace(/```json/g, '').replace(/```/g, '').trim() || '{}');
+      setAiReport(parsed);
+      if (parsed.diagnosis) setFinalDiagnosis(parsed.diagnosis);
+      if (parsed.medications) setPrescribedMeds(parsed.medications);
+    } catch (err) {
+      showAlert('تنبيه', 'تعذر التحليل التلقائي، يمكنك كتابة التشخيص يدوياً.');
     } finally {
       setAnalyzing(false);
     }
@@ -996,87 +739,11 @@ Doctor Additional Notes: ${doctorNotes || 'لا يوجد'}`;
 
   const handleCheckAndAddManualMed = async () => {
     if (!newMedName.trim() || !newMedDose.trim()) {
-      showAlert('تنبيه', 'أدخل اسم الدواء والجرعة على الأقل.');
+      showAlert('تنبيه', 'أدخل اسم الدواء والجرعة.');
       return;
     }
-
-    setCheckingMed(true);
-    setMedCheckError(null);
-    setPendingMed(null);
-
-    const systemPrompt = `You are a Clinical Pharmacologist for specialty: ${specialty}. Check if adding this new medication is safe for the patient based on age, chronic conditions, and current prescribed list.
-Return JSON ONLY:
-{
-  "safe": true/false,
-  "reason": "توضيح التعارض بالعربي إن وجد"
-}`;
-
-    const userPrompt = `
-- Specialty: ${specialty} | Age: ${age || 'Unspecified'}
-- Chronic Diseases: ${chronicDiseases || 'None'}
-- Currently Prescribed: ${JSON.stringify(prescribedMeds.map(m => m.name))}
-- New Proposed Drug: ${newMedName} (${newMedDose})
-`;
-
-    try {
-      const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${GROQ_API_KEY}`,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          model: "openai/gpt-oss-120b",
-          messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: userPrompt }
-          ],
-          temperature: 0.1
-        })
-      });
-
-      const data = await res.json();
-      const rawContent = data?.choices?.[0]?.message?.content || '{}';
-      const cleanJsonString = rawContent.replace(/```json/g, '').replace(/```/g, '').trim();
-      const parsed = JSON.parse(cleanJsonString);
-
-      if (parsed.safe) {
-        setPrescribedMeds(prev => [...prev, { name: newMedName, dose: newMedDose, reason: newMedReason || 'إضافة مباشرة من الطبيب' }]);
-        setNewMedName('');
-        setNewMedDose('');
-        setNewMedReason('');
-      } else {
-        const conflictReason = sanitizeText(parsed.reason) || 'قد يتعارض هذا الدواء مع الحالة الحالية للمريض أو الأدوية المسجلة.';
-        setMedCheckError(conflictReason);
-        setPendingMed({
-          name: newMedName,
-          dose: newMedDose,
-          reason: newMedReason || 'إضافة مباشرة على مسؤولية الطبيب'
-        });
-      }
-    } catch (e) {
-      setPrescribedMeds(prev => [...prev, { name: newMedName, dose: newMedDose, reason: newMedReason || 'إضافة مباشرة من الطبيب' }]);
-      setNewMedName('');
-      setNewMedDose('');
-      setNewMedReason('');
-    } finally {
-      setCheckingMed(false);
-    }
-  };
-
-  const handleDismissConflict = () => {
-    setMedCheckError(null);
-    setPendingMed(null);
-    setNewMedName('');
-    setNewMedDose('');
-    setNewMedReason('');
-  };
-
-  const handleForceAddMed = () => {
-    if (pendingMed) {
-      setPrescribedMeds(prev => [...prev, pendingMed]);
-      handleDismissConflict();
-    }
+    setPrescribedMeds(prev => [...prev, { name: newMedName, dose: newMedDose, reason: newMedReason || 'إضافة مباشرة' }]);
+    setNewMedName(''); setNewMedDose(''); setNewMedReason('');
   };
 
   const handleRemoveMed = (index) => {
@@ -1086,146 +753,33 @@ Return JSON ONLY:
   const executeSaveAndPrint = async () => {
     setLoading(true);
     const generatedCode = selectedPatientCode || ('PAT-' + Math.floor(10000 + Math.random() * 90000));
-
     try {
-      let clinicId = null;
-      const currentUserId = session?.user?.id;
       const userEmail = session?.user?.email?.toLowerCase();
-
-      let cQuery = supabase.from('clinics').select('id');
-      if (userEmail) cQuery = cQuery.ilike('email', userEmail);
-      else if (currentUserId) cQuery = cQuery.eq('user_id', currentUserId);
-
-      const { data: existingClinic } = await cQuery.limit(1).maybeSingle();
-
-      if (existingClinic) clinicId = existingClinic.id;
-      else {
-        const { data: newClinic, error: cErr } = await supabase
-          .from('clinics')
-          .insert([{ 
-            doctor_name: clinicDoctorName, 
-            specialty: specialty, 
-            clinic_name: clinicName,
-            logo_url: clinicLogoUrl,
-            stamp_url: digitalStampUrl,
-            phone: clinicPhone,
-            address: clinicAddress,
-            email: userEmail || null,
-            user_id: currentUserId || null
-          }])
-          .select('id')
-          .single();
-
-        if (cErr) throw new Error('خطأ في حفظ بيانات العيادة: ' + cErr.message);
-        clinicId = newClinic?.id;
-      }
+      let clinicId = null;
+      const { data: cData } = await supabase.from('clinics').select('id').ilike('email', userEmail).limit(1).maybeSingle();
+      if (cData) clinicId = cData.id;
 
       let patientRealId = currentPatientId;
-      let patientRealCode = generatedCode;
-
       if (!patientRealId) {
-        const { data: existingPatient } = await supabase
-          .from('patients')
-          .select('id, patient_code')
-          .ilike('full_name', patientName.trim())
-          .ilike('doctor_email', userEmail)
-          .maybeSingle();
-
-        if (existingPatient) {
-          patientRealId = existingPatient.id;
-          patientRealCode = existingPatient.patient_code;
-        } else {
-          const { data: newPatient, error: pErr } = await supabase
-            .from('patients')
-            .insert([{
-              full_name: patientName.trim(),
-              phone: patientPhone || null,
-              age: age ? parseInt(age) : null,
-              gender: gender,
-              patient_code: generatedCode,
-              clinic_id: clinicId,
-              doctor_email: userEmail || null
-            }])
-            .select('id, patient_code')
-            .single();
-
-          if (pErr) throw new Error('خطأ في حفظ بيانات المريض: ' + pErr.message);
-          patientRealId = newPatient?.id;
-          patientRealCode = newPatient?.patient_code || generatedCode;
-        }
+        const { data: pData } = await supabase.from('patients').insert([{
+          full_name: patientName.trim(), phone: patientPhone, age: age ? parseInt(age) : null, gender, patient_code: generatedCode, clinic_id: clinicId, doctor_email: userEmail
+        }]).select('id, patient_code').single();
+        patientRealId = pData.id;
+        setSelectedPatientCode(pData.patient_code);
       }
-
-      setSelectedPatientCode(patientRealCode);
       setCurrentPatientId(patientRealId);
 
-      if (patientRealId) {
-        const { error: recErr } = await supabase
-          .from('medical_records')
-          .insert([{
-            patient_id: patientRealId,
-            clinic_id: clinicId,
-            doctor_email: userEmail || null,
-            visit_date: new Date().toISOString().split('T')[0],
-            diagnosis: finalDiagnosis,
-            prescriptions: prescribedMeds,
-            qr_verification_code: 'VERIFY-' + patientRealCode,
-            dynamic_fields: { 
-              age, 
-              gender, 
-              occupation,
-              chronicDiseases, 
-              coState,
-              symptomsFlags,
-              pastHistory,
-              familyHistory,
-              symptoms: symptomsInput, 
-              doctorNotes,
-              rheumaDetails: isRheumaSpecialty ? {
-                stiffnessDuration: rheumaStiffness,
-                jointStates: jointStates,
-                antiCCP: rheumaAntiCCP,
-                rf: rheumaRF,
-                ana: rheumaANA,
-                antiDsDNA: rheumaAntiDsDNA,
-                esrCrp: rheumaEsrCrp,
-                organSafety: rheumaOrganSafety,
-                tbScreening: rheumaTbScreening,
-                clinicalStage: rheumaClinicalStage
-              } : null
-            }
-          }]);
+      await supabase.from('medical_records').insert([{
+        patient_id: patientRealId, clinic_id: clinicId, doctor_email: userEmail, visit_date: new Date().toISOString().split('T')[0],
+        diagnosis: finalDiagnosis, prescriptions: prescribedMeds, qr_verification_code: 'VERIFY-' + generatedCode,
+        dynamic_fields: { age, gender, occupation, chronicDiseases, skeletonJointStates, rheumaStiffness, rheumaEsrCrp, rheumaAntiCCP, rheumaRF }
+      }]);
 
-        if (recErr) throw new Error('خطأ في حفظ السجل الطبي: ' + recErr.message);
-      }
-
-      showAlert("نجاح الحفظ السحابي ✅", `تم حفظ التقرير والسجل الطبي بنجاح!\nكود المريض: [${patientRealCode}]`);
-
-      await generatePrescriptionPDF(
-        { name: patientName, phone: patientPhone, code: patientRealCode },
-        finalDiagnosis,
-        {
-          'السن والنوع': `${age || 'غير محدد'} سنة (${gender})`,
-          'الأمراض المزمنة': chronicDiseases || 'لا يوجد',
-          'مرحلة نشاط الروماتويد': isRheumaSpecialty ? rheumaClinicalStage : 'فحص اعتيادي',
-          'دلالات ومؤشرات الفحص': isRheumaSpecialty ? `تيبس: ${rheumaStiffness} | Anti-CCP: ${rheumaAntiCCP} | RF: ${rheumaRF}` : (doctorNotes || 'لا يوجد')
-        },
-        prescribedMeds,
-        {
-          doctorName: clinicDoctorName,
-          clinicName: clinicName,
-          specialty: specialty,
-          logoUrl: clinicLogoUrl,
-          stampUrl: digitalStampUrl,
-          phone: clinicPhone,
-          address: clinicAddress
-        }
-      );
-
-      await fetchPatientScansByPatientId(patientRealId);
-
-    } catch (error) {
-      console.error('Detailed Save Error:', error);
-      showAlert("خطأ في الحفظ السحابي ❌", `فشل حفظ التقرير في السحابة:\n${error.message || error}`);
+      showAlert("نجاح الحفظ ✅", `تم حفظ التقرير وكود المريض [${generatedCode}] بنجاح!`);
+      await generatePrescriptionPDF({ name: patientName, phone: patientPhone, code: generatedCode }, finalDiagnosis, { 'السن والنوع': `${age} سنة (${gender})`, 'التيبس': rheumaStiffness }, prescribedMeds, { doctorName: clinicDoctorName, clinicName, specialty, logoUrl: clinicLogoUrl, phone: clinicPhone, address: clinicAddress });
+      fetchPatientScansByPatientId(patientRealId);
+    } catch (err) {
+      showAlert('خطأ', err.message);
     } finally {
       setLoading(false);
     }
@@ -1233,41 +787,16 @@ Return JSON ONLY:
 
   const handleSaveAndPrint = () => {
     if (!patientName.trim()) {
-      showAlert('تنبيه هام', 'يرجى إدخال اسم المريض بالكامل أولاً قبل الاعتماد والطباعة.');
+      showAlert('تنبيه', 'يرجى إدخال اسم المريض أولاً.');
       return;
     }
-
-    if (Platform.OS === 'web') {
-      if (window.confirm("هل أنت متأكد من اعتماد هذا التقرير وحفظه في السحابة أولاً؟")) {
-        executeSaveAndPrint();
-      }
-    } else {
-      Alert.alert(
-        "تأكيد اعتماد التقرير",
-        "هل أنت متأكد من اعتماد هذا التقرير وحفظه في السحابة أولاً؟",
-        [
-          { text: "إلغاء", style: "cancel" },
-          { text: "نعم، اعتمد واحفظ", onPress: () => executeSaveAndPrint() }
-        ],
-        { cancelable: true }
-      );
-    }
+    executeSaveAndPrint();
   };
 
   const isPatientSavedInDb = Boolean(currentPatientId || selectedPatientCode);
+  const filteredPatients = allDoctorPatients.filter(p => p.full_name?.toLowerCase().includes(patientSearchQuery.toLowerCase()) || p.patient_code?.toLowerCase().includes(patientSearchQuery.toLowerCase()));
 
-  const filteredDoctorPatients = allDoctorPatients.filter(p => 
-    p.full_name?.toLowerCase().includes(patientSearchQuery.toLowerCase()) || 
-    p.patient_code?.toLowerCase().includes(patientSearchQuery.toLowerCase())
-  );
-
-  if (authLoading) {
-    return (
-      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
-        <ActivityIndicator size="large" color="#00F2FE" />
-      </View>
-    );
-  }
+  if (authLoading) return <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}><ActivityIndicator size="large" color="#00F2FE" /></View>;
 
   if (!session) {
     return (
@@ -1275,46 +804,17 @@ Return JSON ONLY:
         <View style={styles.authCard}>
           <Text style={styles.authTitle}>MedVerse Doctor Portal 🔒</Text>
           <Text style={styles.authSub}>{isSigningUp ? 'إنشاء حساب طبيب جديد' : 'تسجيل دخول الطبيب'}</Text>
-
           <Text style={styles.label}>البريد الإلكتروني (Gmail)</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="doctor@gmail.com"
-            placeholderTextColor="#94A3B8"
-            value={email}
-            onChangeText={setEmail}
-            keyboardType="email-address"
-            autoCapitalize="none"
-          />
-
+          <TextInput style={styles.input} placeholder="doctor@gmail.com" placeholderTextColor="#94A3B8" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
           <Text style={styles.label}>كلمة السر</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="••••••••"
-            placeholderTextColor="#94A3B8"
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-          />
-
+          <TextInput style={styles.input} placeholder="••••••••" placeholderTextColor="#94A3B8" value={password} onChangeText={setPassword} secureTextEntry />
           <TouchableOpacity style={styles.authSubmitBtn} onPress={handleAuth} disabled={authSubmitting}>
             {authSubmitting ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.authSubmitBtnText}>{isSigningUp ? 'إنشاء حساب جديد ✨' : 'تسجيل الدخول 🔐'}</Text>}
           </TouchableOpacity>
-
           <TouchableOpacity style={styles.authToggleBtn} onPress={() => setIsSigningUp(!isSigningUp)}>
-            <Text style={styles.authToggleBtnText}>
-              {isSigningUp ? 'لديك حساب بالفعل؟ سجل دخولك' : 'ليس لديك حساب؟ أنشئ حساب جديد الآن'}
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity onPress={() => setShowPrivacyModal(true)} style={{ marginTop: 20, alignItems: 'center' }}>
-            <Text style={{ color: '#38BDF8', fontSize: 12 }}>🛡️ سياسة الخصوصية وشروط الاستخدام</Text>
+            <Text style={styles.authToggleBtnText}>{isSigningUp ? 'لديك حساب بالفعل؟ سجل دخولك' : 'ليس لديك حساب؟ أنشئ حساب جديد'}</Text>
           </TouchableOpacity>
         </View>
-
-        <Modal visible={showPrivacyModal} animationType="slide">
-          <PrivacyPolicy onBack={() => setShowPrivacyModal(false)} />
-        </Modal>
       </ScrollView>
     );
   }
@@ -1326,34 +826,10 @@ Return JSON ONLY:
           <Text style={styles.paywallIcon}>🔒</Text>
           <Text style={styles.paywallTitle}>تنبيه اشتراك التطبيق</Text>
           <Text style={styles.paywallReason}>{subscriptionAccess.message}</Text>
-
-          <View style={styles.paywallInfoBox}>
-            <Text style={styles.paywallInfoTitle}>طرق الدفع وتجديد الاشتراك:</Text>
-            
-            <View style={styles.paymentMethodRow}>
-              <Text style={styles.paymentMethodText}>📱 المحفظة الإلكترونية (فودافون كاش / غيرها):</Text>
-              <Text style={styles.paymentDetail}>01127834972</Text>
-            </View>
-
-            <View style={styles.paymentMethodRow}>
-              <Text style={styles.paymentMethodText}>💸 الدفع عبر InstaPay:</Text>
-              <TouchableOpacity style={styles.instaPayBtn} onPress={handleOpenInstaPay}>
-                <Text style={styles.instaPayBtnText}>⚡ اضغط للدفع عبر InstaPay</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          <Text style={styles.paywallSubNote}>
-            بعد تحويل رسوم الاشتراك الشهري أو السنوي، يرجى الضغط على الزر أدناه لإرسال صورة التحويل عبر الواتساب لتفعيل حسابك فوراً.
-          </Text>
-
           <TouchableOpacity style={styles.whatsappBtn} onPress={handleOpenWhatsApp}>
             <Text style={styles.whatsappBtnText}>💬 التواصل مع الدعم عبر الواتساب لتفعيل الحساب</Text>
           </TouchableOpacity>
-
-          <TouchableOpacity onPress={handleSignOut} style={styles.paywallSignOutBtn}>
-            <Text style={styles.signOutText}>تسجيل الخروج ✕</Text>
-          </TouchableOpacity>
+          <TouchableOpacity onPress={handleSignOut}><Text style={{ color: '#EF4444', textAlign: 'center', marginTop: 10 }}>تسجيل الخروج ✕</Text></TouchableOpacity>
         </View>
       </ScrollView>
     );
@@ -1361,109 +837,25 @@ Return JSON ONLY:
 
   return (
     <ScrollView style={styles.container}>
-      {/* Lightbox Ultra-Zoom Modal */}
+      {/* Lightbox Modal */}
       <Modal visible={!!viewingImageModal} transparent animationType="fade">
         <View style={styles.lightboxOverlay}>
-          <TouchableOpacity style={styles.lightboxCloseBtn} onPress={() => { setViewingImageModal(null); setZoomScale(1); }}>
-            <Text style={styles.lightboxCloseText}>إغلاق ✕</Text>
-          </TouchableOpacity>
-          <View style={styles.lightboxControls}>
-            <TouchableOpacity style={styles.zoomBtn} onPress={() => setZoomScale(z => Math.min(z + 0.8, 5))}>
-              <Text style={styles.zoomBtnText}>🔍 تكبير عالي (+)</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.zoomBtn} onPress={() => setZoomScale(1)}>
-              <Text style={styles.zoomBtnText}>🔄 إعادة (1x)</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.zoomBtn} onPress={() => setZoomScale(z => Math.max(z - 0.4, 0.5))}>
-              <Text style={styles.zoomBtnText}>🔍 تصغير (-)</Text>
-            </TouchableOpacity>
-          </View>
-          {viewingImageModal && (
-            <ScrollView contentContainerStyle={{ alignItems: 'center', justifyContent: 'center', flexGrow: 1 }} maximumZoomScale={5} minimumZoomScale={0.5}>
-              <Image 
-                source={{ uri: viewingImageModal.url }} 
-                style={{ width: 340 * zoomScale, height: 340 * zoomScale, borderRadius: 8 }} 
-                resizeMode="contain"
-              />
-              <Text style={styles.lightboxTitle}>{viewingImageModal.title}</Text>
-            </ScrollView>
-          )}
+          <TouchableOpacity style={styles.lightboxCloseBtn} onPress={() => setViewingImageModal(null)}><Text style={{ color: '#FFF' }}>إغلاق ✕</Text></TouchableOpacity>
+          {viewingImageModal && <Image source={{ uri: viewingImageModal.url }} style={{ width: 320, height: 320, resizeMode: 'contain' }} />}
         </View>
       </Modal>
 
-      {/* Privacy Policy Modal */}
-      <Modal visible={showPrivacyModal} animationType="slide">
-        <PrivacyPolicy onBack={() => setShowPrivacyModal(false)} />
-      </Modal>
-
-      {/* Specialty Mismatch Modal */}
-      <Modal visible={showMismatchModal} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>⚠️ تخصص العيادة المسجل مختلف</Text>
-            <Text style={styles.modalSub}>
-              أنت داخل على تخصص ({initialSpecialty}) لكن تخصصك المسجل في العيادة هو ({registeredSpecialty}). هل تريد الانتقال لتخصصك أم الاستمرار في هذا التخصص؟
-            </Text>
-            <View style={styles.modalButtonsRow}>
-              <TouchableOpacity 
-                style={styles.modalGoBtn} 
-                onPress={() => {
-                  setSpecialty(registeredSpecialty);
-                  setShowMismatchModal(false);
-                  if (onUpdateSpecialty) onUpdateSpecialty(registeredSpecialty);
-                }}
-              >
-                <Text style={styles.modalGoBtnText}>الانتقال للتخصص المسجل بالبروفايل</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={styles.modalStayBtn} 
-                onPress={() => setShowMismatchModal(false)}
-              >
-                <Text style={styles.modalStayBtnText}>الاستمرار بالتخصص الحالي</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
-
-      {/* Subscription Warning Banner */}
-      {subscriptionAccess.showAlert && (
-        <View style={styles.subWarningBanner}>
-          <Text style={styles.subWarningIcon}>⏳</Text>
-          <Text style={styles.subWarningText}>
-            تنبيه الاشتراك: {dynamicTimeLeftText || subscriptionAccess.message}
-          </Text>
-          <TouchableOpacity style={styles.renewQuickBtn} onPress={handleOpenWhatsApp}>
-            <Text style={styles.renewQuickBtnText}>تجديد ⚡</Text>
-          </TouchableOpacity>
-        </View>
-      )}
-
-      {/* Header With Neon Glow & DEVEXT Branding */}
+      {/* Header */}
       <View style={styles.header}>
         <View style={styles.topUserRow}>
           <Text style={styles.userEmailText}>⚡ {clinicDoctorName} ({session?.user?.email})</Text>
-          {onSwitchPortal && (
-            <TouchableOpacity onPress={onSwitchPortal} style={styles.switchPortalBtn}>
-              <Text style={styles.switchPortalBtnText}>🔄 تغيير البوابة</Text>
-            </TouchableOpacity>
-          )}
-          <TouchableOpacity onPress={handleSignOut} style={styles.signOutBtn}>
-            <Text style={styles.signOutText}>خروج ✕</Text>
-          </TouchableOpacity>
+          <TouchableOpacity onPress={handleSignOut} style={styles.signOutBtn}><Text style={styles.signOutText}>خروج ✕</Text></TouchableOpacity>
         </View>
-
         <Text style={styles.title}>MedVerse Smart EMR Suite</Text>
-
-        <View style={styles.brandRow}>
-          <Text style={styles.brandTag}>POWERED BY</Text>
-          <Text style={styles.brandSubtitle}>DEVEXT</Text>
-        </View>
-
-        <Text style={styles.subtitle}>منظومة إدارة عيادات الروماتيزم والمناعة ({specialty})</Text>
+        <Text style={styles.subtitle}>عيادة المفاصل والروماتيزم والمناعة (نموذج د. طاهر عبد الفتاح)</Text>
       </View>
 
-      {/* Navigation Bar */}
+      {/* Navigation */}
       <View style={styles.navBar}>
         <TouchableOpacity style={[styles.navBtn, activeTab === 'prescription' && styles.navBtnActive]} onPress={() => handleTabChange('prescription')}>
           <Text style={[styles.navBtnText, activeTab === 'prescription' && styles.navBtnTextActive]}>🩺 الكشف والفحص الإكلينيكي</Text>
@@ -1479,296 +871,114 @@ Return JSON ONLY:
       {/* TAB 1: PROFILE */}
       {activeTab === 'profile' && (
         <View style={styles.card}>
-          <Text style={styles.sectionTitle}>⚙️ بيانات الطبيب، العيادة، والختم الإلكتروني</Text>
-
-          <View style={styles.linkCardBox}>
-            <Text style={styles.linkBoxTitle}>🔗 رابط بوابة المرضى الخاصة بك</Text>
-            <Text style={styles.linkBoxSub}>مربوط مع بريدك الإلكتروني الفريد: {session.user.email}</Text>
-            <TouchableOpacity style={styles.copyLinkBtn} onPress={handleCopyPortalLink}>
-              <Text style={styles.copyLinkBtnText}>📋 نسخ رابط العيادة المخصص للمرضى</Text>
-            </TouchableOpacity>
-          </View>
-
-          <Text style={styles.label}>اسم الطبيب بالكامل</Text>
+          <Text style={styles.sectionTitle}>⚙️ بيانات الطبيب والعيادة</Text>
+          <TouchableOpacity style={styles.copyLinkBtn} onPress={handleCopyPortalLink}><Text style={styles.copyLinkBtnText}>📋 نسخ رابط العيادة للمرضى</Text></TouchableOpacity>
+          <Text style={styles.label}>اسم الطبيب</Text>
           <TextInput style={styles.input} value={clinicDoctorName} onChangeText={setClinicDoctorName} />
-
-          <Text style={styles.label}>اسم العيادة / المركز الطبي</Text>
+          <Text style={styles.label}>اسم العيادة</Text>
           <TextInput style={styles.input} value={clinicName} onChangeText={setClinicName} />
-
-          <Text style={styles.label}>التخصص والدرجة العلمية (اختيار مباشر):</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
-            {SPECIALITIES_LIST.map((spec, i) => (
-              <TouchableOpacity
-                key={i}
-                style={[styles.specChip, specialty === spec && styles.specChipActive]}
-                onPress={() => setSpecialty(spec)}
-              >
-                <Text style={[styles.specChipText, specialty === spec && styles.specChipTextActive]}>{spec}</Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-
+          <Text style={styles.label}>التخصص</Text>
           <TextInput style={styles.input} value={specialty} onChangeText={setSpecialty} />
-
-          <Text style={styles.label}>رقم هاتف العيادة للتواصل</Text>
-          <TextInput style={styles.input} value={clinicPhone} onChangeText={setClinicPhone} placeholder="01xxxxxxxxx" placeholderTextColor="#64748B" />
-
-          <Text style={styles.label}>عنوان العيادة التفصيلي</Text>
-          <TextInput style={styles.input} value={clinicAddress} onChangeText={setClinicAddress} placeholder="المحافظة - الشارع - المبنى" placeholderTextColor="#64748B" />
-
-          <Text style={styles.label}>شعار / لوجو العيادة (رفع ملف صورة مباشر):</Text>
-          {Platform.OS === 'web' ? (
-            <input 
-              type="file" 
-              accept="image/*" 
-              onChange={handleUploadLogoFile}
-              style={{ marginBottom: 10, color: '#00F2FE' }}
-            />
-          ) : null}
-
-          {uploadingLogo && (
-            <View style={styles.progressBarContainer}>
-              <View style={[styles.progressBarFill, { width: `${logoUploadProgress}%` }]} />
-              <Text style={styles.progressText}>جاري رفع وضغط الصورة... {logoUploadProgress}%</Text>
-            </View>
-          )}
-
-          {clinicLogoUrl ? (
-            <View style={styles.previewBox}>
-              <Text style={styles.label}>معاينة اللوجو:</Text>
-              <Image source={{ uri: clinicLogoUrl }} style={{ width: 90, height: 90 }} resizeMode="contain" />
-              <TouchableOpacity onPress={() => setClinicLogoUrl('')} style={styles.deleteImgBtn}>
-                <Text style={styles.deleteImgBtnText}>🗑️ حذف اللوجو</Text>
-              </TouchableOpacity>
-            </View>
-          ) : null}
-
-          <TouchableOpacity style={styles.saveProfileBtn} onPress={handleSaveProfile} disabled={loading}>
-            {loading ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.saveProfileBtnText}>💾 حفظ وإعتماد بيانات الملف الشخصي</Text>}
-          </TouchableOpacity>
-
-          <TouchableOpacity onPress={() => setShowPrivacyModal(true)} style={{ marginTop: 20, alignItems: 'center' }}>
-            <Text style={{ color: '#38BDF8', fontSize: 12, fontWeight: 'bold' }}>🛡️ سياسة الخصوصية وشروط الاستخدام</Text>
-          </TouchableOpacity>
+          <Text style={styles.label}>الهاتف</Text>
+          <TextInput style={styles.input} value={clinicPhone} onChangeText={setClinicPhone} />
+          <Text style={styles.label}>العنوان</Text>
+          <TextInput style={styles.input} value={clinicAddress} onChangeText={setClinicAddress} />
+          <TouchableOpacity style={styles.saveProfileBtn} onPress={handleSaveProfile}><Text style={styles.saveProfileBtnText}>💾 حفظ البروفايل</Text></TouchableOpacity>
         </View>
       )}
 
-      {/* TAB 2: PATIENTS LIST WITH COUNTERS AND SEARCH */}
+      {/* TAB 2: PATIENTS */}
       {activeTab === 'patients' && (
         <View style={styles.card}>
-          <Text style={styles.sectionTitle}>📂 قائمة مرضى العيادة والملفات الطبية</Text>
-          
+          <Text style={styles.sectionTitle}>📂 قائمة مرضى العيادة</Text>
           <View style={styles.statsContainer}>
-            <View style={styles.statCard}>
-              <Text style={styles.statNumber}>{monthlyPatientsCount}</Text>
-              <Text style={styles.statLabel}>مرضى الشهر الحالي</Text>
-            </View>
-            <View style={styles.statCard}>
-              <Text style={styles.statNumber}>{totalPatientsCount}</Text>
-              <Text style={styles.statLabel}>إجمالي مرضى العيادة</Text>
-            </View>
+            <View style={styles.statCard}><Text style={styles.statNumber}>{monthlyPatientsCount}</Text><Text style={styles.statLabel}>مرضى الشهر</Text></View>
+            <View style={styles.statCard}><Text style={styles.statNumber}>{totalPatientsCount}</Text><Text style={styles.statLabel}>إجمالي المرضى</Text></View>
           </View>
-
-          <Text style={styles.label}>🔍 بحث سريع باسم المريض أو الكود:</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="ادخل اسم المريض للبحث..."
-            placeholderTextColor="#64748B"
-            value={patientSearchQuery}
-            onChangeText={setPatientSearchQuery}
-          />
-
-          {loadingPatientsList ? (
-            <ActivityIndicator color="#00F2FE" style={{ marginVertical: 20 }} />
-          ) : filteredDoctorPatients.length === 0 ? (
-            <Text style={styles.emptyText}>لا يوجد مرضى مطابقين للبحث.</Text>
-          ) : (
-            filteredDoctorPatients.map((item) => (
-              <TouchableOpacity key={item.id} style={styles.patientListItem} onPress={() => selectPatientFromList(item)}>
-                <View style={styles.rowInputs}>
-                  <Text style={styles.patientItemName}>👤 {item.full_name} ({item.gender || 'غير محدد'})</Text>
-                  <Text style={styles.patientItemCode}>{item.patient_code}</Text>
-                </View>
-                <Text style={styles.patientItemSub}>السن: {item.age || 'غير محدد'} | الهاتف: {item.phone || 'لا يوجد'}</Text>
-              </TouchableOpacity>
-            ))
-          )}
+          <Text style={styles.label}>🔍 بحث منفصل باسم المريض أو الكود:</Text>
+          <TextInput style={styles.input} placeholder="اكتب اسم المريض للبحث..." placeholderTextColor="#64748B" value={patientSearchQuery} onChangeText={setPatientSearchQuery} />
+          {loadingPatientsList ? <ActivityIndicator color="#00F2FE" /> : filteredPatients.map(item => (
+            <TouchableOpacity key={item.id} style={styles.patientListItem} onPress={() => selectPatientFromList(item)}>
+              <Text style={styles.patientItemName}>👤 {item.full_name} ({item.patient_code})</Text>
+              <Text style={styles.patientItemSub}>السن: {item.age || 'غير محدد'} | الهاتف: {item.phone || 'لا يوجد'}</Text>
+            </TouchableOpacity>
+          ))}
         </View>
       )}
 
-      {/* TAB 3: CONSULTATION & MULTI-SCANS */}
+      {/* TAB 3: PRESCRIPTION & CLINICAL EXAMINATION */}
       {activeTab === 'prescription' && (
         <>
-          {/* 1. البيانات الأساسية للمريض (Personal Hx) */}
           <View style={styles.card}>
             <View style={styles.cardHeaderRow}>
-              <Text style={styles.sectionTitle}>👤 البيانات الأساسية لكارت المريض (Personal Hx)</Text>
-              <TouchableOpacity style={styles.dummyBtn} onPress={handleFillDummyData}>
-                <Text style={styles.dummyBtnText}>🧪 ملء بيانات تجريبية</Text>
-              </TouchableOpacity>
+              <Text style={styles.sectionTitle}>👤 البيانات الأساسية (Personal Hx)</Text>
+              <TouchableOpacity style={styles.dummyBtn} onPress={handleFillDummyData}><Text style={styles.dummyBtnText}>🧪 بيانات تجريبية</Text></TouchableOpacity>
             </View>
-
-            {allDoctorPatients.length > 0 && (
-              <View style={{ marginBottom: 12 }}>
-                <Text style={styles.label}>اختيار مريض محدد بكوده لإرفاق تقرير/أشعة له:</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                  {allDoctorPatients.map((p) => (
-                    <TouchableOpacity
-                      key={p.id}
-                      style={[styles.patientChip, selectedPatientCode === p.patient_code && styles.patientChipActive]}
-                      onPress={() => selectPatientFromList(p)}
-                    >
-                      <Text style={[styles.patientChipText, selectedPatientCode === p.patient_code && styles.patientChipTextActive]}>
-                        {p.full_name} ({p.patient_code})
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-              </View>
-            )}
-            
             <Text style={styles.label}>اسم المريض بالكامل *</Text>
-            <TextInput 
-              style={styles.input} 
-              placeholder="أدخل اسم المريض..." 
-              placeholderTextColor="#64748B"
-              value={patientName}
-              onChangeText={handleSearchPatientByName}
-            />
-
-            {selectedPatientCode ? (
-              <View style={{ flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Text style={styles.selectedCodeBadge}>📌 كود المريض المربوط: {selectedPatientCode}</Text>
-                <TouchableOpacity onPress={handleSendWhatsAppPrescription} style={styles.whatsappShareBtn}>
-                  <Text style={styles.whatsappShareBtnText}>💬 إرسال عبر الواتساب</Text>
-                </TouchableOpacity>
-              </View>
-            ) : null}
-
+            <TextInput style={styles.input} placeholder="أدخل اسم المريض..." placeholderTextColor="#64748B" value={patientName} onChangeText={handleSearchPatientByName} />
+            {selectedPatientCode ? <Text style={styles.selectedCodeBadge}>📌 كود المريض: {selectedPatientCode}</Text> : null}
             <View style={styles.rowInputs}>
-              <View style={{ flex: 1, marginLeft: 8 }}>
-                <Text style={styles.label}>السن (yrs old)</Text>
-                <TextInput 
-                  style={styles.input} 
-                  placeholder="مثال: 45" 
-                  placeholderTextColor="#64748B"
-                  keyboardType="numeric"
-                  value={age}
-                  onChangeText={setAge}
-                />
-              </View>
-
-              <View style={{ flex: 1, marginLeft: 8 }}>
-                <Text style={styles.label}>الجنس</Text>
-                <View style={{ flexDirection: 'row-reverse', gap: 6, marginTop: 2 }}>
-                  <TouchableOpacity 
-                    style={[styles.genderChip, gender === 'ذكر' && styles.genderChipActive]} 
-                    onPress={() => setGender('ذكر')}
-                  >
-                    <Text style={[styles.genderChipText, gender === 'ذكر' && styles.genderChipTextActive]}>👨 ذكر</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity 
-                    style={[styles.genderChip, gender === 'أنثى' && styles.genderChipActive]} 
-                    onPress={() => setGender('أنثى')}
-                  >
-                    <Text style={[styles.genderChipText, gender === 'أنثى' && styles.genderChipTextActive]}>👩 أنثى</Text>
-                  </TouchableOpacity>
+              <View style={{ flex: 1, marginLeft: 8 }}><Text style={styles.label}>السن</Text><TextInput style={styles.input} placeholder="مثال: 40" placeholderTextColor="#64748B" keyboardType="numeric" value={age} onChangeText={setAge} /></View>
+              <View style={{ flex: 1, marginLeft: 8 }}><Text style={styles.label}>الجنس</Text>
+                <View style={{ flexDirection: 'row-reverse', gap: 4 }}>
+                  <TouchableOpacity style={[styles.genderChip, gender === 'ذكر' && styles.genderChipActive]} onPress={() => setGender('ذكر')}><Text style={{ color: '#FFF', fontSize: 11 }}>ذكر</Text></TouchableOpacity>
+                  <TouchableOpacity style={[styles.genderChip, gender === 'أنثى' && styles.genderChipActive]} onPress={() => setGender('أنثى')}><Text style={{ color: '#FFF', fontSize: 11 }}>أنثى</Text></TouchableOpacity>
                 </View>
               </View>
-
-              <View style={{ flex: 1 }}>
-                <Text style={styles.label}>الوظيفة (Works as)</Text>
-                <TextInput 
-                  style={styles.input} 
-                  placeholder="مثال: موظف" 
-                  placeholderTextColor="#64748B"
-                  value={occupation}
-                  onChangeText={setOccupation}
-                />
-              </View>
+              <View style={{ flex: 1 }}><Text style={styles.label}>الوظيفة</Text><TextInput style={styles.input} placeholder="الوظيفة" placeholderTextColor="#64748B" value={occupation} onChangeText={setOccupation} /></View>
             </View>
-
-            <Text style={styles.label}>الأمراض المزمنة والدائمة</Text>
-            <TextInput style={styles.input} placeholder="مثال: ضغط، سكر، روماتويد..." placeholderTextColor="#64748B" value={chronicDiseases} onChangeText={setChronicDiseases} />
+            <Text style={styles.label}>الأمراض المزمنة</Text>
+            <TextInput style={styles.input} placeholder="الأمراض المزمنة..." placeholderTextColor="#64748B" value={chronicDiseases} onChangeText={setChronicDiseases} />
           </View>
 
-          {/* 2. الشكوى الرئيسية والتاريخ المرضي (C/o & Past Hx) */}
+          {/* C/o */}
           <View style={styles.card}>
             <Text style={styles.sectionTitle}>🩺 الشكوى الرئيسية (Chief Complaint C/o)</Text>
-            <Text style={styles.label}>اختر طبيعة وتطور الشكوى:</Text>
             <View style={styles.chipsContainer}>
-              {[
-                { key: 'generalized', label: 'Generalized' },
-                { key: 'acute', label: 'Acute' },
-                { key: 'chronic', label: 'Chronic' },
-                { key: 'progressive', label: 'Progressive' },
-                { key: 'mechanical', label: 'Mechanical' },
-                { key: 'inflammatory', label: 'Inflammatory' },
-                { key: 'arthralgia', label: 'Arthralgia' },
-                { key: 'arthritis', label: 'Arthritis' }
-              ].map(item => (
-                <TouchableOpacity
-                  key={item.key}
-                  style={[styles.selectChip, coState[item.key] && styles.selectChipActive]}
-                  onPress={() => setCoState(prev => ({ ...prev, [item.key]: !prev[item.key] }))}
-                >
-                  <Text style={[styles.selectChipText, coState[item.key] && styles.selectChipTextActive]}>
-                    {coState[item.key] ? '✓ ' : ''}{item.label}
-                  </Text>
+              {['Generalized', 'Acute', 'Chronic', 'Progressive', 'Mechanical', 'Inflammatory', 'Arthralgia', 'Arthritis'].map(item => (
+                <TouchableOpacity key={item} style={[styles.selectChip, coState[item.toLowerCase()] && styles.selectChipActive]} onPress={() => setCoState(p => ({ ...p, [item.toLowerCase()]: !p[item.toLowerCase()] }))}>
+                  <Text style={[styles.selectChipText, coState[item.toLowerCase()] && styles.selectChipTextActive]}>{item}</Text>
                 </TouchableOpacity>
               ))}
             </View>
           </View>
 
-          {/* 3. فحص المفاصل الإكلينيكي والخريطة التفاعلية والمدة (Joint Map & Stiffness) */}
+          {/* 🦴 خريطة الهيكل العظمي التفاعلية (البصرية الفعلية) */}
           {isRheumaSpecialty && (
             <View style={styles.card}>
-              <Text style={styles.sectionTitle}>🦴 خريطة مفاصل الجسم والتيبس (تفاعلية حسب الجنس: {gender})</Text>
+              <Text style={styles.sectionTitle}>🦴 خريطة مفاصل الجسم التفاعلية (اضغط على المفصل لتحديد مكان الألم/الالتهاب)</Text>
+              <Text style={styles.legendTitle}>🔴 نقرة أولى = ملتهب ومتورم (Arthritis) | 🔵 نقرة ثانية = ألم فقط (Arthralgia) | ⚪ نقرة ثالثة = إلغاء</Text>
 
-              {/* دليل الألوان التفاعلي */}
-              <View style={styles.legendContainer}>
-                <Text style={styles.legendTitle}>طريقة استخدام الخريطة:</Text>
-                <View style={{ flexDirection: 'row-reverse', gap: 12, marginTop: 4 }}>
-                  <Text style={{ color: '#EF4444', fontSize: 11, fontWeight: 'bold' }}>🔴 نقرة أولى = ملتهب (Arthritis / Swollen)</Text>
-                  <Text style={{ color: '#3B82F6', fontSize: 11, fontWeight: 'bold' }}>🔵 نقرة ثانية = مؤلم فقط (Arthralgia / Painful)</Text>
-                </View>
-              </View>
-
-              {/* خريطة المفاصل */}
-              <View style={styles.skeletonBox}>
-                <Text style={styles.skeletonHeader}>رسم مفاصل الجسم ({gender === 'أنثى' ? 'هيكل أنثوي' : 'هيكل ذكري'}):</Text>
-                <View style={styles.jointsGrid}>
-                  {JOINTS_LIST.map((joint) => {
-                    const status = jointStates[joint.id];
+              <View style={styles.visualSkeletonBox}>
+                <Text style={styles.skeletonGenderLabel}>هيكل المريض ({gender}): اضغط على أي نقطة أدناه لتمييزها:</Text>
+                
+                {/* شبكة النقاط التفاعلية التوجيهية فوق شكل الهيكل */}
+                <View style={styles.skeletonInteractiveContainer}>
+                  {SKELETON_JOINTS.map(joint => {
+                    const status = skeletonJointStates[joint.id];
                     return (
                       <TouchableOpacity
                         key={joint.id}
                         style={[
-                          styles.jointBtn,
-                          status === 'red' && styles.jointRed,
-                          status === 'blue' && styles.jointBlue
+                          styles.skeletonMarkerBtn,
+                          { top: joint.top, left: joint.left },
+                          status === 'red' && styles.markerRed,
+                          status === 'blue' && styles.markerBlue
                         ]}
-                        onPress={() => handleJointClick(joint.id)}
+                        onPress={() => handleSkeletonPointClick(joint.id)}
                       >
-                        <Text style={styles.jointBtnText}>
-                          {status === 'red' ? '🔴 ' : status === 'blue' ? '🔵 ' : '⚪ '}
-                          {joint.label}
-                        </Text>
+                        <Text style={styles.markerText}>{status === 'red' ? '🔴' : status === 'blue' ? '🔵' : '⚪'}</Text>
+                        <Text style={styles.markerLabel}>{joint.label}</Text>
                       </TouchableOpacity>
                     );
                   })}
                 </View>
               </View>
 
-              {/* مدة التيبس الصباحي (مبسط بزرين) */}
               <Text style={styles.subSectionTitle}>⏱️ مدة التيبس الصباحي (Morning Stiffness):</Text>
               <View style={styles.chipsContainer}>
-                {RHEUMA_OPTIONS.morningStiffnessDuration.map((stiff, i) => (
-                  <TouchableOpacity
-                    key={i}
-                    style={[styles.selectChip, rheumaStiffness === stiff && styles.selectChipActive]}
-                    onPress={() => setRheumaStiffness(stiff)}
-                  >
+                {RHEUMA_OPTIONS.morningStiffnessDuration.map(stiff => (
+                  <TouchableOpacity key={stiff} style={[styles.selectChip, rheumaStiffness === stiff && styles.selectChipActive]} onPress={() => setRheumaStiffness(stiff)}>
                     <Text style={[styles.selectChipText, rheumaStiffness === stiff && styles.selectChipTextActive]}>{stiff}</Text>
                   </TouchableOpacity>
                 ))}
@@ -1776,80 +986,13 @@ Return JSON ONLY:
             </View>
           )}
 
-          {/* 4. الأعراض الإضافية والتاريخ العائلي المناعي */}
-          <View style={styles.card}>
-            <Text style={styles.sectionTitle}>⚠️ الأعراض والأنظمة الأخرى والتاريخ العائلي</Text>
-            
-            <Text style={styles.label}>الأعراض والظواهر الإكلينيكية (حدد ما ينطبق):</Text>
-            <View style={styles.symptomsGrid}>
-              {[
-                { key: 'rashes', label: 'طفح جلدي / حساسية شمس (Rashes)' },
-                { key: 'oralUlcers', label: 'قرح فموية متكررة (Oral Ulcers)' },
-                { key: 'eye', label: 'التهاب واحمرار العين (Eye)' },
-                { key: 'dysphagia', label: 'صعوبة البلع (Dysphagia)' },
-                { key: 'recurrentDiarrhea', label: 'إسهال متكرر (Diarrhea)' },
-                { key: 'bloodyDiarrhea', label: 'إسهال مصحوب بدم (Bloody)' },
-                { key: 'abdominalPain', label: 'آلام بطن متكررة' },
-                { key: 'cyanosis', label: 'برودة وزرقة الأطراف (Raynaud)' },
-                { key: 'tightSkin', label: 'دكاء وتيبس الجلد (Tight Skin)' },
-                { key: 'skinNailChanges', label: 'تغيرات الجلد والأظافر' },
-                { key: 'dysuria', label: 'حرقان بول متكرر (Dysuria)' },
-                { key: 'recurrentFever', label: 'حمى متكررة (Fever)' },
-                { key: 'weightLoss', label: 'نزول الوزن (Loss of Wt)' },
-                { key: 'lossOfAppetite', label: 'فقدان الشهية' },
-                { key: 'lymphNodes', label: 'تضخم الغدد الليمفاوية (LNs)' }
-              ].map(item => (
-                <TouchableOpacity
-                  key={item.key}
-                  style={[styles.checkboxChip, symptomsFlags[item.key] && styles.checkboxChipActive]}
-                  onPress={() => setSymptomsFlags(prev => ({ ...prev, [item.key]: !prev[item.key] }))}
-                >
-                  <Text style={styles.checkboxChipText}>
-                    {symptomsFlags[item.key] ? '☑️ ' : '☐ '} {item.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            <Text style={styles.subSectionTitle}>👨‍👩‍👧‍👦 التاريخ العائلي (Family Hx):</Text>
-            <View style={styles.symptomsGrid}>
-              <TouchableOpacity
-                style={[styles.checkboxChip, familyHistory.autoimDs && styles.checkboxChipActive]}
-                onPress={() => setFamilyHistory(prev => ({ ...prev, autoimDs: !prev.autoimDs }))}
-              >
-                <Text style={styles.checkboxChipText}>
-                  {familyHistory.autoimDs ? '☑️ ' : '☐ '} أمراض مناعية بالعائلة (Autoimmune ds)
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.checkboxChip, familyHistory.chemother && styles.checkboxChipActive]}
-                onPress={() => setFamilyHistory(prev => ({ ...prev, chemother: !prev.chemother }))}
-              >
-                <Text style={styles.checkboxChipText}>
-                  {familyHistory.chemother ? '☑️ ' : '☐ '} أدوية كيماوية (Chemotherapy)
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.checkboxChip, familyHistory.feverHospital && styles.checkboxChipActive]}
-                onPress={() => setFamilyHistory(prev => ({ ...prev, feverHospital: !prev.feverHospital }))}
-              >
-                <Text style={styles.checkboxChipText}>
-                  {familyHistory.feverHospital ? '☑️ ' : '☐ '} حجوزات مستشفيات الحميات (Fever Hosp)
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          {/* 5. قسم تحاليل وأشعة ومرفقات المريض (مع دعم الكاميرا المباشرة والـ AI) */}
+          {/* الأعراض والتحاليل */}
           <View style={styles.card}>
             <Text style={styles.sectionTitle}>📸 تحاليل وأشعة ومرفقات المريض</Text>
-
-            <Text style={styles.subSectionTitle}>🔬 دلالات الالتهاب والتحاليل المناعية (ESR & CRP في المقدمة):</Text>
-
             <Text style={styles.label}>1. سرعة الترسيب والبروتين الالتهابي (ESR / CRP):</Text>
             <View style={styles.chipsContainer}>
-              {RHEUMA_OPTIONS.esrCrp.map((opt, i) => (
-                <TouchableOpacity key={i} style={[styles.selectChip, rheumaEsrCrp === opt && styles.selectChipActive]} onPress={() => setRheumaEsrCrp(opt)}>
+              {RHEUMA_OPTIONS.esrCrp.map(opt => (
+                <TouchableOpacity key={opt} style={[styles.selectChip, rheumaEsrCrp === opt && styles.selectChipActive]} onPress={() => setRheumaEsrCrp(opt)}>
                   <Text style={[styles.selectChipText, rheumaEsrCrp === opt && styles.selectChipTextActive]}>{opt}</Text>
                 </TouchableOpacity>
               ))}
@@ -1857,8 +1000,8 @@ Return JSON ONLY:
 
             <Text style={styles.label}>2. Rheumatoid Factor (RF):</Text>
             <View style={styles.chipsContainer}>
-              {RHEUMA_OPTIONS.rf.map((opt, i) => (
-                <TouchableOpacity key={i} style={[styles.selectChip, rheumaRF === opt && styles.selectChipActive]} onPress={() => setRheumaRF(opt)}>
+              {RHEUMA_OPTIONS.rf.map(opt => (
+                <TouchableOpacity key={opt} style={[styles.selectChip, rheumaRF === opt && styles.selectChipActive]} onPress={() => setRheumaRF(opt)}>
                   <Text style={[styles.selectChipText, rheumaRF === opt && styles.selectChipTextActive]}>{opt}</Text>
                 </TouchableOpacity>
               ))}
@@ -1866,188 +1009,56 @@ Return JSON ONLY:
 
             <Text style={styles.label}>3. Anti-CCP:</Text>
             <View style={styles.chipsContainer}>
-              {RHEUMA_OPTIONS.antiCCP.map((opt, i) => (
-                <TouchableOpacity key={i} style={[styles.selectChip, rheumaAntiCCP === opt && styles.selectChipActive]} onPress={() => setRheumaAntiCCP(opt)}>
+              {RHEUMA_OPTIONS.antiCCP.map(opt => (
+                <TouchableOpacity key={opt} style={[styles.selectChip, rheumaAntiCCP === opt && styles.selectChipActive]} onPress={() => setRheumaAntiCCP(opt)}>
                   <Text style={[styles.selectChipText, rheumaAntiCCP === opt && styles.selectChipTextActive]}>{opt}</Text>
                 </TouchableOpacity>
               ))}
             </View>
 
-            <Text style={styles.label}>4. ANA (Antinuclear Antibodies):</Text>
-            <View style={styles.chipsContainer}>
-              {RHEUMA_OPTIONS.ana.map((opt, i) => (
-                <TouchableOpacity key={i} style={[styles.selectChip, rheumaANA === opt && styles.selectChipActive]} onPress={() => setRheumaANA(opt)}>
-                  <Text style={[styles.selectChipText, rheumaANA === opt && styles.selectChipTextActive]}>{opt}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+            <Text style={styles.subSectionTitle}>📷 كاميرا الأشعة المباشرة:</Text>
+            {Platform.OS === 'web' && <input type="file" accept="image/*" capture="environment" onChange={handleDirectCameraCapture} style={{ color: '#00F2FE', marginBottom: 10 }} />}
 
-            <Text style={styles.subSectionTitle}>📷 التقاط مباشر لكاميرا الأشعة والمرفقات:</Text>
-            {Platform.OS === 'web' ? (
-              <input 
-                type="file" 
-                accept="image/*" 
-                capture="environment"
-                onChange={handleDirectCameraCapture}
-                style={{ marginBottom: 12, color: '#00F2FE', cursor: 'pointer' }}
-              />
-            ) : null}
-
-            {patientName.trim() !== '' && (
-              <>
-                <Text style={styles.subSectionTitle}>🖼️ المرفقات المخزنة حالياً للمريض:</Text>
-                {searchingHistory ? (
-                  <ActivityIndicator color="#00F2FE" style={{ marginVertical: 10 }} />
-                ) : patientScansGrid.length === 0 ? (
-                  <Text style={styles.emptyText}>لا توجد صور أشعة مرفوعة حالياً لـ {patientName}.</Text>
-                ) : (
-                  <View style={styles.scansGridContainer}>
-                    {patientScansGrid.map((sc, idx) => (
-                      <View key={idx} style={styles.scanGridCard}>
-                        <TouchableOpacity onPress={() => { setViewingImageModal(sc); setZoomScale(1); }}>
-                          {Platform.OS === 'web' ? (
-                            <img 
-                              src={sc.url} 
-                              alt={sc.title} 
-                              style={{ width: '100%', height: '90px', borderRadius: '8px', objectFit: 'cover' }} 
-                            />
-                          ) : (
-                            <Image source={{ uri: sc.url }} style={styles.scanGridImg} resizeMode="cover" />
-                          )}
-                        </TouchableOpacity>
-                        <Text style={styles.scanGridTitle} numberOfLines={1}>{sc.title}</Text>
-                        <TouchableOpacity 
-                          style={styles.scanGridDeleteBtn}
-                          onPress={() => handleDeleteSavedScanFromRecord(sc.recordId, sc.url)}
-                        >
-                          <Text style={styles.scanGridDeleteText}>🗑️ حذف</Text>
-                        </TouchableOpacity>
-                      </View>
-                    ))}
+            {patientScansGrid.length > 0 && (
+              <View style={styles.scansGridContainer}>
+                {patientScansGrid.map((sc, idx) => (
+                  <View key={idx} style={styles.scanGridCard}>
+                    <TouchableOpacity onPress={() => setViewingImageModal(sc)}><Image source={{ uri: sc.url }} style={{ width: 70, height: 70, borderRadius: 6 }} /></TouchableOpacity>
+                    <TouchableOpacity onPress={() => handleDeleteSavedScanFromRecord(sc.recordId, sc.url)}><Text style={{ color: '#EF4444', fontSize: 10, marginTop: 4 }}>حذف</Text></TouchableOpacity>
                   </View>
-                )}
-
-                <TextInput 
-                  style={[styles.input, !isPatientSavedInDb && styles.inputDisabled]} 
-                  placeholder="عنوان المرفق (مثال: أشعة سينية جديدة)" 
-                  placeholderTextColor="#64748B" 
-                  value={scanGroupTitle} 
-                  onChangeText={setScanGroupTitle}
-                  editable={isPatientSavedInDb}
-                />
-
-                {Platform.OS === 'web' ? (
-                  <input 
-                    type="file" 
-                    accept="image/*" 
-                    multiple
-                    disabled={!isPatientSavedInDb}
-                    onChange={handleSelectMultipleScans}
-                    style={{ marginBottom: 12, color: isPatientSavedInDb ? '#00F2FE' : '#64748B', opacity: isPatientSavedInDb ? 1 : 0.4 }}
-                  />
-                ) : null}
-
-                {uploadingScans && (
-                  <View style={styles.progressBarContainer}>
-                    <View style={[styles.progressBarFill, { width: `${scanUploadProgress}%` }]} />
-                    <Text style={styles.progressText}>جاري رفع ومعالجة الصور... {scanUploadProgress}%</Text>
-                  </View>
-                )}
-
-                <TouchableOpacity 
-                  style={[styles.saveScansBtn, (!isPatientSavedInDb || uploadingScans) && styles.saveScansBtnDisabled]} 
-                  onPress={handleSaveScansToPatientFile}
-                  disabled={!isPatientSavedInDb || uploadingScans}
-                >
-                  <Text style={styles.saveScansBtnText}>
-                    {isPatientSavedInDb ? '💾 حفظ وإضافة الأشاعات لملف المريض' : '🔒 زر الرفع مقفول (احفظ المريض أولاً)'}
-                  </Text>
-                </TouchableOpacity>
-              </>
-            )}
-          </View>
-
-          {/* 6. الذكاء الاصطناعي، التشخيص، والأدوية */}
-          <View style={styles.card}>
-            <Text style={styles.sectionTitle}>🩺 ملاحظات وقراءة الذكاء الاصطناعي</Text>
-            
-            <Text style={styles.label}>ملاحظات سريرية إضافية:</Text>
-            <TextInput style={[styles.input, styles.textArea]} placeholder="ملاحظات..." placeholderTextColor="#64748B" multiline numberOfLines={2} value={symptomsInput} onChangeText={setSymptomsInput} />
-
-            <TouchableOpacity style={styles.aiButton} onPress={handleClinicalAnalysis} disabled={analyzing}>
-              {analyzing ? <ActivityIndicator color="#FFFFFF" size="small" /> : <Text style={styles.aiButtonText}>✨ تحليل الفحص والأشعات بالذكاء الاصطناعي ({specialty})</Text>}
-            </TouchableOpacity>
-
-            {aiReport && (
-              <View style={styles.aiReportBox}>
-                <Text style={styles.aiReportHeader}>📋 التقرير المولد من الذكاء الاصطناعي:</Text>
-                {aiReport.warnings && aiReport.warnings.length > 0 && (
-                  <View style={styles.warningBox}>
-                    {aiReport.warnings.map((w, idx) => <Text key={idx} style={styles.warningText}>⚠️ {w}</Text>)}
-                  </View>
-                )}
-                <Text style={styles.aiDiagText}><strong>التشخيص المقترح:</strong> {aiReport.diagnosis}</Text>
+                ))}
               </View>
             )}
           </View>
 
+          {/* التشخيص والأدوية */}
           <View style={styles.card}>
-            <Text style={styles.sectionTitle}>📝 اعتماد الخطة العلاجية والروشتة</Text>
+            <Text style={styles.sectionTitle}>📝 التشخيص والروشتة</Text>
+            <TouchableOpacity style={styles.aiButton} onPress={handleClinicalAnalysis} disabled={analyzing}>
+              {analyzing ? <ActivityIndicator color="#FFF" /> : <Text style={styles.aiButtonText}>✨ تحليل الحالة بالذكاء الاصطناعي</Text>}
+            </TouchableOpacity>
 
-            <Text style={styles.label}>التشخيص المعتمد النهائي:</Text>
+            <Text style={styles.label}>التشخيص النهائي:</Text>
             <TextInput style={[styles.input, styles.textArea]} multiline value={finalDiagnosis} onChangeText={setFinalDiagnosis} />
 
-            <Text style={styles.subSectionTitle}>💊 قائمة الأدوية المعتمدة للروشتة ({prescribedMeds.length}):</Text>
-
-            {prescribedMeds.map((med, index) => (
-              <View key={index} style={styles.medCard}>
-                <View style={styles.medHeader}>
-                  <Text style={styles.medName}>💊 {med.name}</Text>
-                  <TouchableOpacity onPress={() => handleRemoveMed(index)}>
-                    <Text style={styles.deleteText}>إزالة ✕</Text>
-                  </TouchableOpacity>
-                </View>
-                <Text style={styles.medDetail}><strong>الجرعة:</strong> {med.dose}</Text>
-                <Text style={styles.medDetail}><strong>دواعي الاستعمال:</strong> {med.reason}</Text>
+            <Text style={styles.subSectionTitle}>💊 الأدوية ({prescribedMeds.length}):</Text>
+            {prescribedMeds.map((med, idx) => (
+              <View key={idx} style={styles.medCard}>
+                <View style={styles.medHeader}><Text style={styles.medName}>💊 {med.name} - {med.dose}</Text><TouchableOpacity onPress={() => handleRemoveMed(idx)}><Text style={{ color: '#EF4444' }}>إزالة</Text></TouchableOpacity></View>
+                <Text style={styles.medDetail}>{med.reason}</Text>
               </View>
             ))}
 
             <View style={styles.addMedBox}>
-              <Text style={styles.label}>إضافة دواء يدوي (مع فحص التفاعلات والتجاوز الإكلينيكي):</Text>
-              <TextInput style={styles.input} placeholder="اسم الدواء (إنجليزي)" placeholderTextColor="#64748B" value={newMedName} onChangeText={setNewMedName} />
-              <TextInput style={styles.input} placeholder="الجرعة والتوقيت" placeholderTextColor="#64748B" value={newMedDose} onChangeText={setNewMedDose} />
-              <TextInput style={styles.input} placeholder="دواعي الاستعمال" placeholderTextColor="#64748B" value={newMedReason} onChangeText={setNewMedReason} />
-              
-              <TouchableOpacity style={styles.addMedBtn} onPress={handleCheckAndAddManualMed} disabled={checkingMed}>
-                {checkingMed ? <ActivityIndicator color="#FFFFFF" size="small" /> : <Text style={styles.addMedBtnText}>🔍 فحص وإضافة الدواء للروشتة</Text>}
-              </TouchableOpacity>
-
-              {medCheckError && (
-                <View style={styles.warningBox}>
-                  <Text style={styles.warningText}>🚨 تحذير تعارض: {medCheckError}</Text>
-                  
-                  <View style={styles.overrideButtonsRow}>
-                    <TouchableOpacity 
-                      style={styles.forceAddBtn} 
-                      onPress={handleForceAddMed}
-                    >
-                      <Text style={styles.forceAddBtnText}>⚠️ أعلم مدى الخطورة وأضف على مسؤوليتي</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity 
-                      style={styles.cancelAddBtn} 
-                      onPress={handleDismissConflict}
-                    >
-                      <Text style={styles.cancelAddBtnText}>✕ إلغاء وعدم الإضافة</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              )}
+              <Text style={styles.label}>إضافة دواء يدوي:</Text>
+              <TextInput style={styles.input} placeholder="اسم الدواء..." placeholderTextColor="#64748B" value={newMedName} onChangeText={setNewMedName} />
+              <TextInput style={styles.input} placeholder="الجرعة..." placeholderTextColor="#64748B" value={newMedDose} onChangeText={setNewMedDose} />
+              <TouchableOpacity style={styles.addMedBtn} onPress={handleCheckAndAddManualMed}><Text style={styles.addMedBtnText}>➕ إضافة للروشتة</Text></TouchableOpacity>
             </View>
           </View>
 
-          <TouchableOpacity style={[styles.saveButton, loading && styles.saveButtonDisabled]} onPress={handleSaveAndPrint} disabled={loading}>
-            {loading ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.saveButtonText}>اعتماد التقرير وتنزيل الروشتة PDF 🖨️</Text>}
+          <TouchableOpacity style={styles.saveButton} onPress={handleSaveAndPrint} disabled={loading}>
+            {loading ? <ActivityIndicator color="#FFF" /> : <Text style={styles.saveButtonText}>اعتماد التقرير وتنزيل الروشتة PDF 🖨️</Text>}
           </TouchableOpacity>
         </>
       )}
@@ -2057,204 +1068,85 @@ Return JSON ONLY:
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#060911', padding: 14 },
-  header: { marginBottom: 20, alignItems: 'center', marginTop: 10 },
-  title: { 
-    fontSize: 26, 
-    fontWeight: '900', 
-    color: '#00F2FE', 
-    letterSpacing: 0.5,
-    textAlign: 'center',
-    textShadowColor: 'rgba(0, 242, 254, 0.4)',
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 15
-  },
-  brandRow: { flexDirection: 'row', alignItems: 'center', marginTop: 4, marginBottom: 4, gap: 6 },
-  brandTag: { fontSize: 10, color: '#64748B', fontWeight: 'bold', letterSpacing: 1 },
-  brandSubtitle: { 
-    fontSize: 13, 
-    fontWeight: '900', 
-    color: '#38BDF8', 
-    letterSpacing: 2.5, 
-    textShadowColor: 'rgba(56, 189, 248, 0.5)',
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 10 
-  },
-  subtitle: { fontSize: 12, color: '#94A3B8', marginTop: 3, fontWeight: '600', textAlign: 'center' },
-
-  topUserRow: { flexDirection: 'row-reverse', justifyContent: 'space-between', width: '100%', marginBottom: 12, alignItems: 'center' },
+  header: { marginBottom: 15, alignItems: 'center' },
+  title: { fontSize: 22, fontWeight: '900', color: '#00F2FE', textAlign: 'center' },
+  subtitle: { fontSize: 11, color: '#94A3B8', textAlign: 'center', marginTop: 4 },
+  topUserRow: { flexDirection: 'row-reverse', justifyContent: 'space-between', width: '100%', marginBottom: 8 },
   userEmailText: { color: '#38BDF8', fontSize: 11, fontWeight: 'bold' },
-  signOutBtn: { backgroundColor: '#1E293B', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, borderWidth: 1, borderColor: '#334155' },
-  signOutText: { color: '#EF4444', fontSize: 11, fontWeight: 'bold' },
-
-  switchPortalBtn: { backgroundColor: '#1E293B', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, borderWidth: 1, borderColor: '#334155' },
-  switchPortalBtnText: { color: '#00F2FE', fontSize: 11, fontWeight: 'bold' },
-
-  subWarningBanner: { backgroundColor: '#B45309', paddingVertical: 10, paddingHorizontal: 14, borderRadius: 10, marginBottom: 15, flexDirection: 'row-reverse', alignItems: 'center', borderWidth: 1, borderColor: '#F59E0B' },
-  subWarningIcon: { fontSize: 16, marginLeft: 6 },
-  subWarningText: { color: '#FFFFFF', fontSize: 12, fontWeight: 'bold', flex: 1, textAlign: 'right' },
-  renewQuickBtn: { backgroundColor: '#10B981', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6 },
-  renewQuickBtnText: { color: '#FFFFFF', fontSize: 11, fontWeight: 'bold' },
-
-  authCard: { backgroundColor: '#0F172A', padding: 22, borderRadius: 18, borderWidth: 1, borderColor: '#1E293B' },
-  authTitle: { fontSize: 20, fontWeight: 'bold', color: '#00F2FE', textAlign: 'center', marginBottom: 5 },
-  authSub: { fontSize: 13, color: '#94A3B8', textAlign: 'center', marginBottom: 20 },
-  authSubmitBtn: { backgroundColor: '#0284C7', padding: 14, borderRadius: 10, alignItems: 'center', marginTop: 10 },
-  authSubmitBtnText: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 14 },
-  authToggleBtn: { marginTop: 15, alignItems: 'center' },
-  authToggleBtnText: { color: '#38BDF8', fontSize: 12 },
-
-  paywallCard: { backgroundColor: '#0F172A', padding: 20, borderRadius: 18, borderWidth: 1, borderColor: '#EF4444', alignItems: 'center' },
-  paywallIcon: { fontSize: 40, marginBottom: 10 },
-  paywallTitle: { fontSize: 20, fontWeight: 'bold', color: '#EF4444', marginBottom: 8 },
-  paywallReason: { fontSize: 13, color: '#FCA5A5', textAlign: 'center', marginBottom: 20, lineHeight: 20 },
-  paywallInfoBox: { backgroundColor: '#060911', padding: 15, borderRadius: 10, width: '100%', marginBottom: 15, borderWidth: 1, borderColor: '#1E293B' },
-  paywallInfoTitle: { fontSize: 13, fontWeight: 'bold', color: '#38BDF8', marginBottom: 10, textAlign: 'right' },
-  paymentMethodRow: { marginBottom: 12 },
-  paymentMethodText: { fontSize: 12, color: '#CBD5E1', textAlign: 'right', marginBottom: 4 },
-  paymentDetail: { fontSize: 14, fontWeight: 'bold', color: '#10B981', textAlign: 'right' },
-  instaPayBtn: { backgroundColor: '#0284C7', padding: 8, borderRadius: 6, alignItems: 'center', marginTop: 4 },
-  instaPayBtnText: { color: '#FFFFFF', fontSize: 12, fontWeight: 'bold' },
-  paywallSubNote: { fontSize: 11, color: '#94A3B8', textAlign: 'center', marginBottom: 15, lineHeight: 18 },
-  whatsappBtn: { backgroundColor: '#16A34A', padding: 14, borderRadius: 10, width: '100%', alignItems: 'center', marginBottom: 15 },
-  whatsappBtnText: { color: '#FFFFFF', fontSize: 13, fontWeight: 'bold' },
-  paywallSignOutBtn: { marginTop: 5 },
-
-  navBar: { flexDirection: 'row-reverse', backgroundColor: '#0F172A', borderRadius: 12, padding: 4, marginBottom: 18, borderWidth: 1, borderColor: '#1E293B' },
+  signOutBtn: { backgroundColor: '#1E293B', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
+  signOutText: { color: '#EF4444', fontSize: 10, fontWeight: 'bold' },
+  navBar: { flexDirection: 'row-reverse', backgroundColor: '#0F172A', borderRadius: 12, padding: 4, marginBottom: 15 },
   navBtn: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 8 },
   navBtnActive: { backgroundColor: '#0284C7' },
-  navBtnText: { color: '#94A3B8', fontSize: 12, fontWeight: 'bold' },
+  navBtnText: { color: '#94A3B8', fontSize: 11, fontWeight: 'bold' },
   navBtnTextActive: { color: '#FFFFFF' },
-
-  card: { backgroundColor: '#0F172A', padding: 18, borderRadius: 18, marginBottom: 16, borderWidth: 1, borderColor: '#1E293B' },
+  card: { backgroundColor: '#0F172A', padding: 16, borderRadius: 16, marginBottom: 14, borderWidth: 1, borderColor: '#1E293B' },
   cardHeaderRow: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
-  dummyBtn: { backgroundColor: '#0284C7', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6 },
-  dummyBtnText: { color: '#FFFFFF', fontSize: 11, fontWeight: 'bold' },
-  sectionTitle: { fontSize: 15, fontWeight: 'bold', color: '#F8FAFC', marginBottom: 10, textAlign: 'right' },
-  subSectionTitle: { fontSize: 13, fontWeight: 'bold', color: '#38BDF8', marginTop: 14, marginBottom: 8, textAlign: 'right' },
-  label: { fontSize: 12, color: '#CBD5E1', marginBottom: 6, marginTop: 4, textAlign: 'right' },
-  input: { borderWidth: 1, borderColor: '#1E293B', borderRadius: 10, padding: 12, backgroundColor: '#060911', marginBottom: 12, textAlign: 'right', color: '#FFFFFF', fontSize: 13 },
-  inputDisabled: { opacity: 0.5, backgroundColor: '#1E293B' },
+  sectionTitle: { fontSize: 14, fontWeight: 'bold', color: '#F8FAFC', marginBottom: 10, textAlign: 'right' },
+  subSectionTitle: { fontSize: 12, fontWeight: 'bold', color: '#38BDF8', marginTop: 12, marginBottom: 8, textAlign: 'right' },
+  label: { fontSize: 11, color: '#CBD5E1', marginBottom: 6, textAlign: 'right' },
+  input: { borderWidth: 1, borderColor: '#1E293B', borderRadius: 10, padding: 10, backgroundColor: '#060911', marginBottom: 10, textAlign: 'right', color: '#FFFFFF', fontSize: 12 },
   rowInputs: { flexDirection: 'row-reverse' },
-  textArea: { height: 70, textAlignVertical: 'top' },
-  
-  specChip: { backgroundColor: '#060911', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, marginRight: 8, borderWidth: 1, borderColor: '#1E293B' },
-  specChipActive: { backgroundColor: '#0284C7', borderColor: '#00F2FE' },
-  specChipText: { color: '#94A3B8', fontSize: 11 },
-  specChipTextActive: { color: '#FFFFFF', fontWeight: 'bold' },
-
-  chipsContainer: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 6, marginBottom: 12 },
-  selectChip: { backgroundColor: '#060911', paddingHorizontal: 10, paddingVertical: 7, borderRadius: 8, borderWidth: 1, borderColor: '#1E293B' },
+  textArea: { height: 60, textAlignVertical: 'top' },
+  chipsContainer: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 6, marginBottom: 10 },
+  selectChip: { backgroundColor: '#060911', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: '#1E293B' },
   selectChipActive: { backgroundColor: '#0284C7', borderColor: '#00F2FE' },
-  selectChipText: { color: '#94A3B8', fontSize: 11, textAlign: 'center' },
+  selectChipText: { color: '#94A3B8', fontSize: 11 },
   selectChipTextActive: { color: '#FFFFFF', fontWeight: 'bold' },
-
-  genderChip: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, backgroundColor: '#060911', borderWidth: 1, borderColor: '#1E293B' },
-  genderChipActive: { backgroundColor: '#0284C7', borderColor: '#00F2FE' },
-  genderChipText: { color: '#94A3B8', fontSize: 11 },
-  genderChipTextActive: { color: '#FFFFFF', fontWeight: 'bold' },
-
-  legendContainer: { backgroundColor: '#060911', padding: 10, borderRadius: 8, marginBottom: 10, borderWidth: 1, borderColor: '#1E293B' },
-  legendTitle: { color: '#CBD5E1', fontSize: 11, textAlign: 'right' },
-  skeletonBox: { backgroundColor: '#060911', padding: 12, borderRadius: 10, marginBottom: 12, borderWidth: 1, borderColor: '#1E293B' },
-  skeletonHeader: { color: '#00F2FE', fontSize: 12, fontWeight: 'bold', textAlign: 'right', marginBottom: 8 },
-  jointsGrid: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 6 },
-  jointBtn: { width: '48%', backgroundColor: '#0F172A', padding: 8, borderRadius: 6, borderWidth: 1, borderColor: '#1E293B' },
-  jointRed: { backgroundColor: 'rgba(239, 68, 68, 0.25)', borderColor: '#EF4444' },
-  jointBlue: { backgroundColor: 'rgba(59, 130, 246, 0.25)', borderColor: '#3B82F6' },
-  jointBtnText: { color: '#FFF', fontSize: 11, textAlign: 'right' },
-
-  symptomsGrid: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 6, marginBottom: 10 },
-  checkboxChip: { width: '48%', backgroundColor: '#060911', padding: 8, borderRadius: 6, borderWidth: 1, borderColor: '#1E293B' },
-  checkboxChipActive: { backgroundColor: 'rgba(2, 132, 199, 0.25)', borderColor: '#0284C7' },
-  checkboxChipText: { color: '#CBD5E1', fontSize: 11, textAlign: 'right' },
-
-  patientChip: { backgroundColor: '#060911', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, marginRight: 6, borderWidth: 1, borderColor: '#1E293B' },
-  patientChipActive: { backgroundColor: '#0369A1', borderColor: '#00F2FE' },
-  patientChipText: { color: '#CBD5E1', fontSize: 11 },
-  patientChipTextActive: { color: '#FFFFFF', fontWeight: 'bold' },
+  genderChip: { flex: 1, padding: 6, borderRadius: 6, backgroundColor: '#060911', alignItems: 'center', borderWidth: 1, borderColor: '#1E293B' },
+  genderChipActive: { backgroundColor: '#0284C7' },
+  dummyBtn: { backgroundColor: '#0284C7', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
+  dummyBtnText: { color: '#FFF', fontSize: 10, fontWeight: 'bold' },
   selectedCodeBadge: { color: '#10B981', fontSize: 11, fontWeight: 'bold', textAlign: 'right', marginBottom: 10 },
-  whatsappShareBtn: { backgroundColor: '#16A34A', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6, marginBottom: 10 },
-  whatsappShareBtnText: { color: '#FFFFFF', fontSize: 11, fontWeight: 'bold' },
+  
+  /* خريطة الهيكل التفاعلية البصرية */
+  visualSkeletonBox: { backgroundColor: '#060911', padding: 14, borderRadius: 12, borderWidth: 1, borderColor: '#0284C7', alignItems: 'center', minHeight: 280, position: 'relative' },
+  skeletonGenderLabel: { color: '#94A3B8', fontSize: 11, marginBottom: 10, textAlign: 'center' },
+  legendTitle: { color: '#CBD5E1', fontSize: 10, textAlign: 'right', marginBottom: 8 },
+  skeletonInteractiveContainer: { width: '100%', height: 240, position: 'relative', backgroundColor: 'rgba(15, 23, 42, 0.6)', borderRadius: 8, borderWidth: 1, borderColor: '#1E293B' },
+  skeletonMarkerBtn: { position: 'absolute', transform: [{ translateX: -15 }, { translateY: -15 }], backgroundColor: '#1E293B', paddingHorizontal: 6, paddingVertical: 3, borderRadius: 12, borderWidth: 1, borderColor: '#475569', alignItems: 'center', zIndex: 10 },
+  markerRed: { backgroundColor: 'rgba(239, 68, 68, 0.4)', borderColor: '#EF4444' },
+  markerBlue: { backgroundColor: 'rgba(59, 130, 246, 0.4)', borderColor: '#3B82F6' },
+  markerText: { fontSize: 10 },
+  markerLabel: { fontSize: 9, color: '#FFF', marginTop: 1, fontWeight: 'bold' },
 
-  scansGridContainer: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 10, marginBottom: 15 },
-  scanGridCard: { width: '31%', backgroundColor: '#060911', padding: 6, borderRadius: 10, alignItems: 'center', borderWidth: 1, borderColor: '#1E293B' },
-  scanGridImg: { width: '100%', height: 90, borderRadius: 8, backgroundColor: '#1E293B' },
-  scanGridTitle: { color: '#94A3B8', fontSize: 10, marginTop: 4, textAlign: 'center' },
-  scanGridDeleteBtn: { backgroundColor: '#991B1B', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, marginTop: 4, width: '100%', alignItems: 'center' },
-  scanGridDeleteText: { color: '#FFFFFF', fontSize: 10 },
-
-  progressBarContainer: { height: 18, backgroundColor: '#060911', borderRadius: 9, overflow: 'hidden', marginBottom: 12, justifyContent: 'center', borderWidth: 1, borderColor: '#1E293B' },
-  progressBarFill: { height: '100%', backgroundColor: '#059669', position: 'absolute' },
-  progressText: { color: '#FFFFFF', fontSize: 10, fontWeight: 'bold', textAlign: 'center', zIndex: 1 },
-
-  saveScansBtn: { backgroundColor: '#10B981', padding: 14, borderRadius: 10, alignItems: 'center' },
-  saveScansBtnDisabled: { backgroundColor: '#334155', opacity: 0.6 },
-  saveScansBtnText: { color: '#FFFFFF', fontWeight: 'bold' , fontSize: 13 },
-
-  deleteImgBtn: { backgroundColor: '#991B1B', padding: 6, borderRadius: 6, marginTop: 6, alignItems: 'center' },
-  deleteImgBtnText: { color: '#FFFFFF', fontSize: 11, fontWeight: 'bold' },
-
-  linkCardBox: { backgroundColor: '#060911', padding: 12, borderRadius: 8, marginBottom: 15, borderWidth: 1, borderColor: '#0284C7' },
-  linkBoxTitle: { fontSize: 13, fontWeight: 'bold', color: '#00F2FE', textAlign: 'right' },
-  linkBoxSub: { fontSize: 11, color: '#94A3B8', textAlign: 'right', marginTop: 2, marginBottom: 8 },
-  copyLinkBtn: { backgroundColor: '#0284C7', padding: 10, borderRadius: 6, alignItems: 'center' },
-  copyLinkBtnText: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 12 },
-
-  previewBox: { backgroundColor: '#060911', padding: 10, borderRadius: 8, alignItems: 'center', marginBottom: 12, borderWidth: 1, borderColor: '#1E293B' },
-  saveProfileBtn: { backgroundColor: '#10B981', padding: 12, borderRadius: 8, alignItems: 'center', marginTop: 5 },
-  saveProfileBtnText: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 13 },
-
-  statsContainer: { flexDirection: 'row-reverse', gap: 10, marginBottom: 15 },
-  statCard: { flex: 1, backgroundColor: '#060911', padding: 12, borderRadius: 10, alignItems: 'center', borderWidth: 1, borderColor: '#0284C7' },
-  statNumber: { fontSize: 22, fontWeight: 'bold', color: '#00F2FE' },
-  statLabel: { fontSize: 11, color: '#94A3B8', marginTop: 2 },
-
-  patientListItem: { backgroundColor: '#060911', padding: 12, borderRadius: 8, marginBottom: 8, borderWidth: 1, borderColor: '#1E293B' },
-  patientItemName: { fontSize: 14, fontWeight: 'bold', color: '#FFFFFF' },
-  patientItemCode: { fontSize: 12, color: '#00F2FE', fontWeight: 'bold' },
-  patientItemSub: { fontSize: 11, color: '#94A3B8', textAlign: 'right', marginTop: 4 },
-  emptyText: { color: '#64748B', fontSize: 12, textAlign: 'center', marginVertical: 10 },
-
-  aiButton: { backgroundColor: '#0284C7', padding: 14, borderRadius: 10, alignItems: 'center', marginBottom: 12, marginTop: 5 },
-  aiButtonText: { color: '#FFFFFF', fontSize: 13, fontWeight: 'bold' },
-  aiReportBox: { backgroundColor: 'rgba(3, 105, 161, 0.2)', padding: 12, borderRadius: 10, borderWidth: 1, borderColor: '#0284C7' },
-  aiReportHeader: { fontSize: 12, fontWeight: 'bold', color: '#00F2FE', marginBottom: 6, textAlign: 'right' },
-  warningBox: { backgroundColor: 'rgba(153, 27, 27, 0.4)', padding: 12, borderRadius: 8, borderWidth: 1, borderColor: '#EF4444', marginTop: 6, marginBottom: 6 },
-  warningText: { color: '#FCA5A5', fontSize: 11, fontWeight: 'bold', textAlign: 'right', lineHeight: 18 },
-  overrideButtonsRow: { flexDirection: 'row-reverse', gap: 8, marginTop: 10 },
-  forceAddBtn: { flex: 1.4, backgroundColor: '#DC2626', paddingVertical: 8, paddingHorizontal: 6, borderRadius: 6, alignItems: 'center' },
-  forceAddBtnText: { color: '#FFFFFF', fontSize: 11, fontWeight: 'bold', textAlign: 'center' },
-  cancelAddBtn: { flex: 1, backgroundColor: '#334155', paddingVertical: 8, paddingHorizontal: 6, borderRadius: 6, alignItems: 'center' },
-  cancelAddBtnText: { color: '#CBD5E1', fontSize: 11, fontWeight: 'bold', textAlign: 'center' },
-
-  aiDiagText: { fontSize: 12, color: '#F8FAFC', textAlign: 'right' },
-  medCard: { backgroundColor: '#060911', padding: 12, borderRadius: 8, borderWidth: 1, borderColor: '#1E293B', marginBottom: 10 },
-  medHeader: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
-  medName: { fontSize: 13, fontWeight: 'bold', color: '#FFFFFF' },
-  deleteText: { color: '#EF4444', fontSize: 11, fontWeight: 'bold' },
-  medDetail: { fontSize: 11, color: '#94A3B8', textAlign: 'right', marginTop: 2 },
-  addMedBox: { backgroundColor: '#060911', padding: 12, borderRadius: 8, marginTop: 10, borderWidth: 1, borderColor: '#1E293B' },
-  addMedBtn: { backgroundColor: '#1E293B', padding: 10, borderRadius: 6, alignItems: 'center', marginTop: 4 },
-  addMedBtnText: { color: '#00F2FE', fontSize: 12, fontWeight: 'bold' },
-  saveButton: { backgroundColor: '#10B981', padding: 16, borderRadius: 10, alignItems: 'center', marginBottom: 35 },
-  saveButtonDisabled: { opacity: 0.6 },
-  saveButtonText: { color: '#FFFFFF', fontSize: 15, fontWeight: 'bold' },
-
-  lightboxOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.95)', justifyContent: 'center', alignItems: 'center', padding: 20 },
-  lightboxCloseBtn: { position: 'absolute', top: 20, right: 20, backgroundColor: '#EF4444', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6, zIndex: 10 },
-  lightboxCloseText: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 12 },
-  lightboxControls: { position: 'absolute', bottom: 30, flexDirection: 'row-reverse', gap: 10, zIndex: 10 },
-  zoomBtn: { backgroundColor: '#0284C7', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 6 },
-  zoomBtnText: { color: '#FFFFFF', fontSize: 11, fontWeight: 'bold' },
-  lightboxTitle: { color: '#00F2FE', fontSize: 13, fontWeight: 'bold', marginTop: 12, textAlign: 'center' },
-
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', alignItems: 'center', padding: 20 },
-  modalContent: { backgroundColor: '#0F172A', padding: 20, borderRadius: 16, width: '100%', maxWidth: 450, borderWidth: 1, borderColor: '#EF4444' },
-  modalTitle: { fontSize: 16, fontWeight: 'bold', color: '#EF4444', marginBottom: 8, textAlign: 'right' },
-  modalSub: { fontSize: 13, color: '#CBD5E1', marginBottom: 20, textAlign: 'right', lineHeight: 20 },
-  modalButtonsRow: { flexDirection: 'row-reverse', justifyContent: 'space-between', gap: 10 },
-  modalStayBtn: { flex: 1, backgroundColor: '#1E293B', padding: 10, borderRadius: 8, alignItems: 'center' },
-  modalStayBtnText: { color: '#94A3B8', fontSize: 11, fontWeight: 'bold' },
-  modalGoBtn: { flex: 1.2, backgroundColor: '#0284C7', padding: 10, borderRadius: 8, alignItems: 'center' },
-  modalGoBtnText: { color: '#FFFFFF', fontSize: 11, fontWeight: 'bold' }
+  scansGridContainer: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 8, marginTop: 10 },
+  scanGridCard: { backgroundColor: '#060911', padding: 6, borderRadius: 8, alignItems: 'center', borderWidth: 1, borderColor: '#1E293B' },
+  aiButton: { backgroundColor: '#0284C7', padding: 12, borderRadius: 10, alignItems: 'center', marginBottom: 10 },
+  aiButtonText: { color: '#FFF', fontWeight: 'bold', fontSize: 12 },
+  medCard: { backgroundColor: '#060911', padding: 10, borderRadius: 8, marginBottom: 6, borderWidth: 1, borderColor: '#1E293B' },
+  medHeader: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center' },
+  medName: { color: '#FFF', fontWeight: 'bold', fontSize: 12 },
+  medDetail: { color: '#94A3B8', fontSize: 11, textAlign: 'right', marginTop: 2 },
+  addMedBox: { backgroundColor: '#060911', padding: 10, borderRadius: 8, marginTop: 10, borderWidth: 1, borderColor: '#1E293B' },
+  addMedBtn: { backgroundColor: '#1E293B', padding: 8, borderRadius: 6, alignItems: 'center', marginTop: 6 },
+  addMedBtnText: { color: '#00F2FE', fontSize: 11, fontWeight: 'bold' },
+  saveButton: { backgroundColor: '#10B981', padding: 14, borderRadius: 10, alignItems: 'center', marginBottom: 30 },
+  saveButtonText: { color: '#FFF', fontWeight: 'bold', fontSize: 13 },
+  statsContainer: { flexDirection: 'row-reverse', gap: 10, marginBottom: 12 },
+  statCard: { flex: 1, backgroundColor: '#060911', padding: 10, borderRadius: 8, alignItems: 'center', borderWidth: 1, borderColor: '#0284C7' },
+  statNumber: { fontSize: 18, fontWeight: 'bold', color: '#00F2FE' },
+  statLabel: { fontSize: 10, color: '#94A3B8' },
+  patientListItem: { backgroundColor: '#060911', padding: 10, borderRadius: 8, marginBottom: 6, borderWidth: 1, borderColor: '#1E293B' },
+  patientItemName: { color: '#FFF', fontWeight: 'bold', fontSize: 12 },
+  patientItemSub: { color: '#94A3B8', fontSize: 10, textAlign: 'right', marginTop: 2 },
+  authCard: { backgroundColor: '#0F172A', padding: 20, borderRadius: 16, borderWidth: 1, borderColor: '#1E293B' },
+  authTitle: { fontSize: 18, fontWeight: 'bold', color: '#00F2FE', textAlign: 'center', marginBottom: 5 },
+  authSub: { fontSize: 12, color: '#94A3B8', textAlign: 'center', marginBottom: 15 },
+  authSubmitBtn: { backgroundColor: '#0284C7', padding: 12, borderRadius: 8, alignItems: 'center', marginTop: 10 },
+  authSubmitBtnText: { color: '#FFF', fontWeight: 'bold', fontSize: 12 },
+  authToggleBtn: { marginTop: 12, alignItems: 'center' },
+  authToggleBtnText: { color: '#38BDF8', fontSize: 11 },
+  paywallCard: { backgroundColor: '#0F172A', padding: 20, borderRadius: 16, borderWidth: 1, borderColor: '#EF4444', alignItems: 'center' },
+  paywallIcon: { fontSize: 30, marginBottom: 8 },
+  paywallTitle: { fontSize: 16, fontWeight: 'bold', color: '#EF4444', marginBottom: 6 },
+  paywallReason: { fontSize: 11, color: '#FCA5A5', textAlign: 'center', marginBottom: 15 },
+  whatsappBtn: { backgroundColor: '#16A34A', padding: 12, borderRadius: 8, width: '100%', alignItems: 'center' },
+  whatsappBtnText: { color: '#FFF', fontSize: 11, fontWeight: 'bold' },
+  copyLinkBtn: { backgroundColor: '#0284C7', padding: 10, borderRadius: 8, alignItems: 'center', marginBottom: 12 },
+  copyLinkBtnText: { color: '#FFF', fontSize: 11, fontWeight: 'bold' },
+  saveProfileBtn: { backgroundColor: '#10B981', padding: 12, borderRadius: 8, alignItems: 'center', marginTop: 10 },
+  saveProfileBtnText: { color: '#FFF', fontSize: 12, fontWeight: 'bold' },
+  lightboxOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.9)', justifyContent: 'center', alignItems: 'center' },
+  lightboxCloseBtn: { position: 'absolute', top: 20, right: 20, backgroundColor: '#EF4444', padding: 8, borderRadius: 6 }
 });
