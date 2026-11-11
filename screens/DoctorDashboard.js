@@ -18,29 +18,42 @@ const SPECIALITIES_LIST = [
   "استشاري أمراض الباطنة والسكر"
 ];
 
-// --- خريطة مفاصل الهيكل العظمي مع الإحداثيات النسبية التفاعلية ---
+// --- خريطة مفاصل الهيكل العظمي الرسمية (الأمامي على اليسار والخلفي على اليمين) ---
 const SKELETON_JOINTS = [
-  { id: 'TMJ', name: 'المفصل الفكي الصدغي (TMJ)', x: 50, y: 7 },
-  { id: 'Neck', name: 'فقرات الرقبة (Cervical Spine)', x: 50, y: 13 },
-  { id: 'L_Shoulder', name: 'الكتف الأيسر (Left Shoulder)', x: 34, y: 18 },
-  { id: 'R_Shoulder', name: 'الكتف الأيمن (Right Shoulder)', x: 66, y: 18 },
-  { id: 'L_Elbow', name: 'الكوع الأيسر (Left Elbow)', x: 28, y: 30 },
-  { id: 'R_Elbow', name: 'الكوع الأيمن (Right Elbow)', x: 72, y: 30 },
-  { id: 'L_Wrist', name: 'الرسغ الأيسر (Left Wrist)', x: 21, y: 42 },
-  { id: 'R_Wrist', name: 'الرسغ الأيمن (Right Wrist)', x: 79, y: 42 },
-  { id: 'L_MCP_PIP', name: 'أصابع اليد اليسرى (L-MCPs/PIPs)', x: 16, y: 49 },
-  { id: 'R_MCP_PIP', name: 'أصابع اليد اليمنى (R-MCPs/PIPs)', x: 84, y: 49 },
-  { id: 'Thoracic_Spine', name: 'الظهر العلوي (Thoracic Spine)', x: 50, y: 26 },
-  { id: 'Lumbar_Spine', name: 'الظهر السفلي والقطني (Lumbar Spine)', x: 50, y: 38 },
-  { id: 'SIJ', name: 'الحوض والمفاصل العجزية (SIJ / Pelvis)', x: 50, y: 47 },
-  { id: 'L_Hip', name: 'مفصل الفخذ الأيسر (Left Hip)', x: 41, y: 49 },
-  { id: 'R_Hip', name: 'مفصل الفخذ الأيمن (Right Hip)', x: 59, y: 49 },
-  { id: 'L_Knee', name: 'الركبة اليسرى (Left Knee)', x: 40, y: 68 },
-  { id: 'R_Knee', name: 'الركبة اليمنى (Right Knee)', x: 60, y: 68 },
-  { id: 'L_Ankle', name: 'الكاحل الأيسر (Left Ankle)', x: 41, y: 88 },
-  { id: 'R_Ankle', name: 'الكاحل الأيمن (Right Ankle)', x: 59, y: 88 },
-  { id: 'L_MTP', name: 'أصابع القدم اليسرى (Left MTPs)', x: 41, y: 95 },
-  { id: 'R_MTP', name: 'أصابع القدم اليمنى (Right MTPs)', x: 59, y: 95 },
+  // --- الهيكل الأمامي (Anterior - اليسار) ---
+  { id: 'Ant_TMJ', name: 'المفصل الفكي (أمامي)', x: 25, y: 7 },
+  { id: 'Ant_Neck', name: 'فقرات الرقبة (أمامي)', x: 25, y: 14 },
+  { id: 'Ant_L_Shoulder', name: 'الكتف الأيسر (أمامي)', x: 16, y: 20 },
+  { id: 'Ant_R_Shoulder', name: 'الكتف الأيمن (أمامي)', x: 34, y: 20 },
+  { id: 'Ant_L_Elbow', name: 'الكوع الأيسر (أمامي)', x: 13, y: 34 },
+  { id: 'Ant_R_Elbow', name: 'الكوع الأيمن (أمامي)', x: 37, y: 34 },
+  { id: 'Ant_L_Wrist', name: 'الرسغ الأيسر (أمامي)', x: 10, y: 47 },
+  { id: 'Ant_R_Wrist', name: 'الرسغ الأيمن (أمامي)', x: 40, y: 47 },
+  { id: 'Ant_L_MCP', name: 'أصابع اليد اليسرى (L-MCPs)', x: 7, y: 53 },
+  { id: 'Ant_R_MCP', name: 'أصابع اليد اليمنى (R-MCPs)', x: 43, y: 53 },
+  { id: 'Ant_Pelvis', name: 'الحوض (Pelvis)', x: 25, y: 46 },
+  { id: 'Ant_L_Hip', name: 'مفصل الفخذ الأيسر', x: 20, y: 50 },
+  { id: 'Ant_R_Hip', name: 'مفصل الفخذ الأيمن', x: 30, y: 50 },
+  { id: 'Ant_L_Knee', name: 'الركبة اليسرى (أمامي)', x: 20, y: 70 },
+  { id: 'Ant_R_Knee', name: 'الركبة اليمنى (أمامي)', x: 30, y: 70 },
+  { id: 'Ant_L_Ankle', name: 'الكاحل الأيسر (أمامي)', x: 21, y: 90 },
+  { id: 'Ant_R_Ankle', name: 'الكاحل الأيمن (أمامي)', x: 29, y: 90 },
+  { id: 'Ant_L_MTP', name: 'أصابع القدم اليسرى (L-MTPs)', x: 21, y: 96 },
+  { id: 'Ant_R_MTP', name: 'أصابع القدم اليمنى (R-MTPs)', x: 29, y: 96 },
+
+  // --- الهيكل الخلفي (Posterior - اليمين) ---
+  { id: 'Post_Cervical', name: 'الفقرات العنقية (خلفي)', x: 75, y: 14 },
+  { id: 'Post_Thoracic', name: 'العمود الفقري الظهري', x: 75, y: 28 },
+  { id: 'Post_Lumbar', name: 'الفقرات القطنية (LBP)', x: 75, y: 39 },
+  { id: 'Post_SIJ', name: 'المفاصل العجزية الحرقفية (SIJ)', x: 75, y: 47 },
+  { id: 'Post_L_Shoulder', name: 'الكتف الأيسر (خلفي)', x: 66, y: 20 },
+  { id: 'Post_R_Shoulder', name: 'الكتف الأيمن (خلفي)', x: 84, y: 20 },
+  { id: 'Post_L_Elbow', name: 'الكوع الأيسر (خلفي)', x: 63, y: 34 },
+  { id: 'Post_R_Elbow', name: 'الكوع الأيمن (خلفي)', x: 87, y: 34 },
+  { id: 'Post_L_Knee', name: 'الركبة اليسرى (خلفي)', x: 70, y: 70 },
+  { id: 'Post_R_Knee', name: 'الركبة اليمنى (خلفي)', x: 80, y: 70 },
+  { id: 'Post_L_Ankle', name: 'الكاحل الأيسر (خلفي)', x: 70, y: 90 },
+  { id: 'Post_R_Ankle', name: 'الكاحل الأيمن (خلفي)', x: 80, y: 90 }
 ];
 
 // --- خيارات الفحص السريع وقوائم الشكاوى التخصصية ---
@@ -204,7 +217,6 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
   const [aiScanFile, setAiScanFile] = useState(null);
   const [aiScanPreviewUrl, setAiScanPreviewUrl] = useState('');
   const [aiScanBase64, setAiScanBase64] = useState('');
-  const [scanOcrLoading, setScanOcrLoading] = useState(false);
 
   const [symptomsInput, setSymptomsInput] = useState('');
   const [doctorNotes, setDoctorNotes] = useState('');
@@ -348,7 +360,6 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
     });
   };
 
-  // التعامل مع اختيار صورة التحليل المباشرة للذكاء الاصطناعي
   const handleSelectAiScanImage = (event) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -774,12 +785,12 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
     setStiffnessType('تيبس اليدين والأصابع');
     setStiffnessDuration('نصف ساعة أو أكثر (نشاط التهابي)');
     setSelectedJointStates({
-      'L_MCP_PIP': 'inflamed',
-      'R_MCP_PIP': 'inflamed',
-      'L_Wrist': 'inflamed',
-      'R_Wrist': 'inflamed',
-      'L_Knee': 'painful',
-      'R_Knee': 'painful'
+      'Ant_L_MCP': 'inflamed',
+      'Ant_R_MCP': 'inflamed',
+      'Ant_L_Wrist': 'inflamed',
+      'Ant_R_Wrist': 'inflamed',
+      'Ant_L_Knee': 'painful',
+      'Ant_R_Knee': 'painful'
     });
     setSelectedSystemicSigns(['hair_loss', 'oral_ulcers', 'morning_swelling']);
     setSelectedFamilySigns(['chronic_autoimmune']);
@@ -790,7 +801,6 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
     handleSearchPatientByName(dummyName);
   };
 
-  // --- التحليل الإكلينيكي المتقدم بواسطة AI مع دعم الصور المتعددة الوسائط ---
   const handleClinicalAnalysis = async () => {
     if (!patientName.trim()) {
       showAlert('تنبيه', 'يرجى إدخال اسم المريض أولاً.');
@@ -800,7 +810,6 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
     setAnalyzing(true);
     setAiReport(null);
 
-    // تجميع تفاصيل الهيكل العظمي والمفاصل
     const inflamedJointsList = [];
     const painfulJointsList = [];
     Object.entries(selectedJointStates).forEach(([id, state]) => {
@@ -873,7 +882,6 @@ Additional Doctor Notes & Symptoms: ${symptomsInput || 'None'} | ${doctorNotes |
     try {
       let requestBody;
       if (aiScanBase64) {
-        // إذا توفرت صورة تحاليل/أشعة مرفوعة يتم استخدام نموذج المتعدد الوسائط Multimodal
         requestBody = {
           model: "openai/gpt-oss-120b",
           messages: [
@@ -1105,7 +1113,6 @@ Return JSON ONLY:
       setCurrentPatientId(patientRealId);
 
       if (patientRealId) {
-        // حجب التحذيرات والتعارضات والملاحظات الباطنية عن ملف المريض للمحافظة على الخصوصية وعدم الحيرة
         const { error: recErr } = await supabase
           .from('medical_records')
           .insert([{
@@ -1144,7 +1151,6 @@ Return JSON ONLY:
 
       showAlert("نجاح الحفظ السحابي ✅", `تم حفظ التقرير والسجل الطبي بنجاح!\nكود المريض: [${patientRealCode}]`);
 
-      // إعداد الروشتة لتكون صديقة للطباعة بالأبيض والأسود (B&W Friendly للطابعات HP)
       await generatePrescriptionPDF(
         { name: patientName, phone: patientPhone, code: patientRealCode },
         finalDiagnosis,
@@ -1734,7 +1740,7 @@ Return JSON ONLY:
             </>
           )}
 
-          {/* اختصاص الروماتيزم والمناعة: واجهة الفحص الإكلينيكي المحدثة بالتفاعل التفاعلي المباشر */}
+          {/* اختصاص الروماتيزم والمناعة: واجهة الفحص الإكلينيكي المحدثة بـ الهيكل العظمي الخاص بـ عيادتك */}
           {isRheumaSpecialty && (
             <View style={styles.card}>
               <Text style={styles.sectionTitle}>🩺 الفحص الإكلينيكي المتقدم للروماتيزم والمناعة</Text>
@@ -1768,8 +1774,8 @@ Return JSON ONLY:
                 ))}
               </View>
 
-              {/* 2. خريطة الهيكل العظمي والمفاصل التفاعلية المباشرة */}
-              <Text style={styles.subSectionTitle}>🦴 خريطة مفاصل الجسم التفاعلية (Interactive Skeleton Map):</Text>
+              {/* 2. خريطة الهيكل العظمي استمارة العيادة التفاعلية المباشرة (Front & Back View) */}
+              <Text style={styles.subSectionTitle}>🦴 خريطة استمارة العيادة لمفاصل الجسم (O/E Skeleton Map):</Text>
               <Text style={styles.label}>اختر نوع التحديد بالضغط أولاً، ثم انقر المفاصل على الرسمة:</Text>
               
               <View style={styles.jointModeSelectorRow}>
@@ -1788,11 +1794,11 @@ Return JSON ONLY:
                 </TouchableOpacity>
               </View>
 
-              <View style={styles.skeletonContainer}>
-                {/* الرسم التوضيحي للهيكل العظمي */}
+              {/* إطار رسمة استمارة عيادتك المأخوذة من الـ PDF */}
+              <View style={styles.skeletonImageFrame}>
                 <Image 
-                  source={{ uri: 'https://cdn-icons-png.flaticon.com/512/3063/3063174.png' }} 
-                  style={styles.skeletonImg} 
+                  source={{ uri: '/skeleton.png' }} 
+                  style={styles.skeletonBaseImg} 
                   resizeMode="contain" 
                 />
                 {SKELETON_JOINTS.map((joint) => {
@@ -1801,15 +1807,13 @@ Return JSON ONLY:
                     <TouchableOpacity
                       key={joint.id}
                       style={[
-                        styles.jointHotspot,
+                        styles.jointHotspotDot,
                         { left: `${joint.x}%`, top: `${joint.y}%` },
-                        state === 'inflamed' && styles.jointHotspotRed,
-                        state === 'painful' && styles.jointHotspotBlue,
+                        state === 'inflamed' && styles.dotRed,
+                        state === 'painful' && styles.dotBlue,
                       ]}
                       onPress={() => handleJointClick(joint.id)}
-                    >
-                      <Text style={styles.jointHotspotLabel}>{state === 'inflamed' ? '🔴' : state === 'painful' ? '🔵' : '⚪'}</Text>
-                    </TouchableOpacity>
+                    />
                   );
                 })}
               </View>
@@ -2159,7 +2163,7 @@ const styles = StyleSheet.create({
   selectChipText: { color: '#94A3B8', fontSize: 11, textAlign: 'center' },
   selectChipTextActive: { color: '#FFFFFF', fontWeight: 'bold' },
 
-  // --- أنماط الخريطة الرسومية التفاعلية الهيكل العظمي ---
+  // --- أنماط خريطة استمارة العيادة للهيكل العظمي التفاعلية ---
   jointModeSelectorRow: { flexDirection: 'row-reverse', gap: 8, marginBottom: 12 },
   jointModeBtn: { flex: 1, padding: 10, borderRadius: 8, borderWidth: 1, alignItems: 'center' },
   jointModeBtnRed: { backgroundColor: '#1E1111', borderColor: '#7F1D1D' },
@@ -2168,36 +2172,45 @@ const styles = StyleSheet.create({
   jointModeBtnActiveBlue: { backgroundColor: '#1D4ED8', borderColor: '#3B82F6' },
   jointModeBtnText: { color: '#FFFFFF', fontSize: 11, fontWeight: 'bold' },
 
-  skeletonContainer: { 
-    position: 'relative', 
-    width: '100%', 
-    height: 380, 
-    backgroundColor: '#060911', 
-    borderRadius: 12, 
-    borderWidth: 1, 
-    borderColor: '#1E293B', 
-    alignItems: 'center', 
-    justify: 'center',
-    marginBottom: 12,
-    overflow: 'hidden'
+  skeletonImageFrame: {
+    position: 'relative',
+    width: '100%',
+    height: 480,
+    backgroundColor: '#FFFFFF', // خلفية بيضاء لنقاء ورقة الاستمارة
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+    marginVertical: 10
   },
-  skeletonImg: { width: '85%', height: '95%', opacity: 0.8 },
-  jointHotspot: { 
-    position: 'absolute', 
-    width: 28, 
-    height: 28, 
-    marginLeft: -14, 
-    marginTop: -14, 
-    borderRadius: 14, 
-    backgroundColor: 'rgba(15, 23, 42, 0.7)', 
-    borderWidth: 1, 
-    borderColor: '#64748B', 
-    alignItems: 'center', 
-    justifyContent: 'center' 
+  skeletonBaseImg: {
+    width: '100%',
+    height: '100%'
   },
-  jointHotspotRed: { backgroundColor: 'rgba(220, 38, 38, 0.85)', borderColor: '#EF4444' },
-  jointHotspotBlue: { backgroundColor: 'rgba(37, 99, 235, 0.85)', borderColor: '#60A5FA' },
-  jointHotspotLabel: { fontSize: 12 },
+  jointHotspotDot: {
+    position: 'absolute',
+    width: 22,
+    height: 22,
+    marginLeft: -11,
+    marginTop: -11,
+    borderRadius: 11,
+    backgroundColor: 'rgba(0, 0, 0, 0.05)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(0, 0, 0, 0.25)',
+    cursor: 'pointer'
+  },
+  dotRed: {
+    backgroundColor: 'rgba(239, 68, 68, 0.9)',
+    borderColor: '#991B1B',
+    boxShadow: '0 0 8px #EF4444'
+  },
+  dotBlue: {
+    backgroundColor: 'rgba(59, 130, 246, 0.9)',
+    borderColor: '#1E3A8A',
+    boxShadow: '0 0 8px #3B82F6'
+  },
 
   selectedJointChip: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6, marginBottom: 4 },
   chipRed: { backgroundColor: '#7F1D1D', borderWidth: 1, borderColor: '#EF4444' },
