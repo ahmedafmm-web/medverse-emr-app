@@ -19,27 +19,28 @@ const SPECIALITIES_LIST = [
 ];
 
 // --- خريطة مفاصل الهيكل العظمي الرسمية معايرة بدقة 100% على أبعاد صورة skeleton.png ---
+// تم توحيد اتجاهات المنظر الأمامي مع المنظر الخلفي (يمين الصورة = الأيمن، يسار الصورة = الأيسر)
 const SKELETON_JOINTS = [
   // --- الهيكل الأمامي (Anterior - النصف الأيسر من الصورة) ---
   { id: 'Ant_TMJ', name: 'المفصل الفكي (أمامي)', x: 26.5, y: 8.5 },
   { id: 'Ant_Neck', name: 'فقرات الرقبة (أمامي)', x: 26.5, y: 15.5 },
-  { id: 'Ant_L_Shoulder', name: 'الكتف الأيمن للمريض (يسار الصورة)', x: 15.5, y: 21.5 },
-  { id: 'Ant_R_Shoulder', name: 'الكتف الأيسر للمريض (يمين الصورة)', x: 37.5, y: 21.5 },
-  { id: 'Ant_L_Elbow', name: 'الكوع الأيمن (أمامي)', x: 12.0, y: 36.0 },
-  { id: 'Ant_R_Elbow', name: 'الكوع الأيسر (أمامي)', x: 40.5, y: 36.0 },
-  { id: 'Ant_L_Wrist', name: 'الرسغ الأيمن (أمامي)', x: 7.5, y: 49.5 },
-  { id: 'Ant_R_Wrist', name: 'الرسغ الأيسر (أمامي)', x: 44.5, y: 49.5 },
-  { id: 'Ant_L_MCP', name: 'أصابع اليد اليمنى (MCPs)', x: 5.0, y: 55.5 },
-  { id: 'Ant_R_MCP', name: 'أصابع اليد اليسرى (MCPs)', x: 46.5, y: 55.5 },
+  { id: 'Ant_L_Shoulder', name: 'الكتف الأيسر (أمامي)', x: 15.5, y: 21.5 },
+  { id: 'Ant_R_Shoulder', name: 'الكتف الأيمن (أمامي)', x: 37.5, y: 21.5 },
+  { id: 'Ant_L_Elbow', name: 'الكوع الأيسر (أمامي)', x: 12.0, y: 36.0 },
+  { id: 'Ant_R_Elbow', name: 'الكوع الأيمن (أمامي)', x: 40.5, y: 36.0 },
+  { id: 'Ant_L_Wrist', name: 'الرسغ الأيسر (أمامي)', x: 7.5, y: 49.5, subGroup: 'L_Hand' },
+  { id: 'Ant_R_Wrist', name: 'الرسغ الأيمن (أمامي)', x: 44.5, y: 49.5, subGroup: 'R_Hand' },
+  { id: 'Ant_L_MCP', name: 'اليد اليسرى (Hand)', x: 5.0, y: 55.5, subGroup: 'L_Hand' },
+  { id: 'Ant_R_MCP', name: 'اليد اليمنى (Hand)', x: 46.5, y: 55.5, subGroup: 'R_Hand' },
   { id: 'Ant_Pelvis', name: 'الحوض (Pelvis)', x: 26.5, y: 47.0 },
-  { id: 'Ant_L_Hip', name: 'مفصل الفخذ الأيمن', x: 19.5, y: 51.5 },
-  { id: 'Ant_R_Hip', name: 'مفصل الفخذ الأيسر', x: 33.5, y: 51.5 },
-  { id: 'Ant_L_Knee', name: 'الركبة اليمنى (أمامي)', x: 21.0, y: 72.0 },
-  { id: 'Ant_R_Knee', name: 'الركبة اليسرى (أمامي)', x: 32.0, y: 72.0 },
-  { id: 'Ant_L_Ankle', name: 'الكاحل الأيمن (أمامي)', x: 22.0, y: 90.5 },
-  { id: 'Ant_R_Ankle', name: 'الكاحل الأيسر (أمامي)', x: 31.0, y: 90.5 },
-  { id: 'Ant_L_MTP', name: 'أصابع القدم اليمنى (MTPs)', x: 19.0, y: 95.5 },
-  { id: 'Ant_R_MTP', name: 'أصابع القدم اليسرى (MTPs)', x: 34.0, y: 95.5 },
+  { id: 'Ant_L_Hip', name: 'مفصل الفخذ الأيسر', x: 19.5, y: 51.5 },
+  { id: 'Ant_R_Hip', name: 'مفصل الفخذ الأيمن', x: 33.5, y: 51.5 },
+  { id: 'Ant_L_Knee', name: 'الركبة اليسرى (أمامي)', x: 21.0, y: 72.0 },
+  { id: 'Ant_R_Knee', name: 'الركبة اليمنى (أمامي)', x: 32.0, y: 72.0 },
+  { id: 'Ant_L_Ankle', name: 'الكاحل الأيسر (أمامي)', x: 22.0, y: 90.5, subGroup: 'L_Foot' },
+  { id: 'Ant_R_Ankle', name: 'الكاحل الأيمن (أمامي)', x: 31.0, y: 90.5, subGroup: 'R_Foot' },
+  { id: 'Ant_L_MTP', name: 'القدم اليسرى (Foot)', x: 19.0, y: 95.5, subGroup: 'L_Foot' },
+  { id: 'Ant_R_MTP', name: 'القدم اليمنى (Foot)', x: 34.0, y: 95.5, subGroup: 'R_Foot' },
 
   // --- الهيكل الخلفي (Posterior - النصف الأيمن من الصورة) ---
   { id: 'Post_Cervical', name: 'الفقرات العنقية (خلفي)', x: 74.5, y: 15.0 },
@@ -55,6 +56,56 @@ const SKELETON_JOINTS = [
   { id: 'Post_L_Ankle', name: 'الكاحل الأيسر (خلفي)', x: 69.5, y: 90.5 },
   { id: 'Post_R_Ankle', name: 'الكاحل الأيمن (خلفي)', x: 79.5, y: 90.5 }
 ];
+
+// --- شريط التخصيص السريع للمفاصل الدقيقة لليد والقدم ---
+const SUB_JOINTS_GROUPS = {
+  R_Hand: {
+    title: 'تخصيص مفاصل اليد اليمنى (Right Hand):',
+    items: [
+      { id: 'Sub_R_Wrist', label: 'Right Wrist', fullName: 'الرسغ الأيمن (Right Wrist)' },
+      { id: 'Sub_R_MCPs', label: 'Right MCPs', fullName: 'مفاصل مشط اليد اليمنى (Right MCPs)' },
+      { id: 'Sub_R_PIPs', label: 'Right PIPs', fullName: 'سلاميات اليد اليمنى الوسطى (Right PIPs)' },
+      { id: 'Sub_R_DIPs', label: 'Right DIPs', fullName: 'سلاميات اليد اليمنى الطرفية (Right DIPs)' }
+    ]
+  },
+  L_Hand: {
+    title: 'تخصيص مفاصل اليد اليسرى (Left Hand):',
+    items: [
+      { id: 'Sub_L_Wrist', label: 'Left Wrist', fullName: 'الرسغ الأيسر (Left Wrist)' },
+      { id: 'Sub_L_MCPs', label: 'Left MCPs', fullName: 'مفاصل مشط اليد اليسرى (Left MCPs)' },
+      { id: 'Sub_L_PIPs', label: 'Left PIPs', fullName: 'سلاميات اليد اليسرى الوسطى (Left PIPs)' },
+      { id: 'Sub_L_DIPs', label: 'Left DIPs', fullName: 'سلاميات اليد اليسرى الطرفية (Left DIPs)' }
+    ]
+  },
+  R_Foot: {
+    title: 'تخصيص مفاصل القدم اليمنى (Right Foot):',
+    items: [
+      { id: 'Sub_R_Ankle', label: 'Right Ankle', fullName: 'الكاحل الأيمن (Right Ankle)' },
+      { id: 'Sub_R_Midfoot', label: 'Right Midfoot', fullName: 'مشط القدم الأيمن (Right Midfoot)' },
+      { id: 'Sub_R_MTPs', label: 'Right MTPs', fullName: 'مفاصل أصابع القدم اليمنى (Right MTPs)' },
+      { id: 'Sub_R_Toes', label: 'Right Toes (PIPs/DIPs)', fullName: 'سلاميات أصابع القدم اليمنى (Right Toes)' }
+    ]
+  },
+  L_Foot: {
+    title: 'تخصيص مفاصل القدم اليسرى (Left Foot):',
+    items: [
+      { id: 'Sub_L_Ankle', label: 'Left Ankle', fullName: 'الكاحل الأيسر (Left Ankle)' },
+      { id: 'Sub_L_Midfoot', label: 'Left Midfoot', fullName: 'مشط القدم الأيسر (Left Midfoot)' },
+      { id: 'Sub_L_MTPs', label: 'Left MTPs', fullName: 'مفاصل أصابع القدم اليسرى (Left MTPs)' },
+      { id: 'Sub_L_Toes', label: 'Left Toes (PIPs/DIPs)', fullName: 'سلاميات أصابع القدم اليسرى (Left Toes)' }
+    ]
+  }
+};
+
+const ALL_SUB_JOINTS_FLAT = Object.values(SUB_JOINTS_GROUPS).flatMap(g => g.items);
+
+const getJointDisplayName = (id) => {
+  const mainJoint = SKELETON_JOINTS.find(j => j.id === id);
+  if (mainJoint) return mainJoint.name;
+  const subJoint = ALL_SUB_JOINTS_FLAT.find(s => s.id === id);
+  if (subJoint) return subJoint.fullName;
+  return id;
+};
 
 // --- خيارات الفحص السريع وقوائم الشكاوى التخصصية ---
 const RHEUMA_OPTIONS = {
@@ -195,6 +246,7 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
   // --- حالات التحديث الجديد للروماتيزم والمناعة ---
   const [selectedJointStates, setSelectedJointStates] = useState({}); // { JointID: 'inflamed' | 'painful' }
   const [jointSelectMode, setJointSelectMode] = useState('inflamed'); // 'inflamed' (أحمر) أو 'painful' (أزرق)
+  const [activeSubJointGroup, setActiveSubJointGroup] = useState(null); // 'R_Hand' | 'L_Hand' | 'R_Foot' | 'L_Foot' | null
   const [stiffnessType, setStiffnessType] = useState('تيبس اليدين والأصابع');
   const [stiffnessDuration, setStiffnessDuration] = useState('نصف ساعة أو أكثر (نشاط التهابي)');
   const [selectedDiseaseNature, setSelectedDiseaseNature] = useState(['Inflammatory (التهابي)', 'Arthritis (التهاب متورم)']);
@@ -249,6 +301,10 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
   };
 
   const handleJointClick = (jointId) => {
+    const jointObj = SKELETON_JOINTS.find(j => j.id === jointId);
+    if (jointObj && jointObj.subGroup) {
+      setActiveSubJointGroup(jointObj.subGroup);
+    }
     setSelectedJointStates(prev => {
       const current = prev[jointId];
       if (current === jointSelectMode) {
@@ -257,6 +313,26 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
         return copy;
       }
       return { ...prev, [jointId]: jointSelectMode };
+    });
+  };
+
+  const handleSubJointToggle = (subJointId) => {
+    setSelectedJointStates(prev => {
+      const current = prev[subJointId];
+      if (current === jointSelectMode) {
+        const copy = { ...prev };
+        delete copy[subJointId];
+        return copy;
+      }
+      return { ...prev, [subJointId]: jointSelectMode };
+    });
+  };
+
+  const handleRemoveSelectedJoint = (jointId) => {
+    setSelectedJointStates(prev => {
+      const copy = { ...prev };
+      delete copy[jointId];
+      return copy;
     });
   };
 
@@ -789,6 +865,8 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
       'Ant_R_MCP': 'inflamed',
       'Ant_L_Wrist': 'inflamed',
       'Ant_R_Wrist': 'inflamed',
+      'Sub_R_MCPs': 'inflamed',
+      'Sub_L_MCPs': 'inflamed',
       'Ant_L_Knee': 'painful',
       'Ant_R_Knee': 'painful'
     });
@@ -813,8 +891,7 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
     const inflamedJointsList = [];
     const painfulJointsList = [];
     Object.entries(selectedJointStates).forEach(([id, state]) => {
-      const jointObj = SKELETON_JOINTS.find(j => j.id === id);
-      const name = jointObj ? jointObj.name : id;
+      const name = getJointDisplayName(id);
       if (state === 'inflamed') inflamedJointsList.push(name);
       else if (state === 'painful') painfulJointsList.push(name);
     });
@@ -1776,7 +1853,7 @@ Return JSON ONLY:
 
               {/* 2. خريطة الهيكل العظمي استمارة العيادة التفاعلية المباشرة (Front & Back View) */}
               <Text style={styles.subSectionTitle}>🦴 خريطة استمارة العيادة لمفاصل الجسم (O/E Skeleton Map):</Text>
-              <Text style={styles.label}>اختر نوع التحديد بالضغط أولاً، ثم انقر المفاصل على الرسمة:</Text>
+              <Text style={styles.label}>اختر نوع التحديد بالضغط أولاً، ثم انقر المفاصل على الرسمة (اضغط اليد أو القدم لتفصيل الأصابع):</Text>
               
               <View style={styles.jointModeSelectorRow}>
                 <TouchableOpacity 
@@ -1820,19 +1897,56 @@ Return JSON ONLY:
                 </View>
               </View>
 
-              <Text style={styles.label}>المفاصل المحددة حالياً:</Text>
+              {/* شريط التخصيص السريع للمفاصل الدقيقة عند اختيار اليد أو القدم */}
+              {activeSubJointGroup && SUB_JOINTS_GROUPS[activeSubJointGroup] && (
+                <View style={styles.subJointsDrawer}>
+                  <View style={styles.subJointsHeaderRow}>
+                    <Text style={styles.subJointsTitle}>🎯 {SUB_JOINTS_GROUPS[activeSubJointGroup].title}</Text>
+                    <TouchableOpacity onPress={() => setActiveSubJointGroup(null)} style={styles.subJointsCloseBtn}>
+                      <Text style={styles.subJointsCloseText}>إغلاق ✕</Text>
+                    </TouchableOpacity>
+                  </View>
+                  <View style={styles.chipsContainer}>
+                    {SUB_JOINTS_GROUPS[activeSubJointGroup].items.map((subItem) => {
+                      const subState = selectedJointStates[subItem.id];
+                      return (
+                        <TouchableOpacity
+                          key={subItem.id}
+                          style={[
+                            styles.subJointChip,
+                            subState === 'inflamed' && styles.subJointChipRed,
+                            subState === 'painful' && styles.subJointChipBlue,
+                          ]}
+                          onPress={() => handleSubJointToggle(subItem.id)}
+                        >
+                          <Text style={styles.subJointChipText}>
+                            {subState === 'inflamed' ? '🔴 ' : subState === 'painful' ? '🔵 ' : '+ '}
+                            {subItem.label}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </View>
+              )}
+
+              <Text style={styles.label}>المفاصل المحددة حالياً (اضغط على المفصل لإزالته):</Text>
               <View style={styles.chipsContainer}>
                 {Object.keys(selectedJointStates).length === 0 ? (
                   <Text style={styles.emptyText}>لم يتم تحديد أي مفصل على الرسمة بعد.</Text>
                 ) : (
                   Object.entries(selectedJointStates).map(([id, state]) => {
-                    const jointObj = SKELETON_JOINTS.find(j => j.id === id);
+                    const displayName = getJointDisplayName(id);
                     return (
-                      <View key={id} style={[styles.selectedJointChip, state === 'inflamed' ? styles.chipRed : styles.chipBlue]}>
+                      <TouchableOpacity
+                        key={id}
+                        style={[styles.selectedJointChip, state === 'inflamed' ? styles.chipRed : styles.chipBlue]}
+                        onPress={() => handleRemoveSelectedJoint(id)}
+                      >
                         <Text style={styles.selectedJointChipText}>
-                          {state === 'inflamed' ? '🔴 ' : '🔵 '}{jointObj ? jointObj.name : id}
+                          {state === 'inflamed' ? '🔴 ' : '🔵 '}{displayName} ✕
                         </Text>
-                      </View>
+                      </TouchableOpacity>
                     );
                   })
                 )}
@@ -2217,6 +2331,60 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(59, 130, 246, 0.92)',
     borderColor: '#1E3A8A',
     boxShadow: '0 0 8px #3B82F6'
+  },
+
+  // --- أنماط شريط التخصيص السريع للمفاصل الدقيقة ---
+  subJointsDrawer: {
+    backgroundColor: '#060911',
+    borderRadius: 10,
+    padding: 12,
+    marginTop: 6,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#0284C7'
+  },
+  subJointsHeaderRow: {
+    flexDirection: 'row-reverse',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8
+  },
+  subJointsTitle: {
+    color: '#00F2FE',
+    fontSize: 12,
+    fontWeight: 'bold'
+  },
+  subJointsCloseBtn: {
+    backgroundColor: '#1E293B',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6
+  },
+  subJointsCloseText: {
+    color: '#94A3B8',
+    fontSize: 10,
+    fontWeight: 'bold'
+  },
+  subJointChip: {
+    backgroundColor: '#0F172A',
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#334155'
+  },
+  subJointChipRed: {
+    backgroundColor: '#7F1D1D',
+    borderColor: '#EF4444'
+  },
+  subJointChipBlue: {
+    backgroundColor: '#1E3A8A',
+    borderColor: '#3B82F6'
+  },
+  subJointChipText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: 'bold'
   },
 
   selectedJointChip: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6, marginBottom: 4 },
