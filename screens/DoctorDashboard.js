@@ -109,10 +109,26 @@ const getJointDisplayName = (id) => {
 
 // --- خيارات الفحص السريع وقوائم الشكاوى التخصصية ---
 const RHEUMA_OPTIONS = {
-  stiffnessType: ["لا يوجد", "تيبس اليدين والأصابع", "تيبس الظهر والعمود الفقري", "تيبس عام في الجسم"],
-  stiffnessDuration: ["دقائق معدودة", "نصف ساعة أو أكثر (نشاط التهابي)"],
+  stiffnessType: ["تيبس إيد", "تيبس ضهر"],
+  stiffnessDuration: ["دقائق", "نصف ساعة أو أكثر"],
   diseaseNature: ["Acute (حاد)", "Chronic (مزمن)", "Progressive (متزايد)", "Mechanical (ميكانيكي)", "Inflammatory (التهابي)", "Arthralgia (ألم فقط)", "Arthritis (التهاب متورم)"],
+  provisionalDiagnoses: [
+    "Still in diagnosis (تحت التشخيص)",
+    "Query Rheumatoid Arthritis (RA)",
+    "Active RA (روماتويد نشط)",
+    "Query SLE (ذئبة حمراء)",
+    "Query Scleroderma (تصلب الجلد)",
+    "Query Spondyloarthritis / AS",
+    "Query Psoriatic Arthritis (PsA)",
+    "Query Vasculitis (التهاب أوعية)",
+    "Query Sjögren's Syndrome",
+    "Query Polymyositis / Dermatomyositis",
+    "Query Gout / Crystal Arthritis",
+    "Query Fibromyalgia",
+    "Query Osteoarthritis (OA)"
+  ],
   systemicChecklist: [
+    { id: 'morning_swelling', label: 'تورم وتخشيب صباحي باليدين (صعوبة خلع الخاتم)' },
     { id: 'hair_loss', label: 'تساقط شعر نشط (خصلات)' },
     { id: 'malar_rash', label: 'طفح جلدي في الوجه (Malar Rash / شمس)' },
     { id: 'general_rash', label: 'طفح جلدي عام في الجسم' },
@@ -124,7 +140,6 @@ const RHEUMA_OPTIONS = {
     { id: 'raynauds', label: 'زرقة وتغير لون الأطراف (رينود عند البرد)' },
     { id: 'dysuria', label: 'حرقان بول متكرر' },
     { id: 'eye_redness', label: 'احمرار شديد أو ألم متكرر في العين' },
-    { id: 'morning_swelling', label: 'تورم وخشونة صباحية بالمفاصل' },
     { id: 'fever', label: 'حمى وسخونية متكررة' },
     { id: 'weight_loss', label: 'نزول ملحوظ في الوزن' },
     { id: 'appetite_loss', label: 'فقدان الشهية' },
@@ -247,8 +262,8 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
   const [selectedJointStates, setSelectedJointStates] = useState({}); // { JointID: 'inflamed' | 'painful' }
   const [jointSelectMode, setJointSelectMode] = useState('inflamed'); // 'inflamed' (أحمر) أو 'painful' (أزرق)
   const [activeSubJointGroup, setActiveSubJointGroup] = useState(null); // 'R_Hand' | 'L_Hand' | 'R_Foot' | 'L_Foot' | null
-  const [stiffnessType, setStiffnessType] = useState('تيبس اليدين والأصابع');
-  const [stiffnessDuration, setStiffnessDuration] = useState('نصف ساعة أو أكثر (نشاط التهابي)');
+  const [stiffnessType, setStiffnessType] = useState('تيبس إيد');
+  const [stiffnessDuration, setStiffnessDuration] = useState('نصف ساعة أو أكثر');
   const [selectedDiseaseNature, setSelectedDiseaseNature] = useState(['Inflammatory (التهابي)', 'Arthritis (التهاب متورم)']);
   const [selectedSystemicSigns, setSelectedSystemicSigns] = useState([]);
   const [selectedFamilySigns, setSelectedFamilySigns] = useState([]);
@@ -264,6 +279,8 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
   const [rheumaOrganSafety, setRheumaOrganSafety] = useState('طبيعي وآمن للعلاج');
   const [rheumaTbScreening, setRheumaTbScreening] = useState('سلبي وجاهز للعلاج البيولوجي');
   const [isQueryDiagnosis, setIsQueryDiagnosis] = useState(false);
+  const [selectedProvisionalChips, setSelectedProvisionalChips] = useState([]);
+  const [provisionalDiagnosisText, setProvisionalDiagnosisText] = useState('');
 
   // حالة رفع صورة تحاليل/أشعة للذكاء الاصطناعي للقراءة الفورية
   const [aiScanFile, setAiScanFile] = useState(null);
@@ -298,6 +315,14 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
   const toggleMultiSelect = (item, currentList, setter) => {
     if (currentList.includes(item)) setter(currentList.filter(i => i !== item));
     else setter([...currentList, item]);
+  };
+
+  const getCombinedProvisionalText = () => {
+    const parts = [...selectedProvisionalChips];
+    if (provisionalDiagnosisText.trim()) {
+      parts.push(provisionalDiagnosisText.trim());
+    }
+    return parts.join(' | ');
   };
 
   const handleJointClick = (jointId) => {
@@ -858,8 +883,8 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
     setGender('ذكر');
     setChronicDiseases('روماتويد مفصلي، ارتفاع ضغط الدم');
     setFamilyHistoryText('تاريخ عائلي للأمراض المناعية والروماتيزم');
-    setStiffnessType('تيبس اليدين والأصابع');
-    setStiffnessDuration('نصف ساعة أو أكثر (نشاط التهابي)');
+    setStiffnessType('تيبس إيد');
+    setStiffnessDuration('نصف ساعة أو أكثر');
     setSelectedJointStates({
       'Ant_L_MCP': 'inflamed',
       'Ant_R_MCP': 'inflamed',
@@ -870,7 +895,7 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
       'Ant_L_Knee': 'painful',
       'Ant_R_Knee': 'painful'
     });
-    setSelectedSystemicSigns(['hair_loss', 'oral_ulcers', 'morning_swelling']);
+    setSelectedSystemicSigns(['morning_swelling', 'hair_loss', 'oral_ulcers']);
     setSelectedFamilySigns(['chronic_autoimmune']);
     setSelectedClinicalTests(['mcps_squeeze']);
     setRheumaAntiCCP('إيجابي مرتفع (+++) > 3x');
@@ -908,9 +933,15 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
       .filter(item => selectedClinicalTests.includes(item.id))
       .map(item => item.label);
 
+    const combinedProvisional = getCombinedProvisionalText();
+
+    const queryNote = isQueryDiagnosis
+      ? `NOTE: This is a PROVISIONAL / QUERY DIAGNOSIS (تشخيص مبدئي محتمل). Doctor's suspected provisional diagnosis: "${combinedProvisional || 'Unspecified'}". Evaluate this provisional suspicion against the clinical findings, suggest probable differential diagnoses, and recommend specific required laboratory tests/radiology to confirm.`
+      : "";
+
     const systemPrompt = `You are an expert AI Clinical Rheumatologist & Immunologist.
 Analyze the rheumatology patient case based on ACR/EULAR criteria.
-${isQueryDiagnosis ? "NOTE: This is a QUERY DIAGNOSIS (تشخيص مبدئي محتمل). Suggest probable diagnoses and recommend specific required laboratory tests/radiology to confirm." : ""}
+${queryNote}
 
 Respond ONLY with a valid JSON object without Markdown formatting:
 {
@@ -932,18 +963,18 @@ Patient: ${patientName} | Age: ${age || 'Unspecified'} | Gender: ${gender}
 Chronic Diseases: ${chronicDiseases || 'None'}
 Family History: ${familyHistoryText || 'None'} | Family Risk Signs: ${familySignsNames.join(', ') || 'None'}
 
--- Clinical Joint Map & Stiffness --
-- Morning Stiffness Type: ${stiffnessType}
-- Morning Stiffness Duration: ${stiffnessDuration}
+-- History & Morning Stiffness --
+- Morning Stiffness Type: ${stiffnessType || 'None'}
+- Morning Stiffness Duration: ${stiffnessType ? stiffnessDuration : 'None'}
 - Disease Nature: ${selectedDiseaseNature.join(', ')}
+- Systemic & Extra-articular Signs: ${systemicSignsNames.join(', ') || 'None'}
+
+-- Clinical Joint Map (O/E) --
 - INFLAMMED/SWOLLEN JOINTS (Red): ${inflamedJointsList.join(', ') || 'None'}
 - PAINFUL JOINTS ONLY (Blue): ${painfulJointsList.join(', ') || 'None'}
 
 -- Physical & Clinical Tests --
 - Physical Examination Findings: ${clinicalTestsNames.join(', ') || 'None'}
-
--- Systemic Symptoms Checklist --
-- Systemic & Extra-articular Signs: ${systemicSignsNames.join(', ') || 'None'}
 
 -- Serology & Lab Markers --
 - ESR / CRP: ${rheumaEsrCrp}
@@ -954,6 +985,7 @@ Family History: ${familyHistoryText || 'None'} | Family Risk Signs: ${familySign
 - Organ Safety (LFTs/Kidney): ${rheumaOrganSafety}
 - TB Screening: ${rheumaTbScreening}
 
+${isQueryDiagnosis ? `Doctor's Provisional / Query Diagnosis: ${combinedProvisional || 'Suspected autoimmune/rheumatic condition'}` : ''}
 Additional Doctor Notes & Symptoms: ${symptomsInput || 'None'} | ${doctorNotes || ''}`;
 
     try {
@@ -1011,7 +1043,10 @@ Additional Doctor Notes & Symptoms: ${symptomsInput || 'None'} | ${doctorNotes |
 
       setAiReport(parsedResult);
       if (parsedResult.diagnosis) {
-        setFinalDiagnosis(isQueryDiagnosis ? `[Query Diagnosis]: ${parsedResult.diagnosis}` : parsedResult.diagnosis);
+        const queryPrefix = isQueryDiagnosis
+          ? `[Query Diagnosis${combinedProvisional ? `: ${combinedProvisional}` : ''}]: `
+          : '';
+        setFinalDiagnosis(`${queryPrefix}${parsedResult.diagnosis}`);
       }
       if (parsedResult.medications && Array.isArray(parsedResult.medications)) {
         setPrescribedMeds(parsedResult.medications);
@@ -1118,6 +1153,7 @@ Return JSON ONLY:
   const executeSaveAndPrint = async () => {
     setLoading(true);
     const generatedCode = selectedPatientCode || ('PAT-' + Math.floor(10000 + Math.random() * 90000));
+    const combinedProvisional = getCombinedProvisionalText();
 
     try {
       let clinicId = null;
@@ -1209,6 +1245,7 @@ Return JSON ONLY:
               rheumaDetails: isRheumaSpecialty ? {
                 stiffnessType,
                 stiffnessDuration,
+                provisionalDiagnosis: isQueryDiagnosis ? combinedProvisional : null,
                 jointStates: selectedJointStates,
                 esrCrp: rheumaEsrCrp,
                 antiCCP: rheumaAntiCCP,
@@ -1234,7 +1271,9 @@ Return JSON ONLY:
         {
           'السن والنوع': `${age || 'غير محدد'} سنة (${gender})`,
           'الأمراض المزمنة': chronicDiseases || 'لا يوجد',
-          'ملاحظات التشخيص': isQueryDiagnosis ? 'تشخيص محتمل (Query Diagnosis) - يحتاج متابعة' : 'فحص معتمد'
+          'ملاحظات التشخيص': isQueryDiagnosis
+            ? `تشخيص محتمل (${combinedProvisional || 'Query Diagnosis'}) - يحتاج متابعة`
+            : 'فحص معتمد'
         },
         prescribedMeds,
         {
@@ -1817,30 +1856,38 @@ Return JSON ONLY:
             </>
           )}
 
-          {/* اختصاص الروماتيزم والمناعة: واجهة الفحص الإكلينيكي المحدثة بـ الهيكل العظمي الخاص بـ عيادتك */}
+          {/* اختصاص الروماتيزم والمناعة: التاريخ المرضي (History) أولاً ثم الفحص الإكلينيكي (O/E) */}
           {isRheumaSpecialty && (
             <View style={styles.card}>
-              <Text style={styles.sectionTitle}>🩺 الفحص الإكلينيكي المتقدم للروماتيزم والمناعة</Text>
+              <Text style={styles.sectionTitle}>📋 التاريخ المرضي والفحص الإكلينيكي للروماتيزم والمناعة</Text>
 
-              {/* 1. التيبس الصباحي وطبيعة الألم */}
-              <Text style={styles.subSectionTitle}>⏱️ نوع وفترة التيبس الصباحي (Morning Stiffness):</Text>
-              <Text style={styles.label}>نوع التيبس:</Text>
+              {/* القسم الأول: التاريخ المرضي والشكوى (History) */}
+              <Text style={styles.subSectionTitle}>⏱️ أولاً: التاريخ المرضي والتيبس الصباحي (History & Morning Stiffness):</Text>
+              <Text style={styles.label}>نوع التيبس الصباحي (اضغط للإلغاء إذا لم يوجد):</Text>
               <View style={styles.chipsContainer}>
                 {RHEUMA_OPTIONS.stiffnessType.map((st, i) => (
-                  <TouchableOpacity key={i} style={[styles.selectChip, stiffnessType === st && styles.selectChipActive]} onPress={() => setStiffnessType(st)}>
+                  <TouchableOpacity
+                    key={i}
+                    style={[styles.selectChip, stiffnessType === st && styles.selectChipActive]}
+                    onPress={() => setStiffnessType(prev => prev === st ? '' : st)}
+                  >
                     <Text style={[styles.selectChipText, stiffnessType === st && styles.selectChipTextActive]}>{st}</Text>
                   </TouchableOpacity>
                 ))}
               </View>
 
-              <Text style={styles.label}>فترة التيبس:</Text>
-              <View style={styles.chipsContainer}>
-                {RHEUMA_OPTIONS.stiffnessDuration.map((sd, i) => (
-                  <TouchableOpacity key={i} style={[styles.selectChip, stiffnessDuration === sd && styles.selectChipActive]} onPress={() => setStiffnessDuration(sd)}>
-                    <Text style={[styles.selectChipText, stiffnessDuration === sd && styles.selectChipTextActive]}>{sd}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
+              {stiffnessType !== '' && (
+                <>
+                  <Text style={styles.label}>مدة التيبس الصباحي:</Text>
+                  <View style={styles.chipsContainer}>
+                    {RHEUMA_OPTIONS.stiffnessDuration.map((sd, i) => (
+                      <TouchableOpacity key={i} style={[styles.selectChip, stiffnessDuration === sd && styles.selectChipActive]} onPress={() => setStiffnessDuration(sd)}>
+                        <Text style={[styles.selectChipText, stiffnessDuration === sd && styles.selectChipTextActive]}>{sd}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </>
+              )}
 
               <Text style={styles.label}>طبيعة الألم والشكوى (C/o Nature):</Text>
               <View style={styles.chipsContainer}>
@@ -1851,8 +1898,28 @@ Return JSON ONLY:
                 ))}
               </View>
 
-              {/* 2. خريطة الهيكل العظمي استمارة العيادة التفاعلية المباشرة (Front & Back View) */}
-              <Text style={styles.subSectionTitle}>🦴 خريطة استمارة العيادة لمفاصل الجسم (O/E Skeleton Map):</Text>
+              {/* الأعراض والشكاوى الجهازية ضمن التاريخ المرضي */}
+              <Text style={styles.subSectionTitle}>⚠️ الأعراض والشكاوى الجهازية خارج المفصل (Systemic Checklist):</Text>
+              <View style={styles.chipsContainer}>
+                {RHEUMA_OPTIONS.systemicChecklist.map((item) => (
+                  <TouchableOpacity key={item.id} style={[styles.selectChip, selectedSystemicSigns.includes(item.id) && styles.selectChipActiveMulti]} onPress={() => toggleMultiSelect(item.id, selectedSystemicSigns, setSelectedSystemicSigns)}>
+                    <Text style={[styles.selectChipText, selectedSystemicSigns.includes(item.id) && styles.selectChipTextActive]}>{selectedSystemicSigns.includes(item.id) ? '✓ ' : ''}{item.label}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              {/* التاريخ العائلي المناعي ضمن التاريخ المرضي */}
+              <Text style={styles.subSectionTitle}>👨‍👩‍👧‍👦 التاريخ العائلي والدوائي الخاص (Family History):</Text>
+              <View style={styles.chipsContainer}>
+                {RHEUMA_OPTIONS.familyHistoryChecklist.map((item) => (
+                  <TouchableOpacity key={item.id} style={[styles.selectChip, selectedFamilySigns.includes(item.id) && styles.selectChipActiveMulti]} onPress={() => toggleMultiSelect(item.id, selectedFamilySigns, setSelectedFamilySigns)}>
+                    <Text style={[styles.selectChipText, selectedFamilySigns.includes(item.id) && styles.selectChipTextActive]}>{selectedFamilySigns.includes(item.id) ? '✓ ' : ''}{item.label}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              {/* القسم الثاني: خريطة الهيكل العظمي والفحص الفيزيائي (O/E) */}
+              <Text style={styles.subSectionTitle}>🦴 ثانياً: خريطة استمارة العيادة لمفاصل الجسم (O/E Skeleton Map):</Text>
               <Text style={styles.label}>اختر نوع التحديد بالضغط أولاً، ثم انقر المفاصل على الرسمة (اضغط اليد أو القدم لتفصيل الأصابع):</Text>
               
               <View style={styles.jointModeSelectorRow}>
@@ -1952,7 +2019,7 @@ Return JSON ONLY:
                 )}
               </View>
 
-              {/* 3. الفحوصات الفيزيائية السريعة (O/E Tests) */}
+              {/* الفحوصات الفيزيائية السريعة (O/E Tests) */}
               <Text style={styles.subSectionTitle}>🔍 الفحص الفيزيائي المباشر (O/E Specific Tests):</Text>
               <View style={styles.chipsContainer}>
                 {RHEUMA_OPTIONS.clinicalTests.map((t) => (
@@ -1962,28 +2029,8 @@ Return JSON ONLY:
                 ))}
               </View>
 
-              {/* 4. قائمة الشكاوى والأعراض الجهازية العامة (Checklist) */}
-              <Text style={styles.subSectionTitle}>⚠️ الأعراض والشكاوى الجهازية (Systemic Checklist):</Text>
-              <View style={styles.chipsContainer}>
-                {RHEUMA_OPTIONS.systemicChecklist.map((item) => (
-                  <TouchableOpacity key={item.id} style={[styles.selectChip, selectedSystemicSigns.includes(item.id) && styles.selectChipActiveMulti]} onPress={() => toggleMultiSelect(item.id, selectedSystemicSigns, setSelectedSystemicSigns)}>
-                    <Text style={[styles.selectChipText, selectedSystemicSigns.includes(item.id) && styles.selectChipTextActive]}>{selectedSystemicSigns.includes(item.id) ? '✓ ' : ''}{item.label}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-
-              {/* 5. التاريخ العائلي المناعي (Family History Checklist) */}
-              <Text style={styles.subSectionTitle}>👨‍👩‍👧‍👦 التاريخ العائلي والدوائي الخاص:</Text>
-              <View style={styles.chipsContainer}>
-                {RHEUMA_OPTIONS.familyHistoryChecklist.map((item) => (
-                  <TouchableOpacity key={item.id} style={[styles.selectChip, selectedFamilySigns.includes(item.id) && styles.selectChipActiveMulti]} onPress={() => toggleMultiSelect(item.id, selectedFamilySigns, setSelectedFamilySigns)}>
-                    <Text style={[styles.selectChipText, selectedFamilySigns.includes(item.id) && styles.selectChipTextActive]}>{selectedFamilySigns.includes(item.id) ? '✓ ' : ''}{item.label}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-
-              {/* 6. التحاليل والفحوصات المناعية (Serology) */}
-              <Text style={styles.subSectionTitle}>🔬 التحاليل المناعية ودلالات الالتهاب (Serology & Labs):</Text>
+              {/* القسم الثالث: التحاليل والفحوصات المناعية (Serology) */}
+              <Text style={styles.subSectionTitle}>🔬 ثالثاً: التحاليل المناعية ودلالات الالتهاب (Serology & Labs):</Text>
 
               <Text style={styles.label}>1. سرعة الترسيب والبروتين الالتهابي (ESR / CRP) - الأساس:</Text>
               <View style={styles.chipsContainer}>
@@ -2066,15 +2113,46 @@ Return JSON ONLY:
                 ))}
               </View>
 
-              {/* 7. تصنيف التشخيص المبدئي Query Diagnosis */}
+              {/* تصنيف التشخيص المبدئي بأيقونات جاهزة + خانة إضافية مرنة */}
               <TouchableOpacity 
                 style={[styles.queryCheckBtn, isQueryDiagnosis && styles.queryCheckBtnActive]} 
                 onPress={() => setIsQueryDiagnosis(!isQueryDiagnosis)}
               >
                 <Text style={styles.queryCheckBtnText}>
-                  {isQueryDiagnosis ? '✓ ' : ''}🔍 تشخيص محتمل حتى الآن (Query Diagnosis - طلب تحاليل إضافية من الـ AI)
+                  {isQueryDiagnosis ? '✓ ' : ''}🔍 تشخيص مبدئي / محتمل (Provisional / Query Diagnosis)
                 </Text>
               </TouchableOpacity>
+
+              {isQueryDiagnosis && (
+                <View style={styles.provisionalBox}>
+                  <Text style={styles.label}>اختر التشخيص المبدئي بنقرة واحدة (يمكن اختيار أكثر من اشتباه):</Text>
+                  <View style={styles.chipsContainer}>
+                    {RHEUMA_OPTIONS.provisionalDiagnoses.map((diag, idx) => {
+                      const isSelected = selectedProvisionalChips.includes(diag);
+                      return (
+                        <TouchableOpacity
+                          key={idx}
+                          style={[styles.selectChip, isSelected && styles.selectChipActiveMulti]}
+                          onPress={() => toggleMultiSelect(diag, selectedProvisionalChips, setSelectedProvisionalChips)}
+                        >
+                          <Text style={[styles.selectChipText, isSelected && styles.selectChipTextActive]}>
+                            {isSelected ? '✓ ' : ''}{diag}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+
+                  <Text style={styles.label}>إضافة اشتباه آخر غير موجود بالقائمة (اختياري):</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="اكتب أي تشخيص إضافي هنا..."
+                    placeholderTextColor="#64748B"
+                    value={provisionalDiagnosisText}
+                    onChangeText={setProvisionalDiagnosisText}
+                  />
+                </View>
+              )}
             </View>
           )}
 
@@ -2395,6 +2473,7 @@ const styles = StyleSheet.create({
   queryCheckBtn: { backgroundColor: '#1E293B', padding: 12, borderRadius: 8, borderWidth: 1, borderColor: '#334155', alignItems: 'center', marginTop: 8 },
   queryCheckBtnActive: { backgroundColor: '#0284C7', borderColor: '#00F2FE' },
   queryCheckBtnText: { color: '#FFFFFF', fontSize: 12, fontWeight: 'bold' },
+  provisionalBox: { backgroundColor: '#060911', padding: 10, borderRadius: 8, marginTop: 8, borderWidth: 1, borderColor: '#0284C7' },
 
   scanPreviewBox: { backgroundColor: '#060911', padding: 10, borderRadius: 8, alignItems: 'center', marginTop: 10, borderWidth: 1, borderColor: '#1E293B' },
 
