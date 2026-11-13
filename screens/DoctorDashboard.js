@@ -18,42 +18,42 @@ const SPECIALITIES_LIST = [
   "استشاري أمراض الباطنة والسكر"
 ];
 
-// --- خريطة مفاصل الهيكل العظمي الرسمية (الأمامي على اليسار والخلفي على اليمين) ---
+// --- خريطة مفاصل الهيكل العظمي الرسمية معايرة بدقة 100% على أبعاد صورة skeleton.png ---
 const SKELETON_JOINTS = [
-  // --- الهيكل الأمامي (Anterior - اليسار) ---
-  { id: 'Ant_TMJ', name: 'المفصل الفكي (أمامي)', x: 25, y: 7 },
-  { id: 'Ant_Neck', name: 'فقرات الرقبة (أمامي)', x: 25, y: 14 },
-  { id: 'Ant_L_Shoulder', name: 'الكتف الأيسر (أمامي)', x: 16, y: 20 },
-  { id: 'Ant_R_Shoulder', name: 'الكتف الأيمن (أمامي)', x: 34, y: 20 },
-  { id: 'Ant_L_Elbow', name: 'الكوع الأيسر (أمامي)', x: 13, y: 34 },
-  { id: 'Ant_R_Elbow', name: 'الكوع الأيمن (أمامي)', x: 37, y: 34 },
-  { id: 'Ant_L_Wrist', name: 'الرسغ الأيسر (أمامي)', x: 10, y: 47 },
-  { id: 'Ant_R_Wrist', name: 'الرسغ الأيمن (أمامي)', x: 40, y: 47 },
-  { id: 'Ant_L_MCP', name: 'أصابع اليد اليسرى (L-MCPs)', x: 7, y: 53 },
-  { id: 'Ant_R_MCP', name: 'أصابع اليد اليمنى (R-MCPs)', x: 43, y: 53 },
-  { id: 'Ant_Pelvis', name: 'الحوض (Pelvis)', x: 25, y: 46 },
-  { id: 'Ant_L_Hip', name: 'مفصل الفخذ الأيسر', x: 20, y: 50 },
-  { id: 'Ant_R_Hip', name: 'مفصل الفخذ الأيمن', x: 30, y: 50 },
-  { id: 'Ant_L_Knee', name: 'الركبة اليسرى (أمامي)', x: 20, y: 70 },
-  { id: 'Ant_R_Knee', name: 'الركبة اليمنى (أمامي)', x: 30, y: 70 },
-  { id: 'Ant_L_Ankle', name: 'الكاحل الأيسر (أمامي)', x: 21, y: 90 },
-  { id: 'Ant_R_Ankle', name: 'الكاحل الأيمن (أمامي)', x: 29, y: 90 },
-  { id: 'Ant_L_MTP', name: 'أصابع القدم اليسرى (L-MTPs)', x: 21, y: 96 },
-  { id: 'Ant_R_MTP', name: 'أصابع القدم اليمنى (R-MTPs)', x: 29, y: 96 },
+  // --- الهيكل الأمامي (Anterior - النصف الأيسر من الصورة) ---
+  { id: 'Ant_TMJ', name: 'المفصل الفكي (أمامي)', x: 26.5, y: 8.5 },
+  { id: 'Ant_Neck', name: 'فقرات الرقبة (أمامي)', x: 26.5, y: 15.5 },
+  { id: 'Ant_L_Shoulder', name: 'الكتف الأيمن للمريض (يسار الصورة)', x: 15.5, y: 21.5 },
+  { id: 'Ant_R_Shoulder', name: 'الكتف الأيسر للمريض (يمين الصورة)', x: 37.5, y: 21.5 },
+  { id: 'Ant_L_Elbow', name: 'الكوع الأيمن (أمامي)', x: 12.0, y: 36.0 },
+  { id: 'Ant_R_Elbow', name: 'الكوع الأيسر (أمامي)', x: 40.5, y: 36.0 },
+  { id: 'Ant_L_Wrist', name: 'الرسغ الأيمن (أمامي)', x: 7.5, y: 49.5 },
+  { id: 'Ant_R_Wrist', name: 'الرسغ الأيسر (أمامي)', x: 44.5, y: 49.5 },
+  { id: 'Ant_L_MCP', name: 'أصابع اليد اليمنى (MCPs)', x: 5.0, y: 55.5 },
+  { id: 'Ant_R_MCP', name: 'أصابع اليد اليسرى (MCPs)', x: 46.5, y: 55.5 },
+  { id: 'Ant_Pelvis', name: 'الحوض (Pelvis)', x: 26.5, y: 47.0 },
+  { id: 'Ant_L_Hip', name: 'مفصل الفخذ الأيمن', x: 19.5, y: 51.5 },
+  { id: 'Ant_R_Hip', name: 'مفصل الفخذ الأيسر', x: 33.5, y: 51.5 },
+  { id: 'Ant_L_Knee', name: 'الركبة اليمنى (أمامي)', x: 21.0, y: 72.0 },
+  { id: 'Ant_R_Knee', name: 'الركبة اليسرى (أمامي)', x: 32.0, y: 72.0 },
+  { id: 'Ant_L_Ankle', name: 'الكاحل الأيمن (أمامي)', x: 22.0, y: 90.5 },
+  { id: 'Ant_R_Ankle', name: 'الكاحل الأيسر (أمامي)', x: 31.0, y: 90.5 },
+  { id: 'Ant_L_MTP', name: 'أصابع القدم اليمنى (MTPs)', x: 19.0, y: 95.5 },
+  { id: 'Ant_R_MTP', name: 'أصابع القدم اليسرى (MTPs)', x: 34.0, y: 95.5 },
 
-  // --- الهيكل الخلفي (Posterior - اليمين) ---
-  { id: 'Post_Cervical', name: 'الفقرات العنقية (خلفي)', x: 75, y: 14 },
-  { id: 'Post_Thoracic', name: 'العمود الفقري الظهري', x: 75, y: 28 },
-  { id: 'Post_Lumbar', name: 'الفقرات القطنية (LBP)', x: 75, y: 39 },
-  { id: 'Post_SIJ', name: 'المفاصل العجزية الحرقفية (SIJ)', x: 75, y: 47 },
-  { id: 'Post_L_Shoulder', name: 'الكتف الأيسر (خلفي)', x: 66, y: 20 },
-  { id: 'Post_R_Shoulder', name: 'الكتف الأيمن (خلفي)', x: 84, y: 20 },
-  { id: 'Post_L_Elbow', name: 'الكوع الأيسر (خلفي)', x: 63, y: 34 },
-  { id: 'Post_R_Elbow', name: 'الكوع الأيمن (خلفي)', x: 87, y: 34 },
-  { id: 'Post_L_Knee', name: 'الركبة اليسرى (خلفي)', x: 70, y: 70 },
-  { id: 'Post_R_Knee', name: 'الركبة اليمنى (خلفي)', x: 80, y: 70 },
-  { id: 'Post_L_Ankle', name: 'الكاحل الأيسر (خلفي)', x: 70, y: 90 },
-  { id: 'Post_R_Ankle', name: 'الكاحل الأيمن (خلفي)', x: 80, y: 90 }
+  // --- الهيكل الخلفي (Posterior - النصف الأيمن من الصورة) ---
+  { id: 'Post_Cervical', name: 'الفقرات العنقية (خلفي)', x: 74.5, y: 15.0 },
+  { id: 'Post_Thoracic', name: 'العمود الفقري الظهري', x: 74.5, y: 27.5 },
+  { id: 'Post_Lumbar', name: 'الفقرات القطنية (LBP)', x: 74.5, y: 39.5 },
+  { id: 'Post_SIJ', name: 'المفاصل العجزية الحرقفية (SIJ)', x: 74.5, y: 47.0 },
+  { id: 'Post_L_Shoulder', name: 'الكتف الأيسر (خلفي)', x: 63.5, y: 21.5 },
+  { id: 'Post_R_Shoulder', name: 'الكتف الأيمن (خلفي)', x: 85.5, y: 21.5 },
+  { id: 'Post_L_Elbow', name: 'الكوع الأيسر (خلفي)', x: 60.0, y: 36.0 },
+  { id: 'Post_R_Elbow', name: 'الكوع الأيمن (خلفي)', x: 89.0, y: 36.0 },
+  { id: 'Post_L_Knee', name: 'الركبة اليسرى (خلفي)', x: 69.0, y: 72.0 },
+  { id: 'Post_R_Knee', name: 'الركبة اليمنى (خلفي)', x: 80.0, y: 72.0 },
+  { id: 'Post_L_Ankle', name: 'الكاحل الأيسر (خلفي)', x: 69.5, y: 90.5 },
+  { id: 'Post_R_Ankle', name: 'الكاحل الأيمن (خلفي)', x: 79.5, y: 90.5 }
 ];
 
 // --- خيارات الفحص السريع وقوائم الشكاوى التخصصية ---
@@ -1794,28 +1794,30 @@ Return JSON ONLY:
                 </TouchableOpacity>
               </View>
 
-              {/* إطار رسمة استمارة عيادتك المأخوذة من الـ PDF */}
-              <View style={styles.skeletonImageFrame}>
-                <Image 
-                  source={{ uri: '/skeleton.png' }} 
-                  style={styles.skeletonBaseImg} 
-                  resizeMode="contain" 
-                />
-                {SKELETON_JOINTS.map((joint) => {
-                  const state = selectedJointStates[joint.id];
-                  return (
-                    <TouchableOpacity
-                      key={joint.id}
-                      style={[
-                        styles.jointHotspotDot,
-                        { left: `${joint.x}%`, top: `${joint.y}%` },
-                        state === 'inflamed' && styles.dotRed,
-                        state === 'painful' && styles.dotBlue,
-                      ]}
-                      onPress={() => handleJointClick(joint.id)}
-                    />
-                  );
-                })}
+              {/* إطار رسمة استمارة عيادتك مقفول الأبعاد مع الصورة بنسبة 100% */}
+              <View style={styles.skeletonOuterWrapper}>
+                <View style={styles.skeletonCanvasBox}>
+                  <Image 
+                    source={{ uri: '/skeleton.png' }} 
+                    style={styles.skeletonBaseImg} 
+                    resizeMode="stretch" 
+                  />
+                  {SKELETON_JOINTS.map((joint) => {
+                    const state = selectedJointStates[joint.id];
+                    return (
+                      <TouchableOpacity
+                        key={joint.id}
+                        style={[
+                          styles.jointHotspotDot,
+                          { left: `${joint.x}%`, top: `${joint.y}%` },
+                          state === 'inflamed' && styles.dotRed,
+                          state === 'painful' && styles.dotBlue,
+                        ]}
+                        onPress={() => handleJointClick(joint.id)}
+                      />
+                    );
+                  })}
+                </View>
               </View>
 
               <Text style={styles.label}>المفاصل المحددة حالياً:</Text>
@@ -2172,18 +2174,23 @@ const styles = StyleSheet.create({
   jointModeBtnActiveBlue: { backgroundColor: '#1D4ED8', borderColor: '#3B82F6' },
   jointModeBtnText: { color: '#FFFFFF', fontSize: 11, fontWeight: 'bold' },
 
-  skeletonImageFrame: {
-    position: 'relative',
+  skeletonOuterWrapper: {
     width: '100%',
-    height: 480,
-    backgroundColor: '#FFFFFF', // خلفية بيضاء لنقاء ورقة الاستمارة
+    backgroundColor: '#FFFFFF',
     borderRadius: 12,
     borderWidth: 1,
     borderColor: '#CBD5E1',
     alignItems: 'center',
     justifyContent: 'center',
-    overflow: 'hidden',
-    marginVertical: 10
+    paddingVertical: 12,
+    marginVertical: 10,
+    overflow: 'hidden'
+  },
+  skeletonCanvasBox: {
+    position: 'relative',
+    width: '92%',
+    maxWidth: 460,
+    aspectRatio: 1.02,
   },
   skeletonBaseImg: {
     width: '100%',
@@ -2191,23 +2198,23 @@ const styles = StyleSheet.create({
   },
   jointHotspotDot: {
     position: 'absolute',
-    width: 22,
-    height: 22,
-    marginLeft: -11,
-    marginTop: -11,
-    borderRadius: 11,
-    backgroundColor: 'rgba(0, 0, 0, 0.05)',
+    width: 16,
+    height: 16,
+    marginLeft: -8,
+    marginTop: -8,
+    borderRadius: 8,
+    backgroundColor: 'rgba(14, 165, 233, 0.14)',
     borderWidth: 1.5,
-    borderColor: 'rgba(0, 0, 0, 0.25)',
+    borderColor: 'rgba(2, 132, 199, 0.55)',
     cursor: 'pointer'
   },
   dotRed: {
-    backgroundColor: 'rgba(239, 68, 68, 0.9)',
+    backgroundColor: 'rgba(239, 68, 68, 0.92)',
     borderColor: '#991B1B',
     boxShadow: '0 0 8px #EF4444'
   },
   dotBlue: {
-    backgroundColor: 'rgba(59, 130, 246, 0.9)',
+    backgroundColor: 'rgba(59, 130, 246, 0.92)',
     borderColor: '#1E3A8A',
     boxShadow: '0 0 8px #3B82F6'
   },
