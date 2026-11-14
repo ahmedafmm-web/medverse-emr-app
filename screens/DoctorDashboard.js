@@ -159,12 +159,12 @@ const RHEUMA_OPTIONS = {
     { id: 'femoral_stretch', label: 'Femoral Stretch Test' },
     { id: 'sij_faber', label: 'SIJ FABER Test' }
   ],
-  antiCCP: ["غير متوفر", "سلبي (Negative)", "إيجابي (+) < 3x", "إيجابي مرتفع (+++) > 3x"],
-  rf: ["غير متوفر", "سلبي (Negative)", "إيجابي ضعيف (+)", "إيجابي مرتفع (+++)"],
-  ana: ["غير متوفر", "سلبي (Negative)", "إيجابي Homogeneous", "إيجابي Speckled", "إيجابي Nucleolar"],
-  antiDsDNA: ["غير متوفر", "سلبي (Negative)", "إيجابي مرتفع (Positive)"],
-  connectiveTissue: ["غير متوفر", "Anti-Scl-70", "Anti-Centromere", "U1-RNP", "Anti-Ro / Anti-La (SS-A / SS-B)"],
-  antiPhospholipid: ["غير متوفر", "سلبي", "إيجابي (تاريخ جلطات / إجهاض متكرر)"],
+  antiCCP: ["سلبي (Negative)", "إيجابي (+) < 3x", "إيجابي مرتفع (+++) > 3x"],
+  rf: ["سلبي (Negative)", "إيجابي ضعيف (+)", "إيجابي مرتفع (+++)"],
+  ana: ["سلبي (Negative)", "إيجابي Homogeneous", "إيجابي Speckled", "إيجابي Nucleolar"],
+  antiDsDNA: ["سلبي (Negative)", "إيجابي مرتفع (Positive)"],
+  connectiveTissue: ["Anti-Scl-70", "Anti-Centromere", "U1-RNP", "Anti-Ro / Anti-La (SS-A / SS-B)"],
+  antiPhospholipid: ["سلبي", "إيجابي (تاريخ جلطات / إجهاض متكرر)"],
   esrCrp: ["طبيعي (Normal)", "مرتفع بدرجة متوسطة (Moderate)", "مرتفع جداً (High Active Flare)"],
   organSafety: ["طبيعي وآمن للعلاج", "ارتفاع طفيف في إنزيمات الكبد", "قصور كلوي / كبدي"],
   tbScreening: ["سلبي وجاهز للعلاج البيولوجي", "إيجابي / غير مكتمل", "لم يتم الفحص بعد"]
@@ -262,30 +262,34 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
   const [selectedJointStates, setSelectedJointStates] = useState({}); // { JointID: 'inflamed' | 'painful' }
   const [jointSelectMode, setJointSelectMode] = useState('inflamed'); // 'inflamed' (أحمر) أو 'painful' (أزرق)
   const [activeSubJointGroup, setActiveSubJointGroup] = useState(null); // 'R_Hand' | 'L_Hand' | 'R_Foot' | 'L_Foot' | null
-  const [stiffnessType, setStiffnessType] = useState('تيبس إيد');
+  const [stiffnessType, setStiffnessType] = useState('');
   const [stiffnessDuration, setStiffnessDuration] = useState('نصف ساعة أو أكثر');
-  const [selectedDiseaseNature, setSelectedDiseaseNature] = useState(['Inflammatory (التهابي)', 'Arthritis (التهاب متورم)']);
+  const [selectedDiseaseNature, setSelectedDiseaseNature] = useState([]);
   const [selectedSystemicSigns, setSelectedSystemicSigns] = useState([]);
   const [selectedFamilySigns, setSelectedFamilySigns] = useState([]);
   const [selectedClinicalTests, setSelectedClinicalTests] = useState([]);
 
-  const [rheumaAntiCCP, setRheumaAntiCCP] = useState('إيجابي مرتفع (+++) > 3x');
-  const [rheumaRF, setRheumaRF] = useState('إيجابي مرتفع (+++)');
-  const [rheumaANA, setRheumaANA] = useState('غير متوفر');
-  const [rheumaAntiDsDNA, setRheumaAntiDsDNA] = useState('غير متوفر');
-  const [rheumaConnective, setRheumaConnective] = useState('غير متوفر');
-  const [rheumaAPL, setRheumaAPL] = useState('غير متوفر');
-  const [rheumaEsrCrp, setRheumaEsrCrp] = useState('مرتفع جداً (High Active Flare)');
-  const [rheumaOrganSafety, setRheumaOrganSafety] = useState('طبيعي وآمن للعلاج');
-  const [rheumaTbScreening, setRheumaTbScreening] = useState('سلبي وجاهز للعلاج البيولوجي');
+  // التحاليل المناعية (تبدأ فارغة بدون قيم افتراضية مسبقة)
+  const [rheumaAntiCCP, setRheumaAntiCCP] = useState('');
+  const [rheumaRF, setRheumaRF] = useState('');
+  const [rheumaANA, setRheumaANA] = useState('');
+  const [rheumaAntiDsDNA, setRheumaAntiDsDNA] = useState('');
+  const [rheumaConnective, setRheumaConnective] = useState('');
+  const [rheumaAPL, setRheumaAPL] = useState('');
+  const [rheumaEsrCrp, setRheumaEsrCrp] = useState('');
+  const [rheumaOrganSafety, setRheumaOrganSafety] = useState('');
+  const [rheumaTbScreening, setRheumaTbScreening] = useState('');
+  const [showAdvancedLabs, setShowAdvancedLabs] = useState(false);
+
   const [isQueryDiagnosis, setIsQueryDiagnosis] = useState(false);
   const [selectedProvisionalChips, setSelectedProvisionalChips] = useState([]);
   const [provisionalDiagnosisText, setProvisionalDiagnosisText] = useState('');
 
-  // حالة رفع صورة تحاليل/أشعة للذكاء الاصطناعي للقراءة الفورية
-  const [aiScanFile, setAiScanFile] = useState(null);
-  const [aiScanPreviewUrl, setAiScanPreviewUrl] = useState('');
-  const [aiScanBase64, setAiScanBase64] = useState('');
+  // --- المرحلة 3: رفع صور متعددة للتحاليل/الأشعة بدقة عالية + معاينة + قفل تلقائي للإدخال اليدوي ---
+  // aiScanItems: [{ id, blob, previewUrl, base64, title }]
+  const [aiScanItems, setAiScanItems] = useState([]);
+  const [processingAiImages, setProcessingAiImages] = useState(false);
+  const [manualLabsUnlocked, setManualLabsUnlocked] = useState(false);
 
   const [symptomsInput, setSymptomsInput] = useState('');
   const [doctorNotes, setDoctorNotes] = useState('');
@@ -311,10 +315,16 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
   const [loadingPatientsList, setLoadingPatientsList] = useState(false);
 
   const isRheumaSpecialty = specialty.includes("الروماتيزم") || specialty.includes("الروماتويد") || specialty.includes("المناعية");
+  const hasAiScanImages = aiScanItems.length > 0;
+  const isManualLabsLocked = hasAiScanImages && !manualLabsUnlocked;
 
   const toggleMultiSelect = (item, currentList, setter) => {
     if (currentList.includes(item)) setter(currentList.filter(i => i !== item));
     else setter([...currentList, item]);
+  };
+
+  const toggleSingleChip = (val, currentVal, setter) => {
+    setter(currentVal === val ? '' : val);
   };
 
   const getCombinedProvisionalText = () => {
@@ -437,7 +447,7 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
       try {
         if (!file || !file.type.includes('image')) return resolve(file);
         const objectUrl = URL.createObjectURL(file);
-        const img = new Image();
+        const img = new window.Image();
         img.src = objectUrl;
         img.onload = () => {
           URL.revokeObjectURL(objectUrl);
@@ -461,18 +471,129 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
     });
   };
 
-  const handleSelectAiScanImage = (event) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    setAiScanFile(file);
-    const url = URL.createObjectURL(file);
-    setAiScanPreviewUrl(url);
+  // --- معالجة وتحسين دقة وتباين صور التحاليل والأشعة للقراءة الدقيقة بالذكاء الاصطناعي ---
+  const enhanceScanImageForAI = (file, maxWidth = 2800, quality = 0.95) => {
+    return new Promise((resolve) => {
+      try {
+        const objectUrl = URL.createObjectURL(file);
+        const img = new window.Image();
+        img.src = objectUrl;
+        img.onload = () => {
+          URL.revokeObjectURL(objectUrl);
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
 
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setAiScanBase64(reader.result);
-    };
-    reader.readAsDataURL(file);
+          // الحفاظ على الدقة الفائقة (حتى 2800px) وتكبير الصور الصغيرة قليلاً لوضوح الأرقام الطبية
+          if (width > maxWidth) {
+            height = Math.round((height * maxWidth) / width);
+            width = maxWidth;
+          } else if (width < 1400) {
+            const scale = Math.min(1800 / width, 1.5);
+            width = Math.round(width * scale);
+            height = Math.round(height * scale);
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx.imageSmoothingEnabled = true;
+          ctx.imageSmoothingQuality = 'high';
+
+          // تحسين التباين والوضوح للنصوص والأرقام المطبوعة على أوراق التحاليل
+          if (typeof ctx.filter !== 'undefined') {
+            ctx.filter = 'contrast(1.18) brightness(1.04) saturate(1.05)';
+          }
+          ctx.drawImage(img, 0, 0, width, height);
+
+          const base64DataUrl = canvas.toDataURL('image/jpeg', quality);
+          canvas.toBlob(
+            (blob) => {
+              const finalBlob = blob || file;
+              resolve({
+                blob: finalBlob,
+                previewUrl: URL.createObjectURL(finalBlob),
+                base64: base64DataUrl
+              });
+            },
+            'image/jpeg',
+            quality
+          );
+        };
+        img.onerror = () => {
+          URL.revokeObjectURL(objectUrl);
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            resolve({
+              blob: file,
+              previewUrl: URL.createObjectURL(file),
+              base64: reader.result
+            });
+          };
+          reader.readAsDataURL(file);
+        };
+      } catch (e) {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          resolve({
+            blob: file,
+            previewUrl: URL.createObjectURL(file),
+            base64: reader.result
+          });
+        };
+        reader.readAsDataURL(file);
+      }
+    });
+  };
+
+  // --- التقاط أو رفع عدة صور للتحاليل والأشعة بدقة عالية + قفل الإدخال اليدوي تلقائياً ---
+  const handleSelectMultipleAiScanImages = async (event) => {
+    const files = Array.from(event.target.files || []);
+    if (files.length === 0) return;
+
+    setProcessingAiImages(true);
+    try {
+      const processedItems = [];
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const enhanced = await enhanceScanImageForAI(file, 2800, 0.95);
+        processedItems.push({
+          id: `${Date.now()}_${Math.random().toString(36).substring(2, 7)}_${i}`,
+          blob: enhanced.blob,
+          previewUrl: enhanced.previewUrl,
+          base64: enhanced.base64,
+          title: file.name ? file.name.replace(/\.[^/.]+$/, '') : `تحليل / أشعة ${i + 1}`
+        });
+      }
+
+      setAiScanItems(prev => {
+        // إذا كانت هذه أول صور تُرفع، نقفل الإدخال اليدوي للتحاليل تلقائياً لعدم التشتيت
+        if (prev.length === 0) {
+          setManualLabsUnlocked(false);
+        }
+        return [...prev, ...processedItems];
+      });
+    } catch (err) {
+      showAlert('خطأ في معالجة الصور', err.message || 'تعذر تحسين دقة الصور المختارة.');
+    } finally {
+      setProcessingAiImages(false);
+      if (event.target) event.target.value = '';
+    }
+  };
+
+  const handleRemoveAiScanItem = (id) => {
+    setAiScanItems(prev => {
+      const updated = prev.filter(item => item.id !== id);
+      if (updated.length === 0) {
+        setManualLabsUnlocked(false);
+      }
+      return updated;
+    });
+  };
+
+  const handleClearAllAiScanItems = () => {
+    setAiScanItems([]);
+    setManualLabsUnlocked(false);
   };
 
   const handleSelectMultipleScans = (event) => {
@@ -885,6 +1006,7 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
     setFamilyHistoryText('تاريخ عائلي للأمراض المناعية والروماتيزم');
     setStiffnessType('تيبس إيد');
     setStiffnessDuration('نصف ساعة أو أكثر');
+    setSelectedDiseaseNature(['Inflammatory (التهابي)', 'Arthritis (التهاب متورم)']);
     setSelectedJointStates({
       'Ant_L_MCP': 'inflamed',
       'Ant_R_MCP': 'inflamed',
@@ -935,18 +1057,35 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
 
     const combinedProvisional = getCombinedProvisionalText();
 
+    // تجميع التحاليل اليدوية المختارة فعلياً فقط
+    const manualLabsSummary = [];
+    if (rheumaEsrCrp) manualLabsSummary.push(`ESR / CRP: ${rheumaEsrCrp}`);
+    if (rheumaAntiCCP) manualLabsSummary.push(`Anti-CCP: ${rheumaAntiCCP}`);
+    if (rheumaRF) manualLabsSummary.push(`RF: ${rheumaRF}`);
+    if (rheumaANA) manualLabsSummary.push(`ANA: ${rheumaANA}`);
+    if (rheumaAntiDsDNA) manualLabsSummary.push(`Anti-dsDNA: ${rheumaAntiDsDNA}`);
+    if (rheumaConnective) manualLabsSummary.push(`Connective Tissue Profile: ${rheumaConnective}`);
+    if (rheumaAPL) manualLabsSummary.push(`Anti-Phospholipid: ${rheumaAPL}`);
+    if (rheumaOrganSafety) manualLabsSummary.push(`Organ Safety (LFTs/Kidney): ${rheumaOrganSafety}`);
+    if (rheumaTbScreening) manualLabsSummary.push(`TB Screening: ${rheumaTbScreening}`);
+
     const queryNote = isQueryDiagnosis
       ? `NOTE: This is a PROVISIONAL / QUERY DIAGNOSIS (تشخيص مبدئي محتمل). Doctor's suspected provisional diagnosis: "${combinedProvisional || 'Unspecified'}". Evaluate this provisional suspicion against the clinical findings, suggest probable differential diagnoses, and recommend specific required laboratory tests/radiology to confirm.`
+      : "";
+
+    const multiImageInstruction = aiScanItems.length > 0
+      ? `\nIMPORTANT: The doctor has attached ${aiScanItems.length} high-resolution lab/radiology image(s). Perform careful medical OCR on ALL attached images, extract exact lab values, reference ranges, and radiology findings, and integrate them directly into your clinical assessment and warnings.`
       : "";
 
     const systemPrompt = `You are an expert AI Clinical Rheumatologist & Immunologist.
 Analyze the rheumatology patient case based on ACR/EULAR criteria.
 ${queryNote}
+${multiImageInstruction}
 
 Respond ONLY with a valid JSON object without Markdown formatting:
 {
   "diagnosis": "English Diagnosis - الشرح بالعربي",
-  "warnings": ["تحذير إكلينيكي بالعربي عن الضغط، الكبد، التعارضات والتحاليل"],
+  "warnings": ["تحذير إكلينيكي بالعربي عن الضغط، الكبد، التعارضات والتحاليل المستخرجة"],
   "medications": [
     {
       "name": "Exact Drug Name",
@@ -966,7 +1105,7 @@ Family History: ${familyHistoryText || 'None'} | Family Risk Signs: ${familySign
 -- History & Morning Stiffness --
 - Morning Stiffness Type: ${stiffnessType || 'None'}
 - Morning Stiffness Duration: ${stiffnessType ? stiffnessDuration : 'None'}
-- Disease Nature: ${selectedDiseaseNature.join(', ')}
+- Disease Nature: ${selectedDiseaseNature.join(', ') || 'None'}
 - Systemic & Extra-articular Signs: ${systemicSignsNames.join(', ') || 'None'}
 
 -- Clinical Joint Map (O/E) --
@@ -977,31 +1116,27 @@ Family History: ${familyHistoryText || 'None'} | Family Risk Signs: ${familySign
 - Physical Examination Findings: ${clinicalTestsNames.join(', ') || 'None'}
 
 -- Serology & Lab Markers --
-- ESR / CRP: ${rheumaEsrCrp}
-- Anti-CCP: ${rheumaAntiCCP} | RF: ${rheumaRF}
-- ANA: ${rheumaANA} | Anti-dsDNA: ${rheumaAntiDsDNA}
-- Connective Tissue Markers (Anti-Scl-70/Centromere/Ro/La): ${rheumaConnective}
-- Anti-Phospholipid: ${rheumaAPL}
-- Organ Safety (LFTs/Kidney): ${rheumaOrganSafety}
-- TB Screening: ${rheumaTbScreening}
+${manualLabsSummary.length > 0 ? manualLabsSummary.map(l => `- ${l}`).join('\n') : '- Relying on attached Lab/Radiology images (no manual lab overrides entered)'}
 
 ${isQueryDiagnosis ? `Doctor's Provisional / Query Diagnosis: ${combinedProvisional || 'Suspected autoimmune/rheumatic condition'}` : ''}
 Additional Doctor Notes & Symptoms: ${symptomsInput || 'None'} | ${doctorNotes || ''}`;
 
     try {
       let requestBody;
-      if (aiScanBase64) {
+      if (aiScanItems.length > 0) {
+        const userContentArray = [
+          { type: "text", text: promptText + `\n[Attached ${aiScanItems.length} High-Resolution Lab/Scan Image(s) for Multi-Image OCR Analysis]` },
+          ...aiScanItems.map(item => ({
+            type: "image_url",
+            image_url: { url: item.base64 }
+          }))
+        ];
+
         requestBody = {
           model: "openai/gpt-oss-120b",
           messages: [
             { role: "system", content: systemPrompt },
-            {
-              role: "user",
-              content: [
-                { type: "text", text: promptText + "\n[Attached Lab/Scan Image for OCR Analysis]" },
-                { type: "image_url", image_url: { url: aiScanBase64 } }
-              ]
-            }
+            { role: "user", content: userContentArray }
           ],
           temperature: 0.2
         };
@@ -1225,7 +1360,63 @@ Return JSON ONLY:
       setSelectedPatientCode(patientRealCode);
       setCurrentPatientId(patientRealId);
 
+      // --- رفع صور التحاليل والأشعة الملتقطة تلقائياً إلى ملف المريض السحابي ---
+      const autoUploadedScansList = [];
+      if (aiScanItems.length > 0 && patientRealCode) {
+        for (let i = 0; i < aiScanItems.length; i++) {
+          const item = aiScanItems[i];
+          const uniqueId = Math.random().toString(36).substring(2, 9);
+          const filePath = `patient_scans/${patientRealCode}/${Date.now()}_${uniqueId}_${i}.jpg`;
+
+          const { error: uploadErr } = await supabase.storage
+            .from('clinic-assets')
+            .upload(filePath, item.blob, { upsert: true });
+
+          let publicUrl = '';
+          if (!uploadErr) {
+            const { data: urlData } = supabase.storage.from('clinic-assets').getPublicUrl(filePath);
+            publicUrl = urlData?.publicUrl || (urlData?.data ? urlData.data.publicUrl : null) || `https://emynlqikbdwogijqfbfw.supabase.co/storage/v1/object/public/clinic-assets/${filePath}`;
+          } else {
+            publicUrl = item.base64;
+          }
+
+          autoUploadedScansList.push({
+            id: `${Date.now()}_${i}`,
+            title: item.title || `تحليل / أشعة (${new Date().toLocaleDateString('ar-EG')})`,
+            url: publicUrl,
+            created_at: new Date().toISOString()
+          });
+        }
+      }
+
       if (patientRealId) {
+        const dynamicPayload = { 
+          age, 
+          gender, 
+          chronicDiseases, 
+          familyHistory: familyHistoryText, 
+          symptoms: symptomsInput,
+          rheumaDetails: isRheumaSpecialty ? {
+            stiffnessType,
+            stiffnessDuration,
+            provisionalDiagnosis: isQueryDiagnosis ? combinedProvisional : null,
+            jointStates: selectedJointStates,
+            esrCrp: rheumaEsrCrp || null,
+            antiCCP: rheumaAntiCCP || null,
+            rf: rheumaRF || null,
+            ana: rheumaANA || null,
+            antiDsDNA: rheumaAntiDsDNA || null,
+            connective: rheumaConnective || null,
+            apl: rheumaAPL || null,
+            organSafety: rheumaOrganSafety || null,
+            tbScreening: rheumaTbScreening || null
+          } : null
+        };
+
+        if (autoUploadedScansList.length > 0) {
+          dynamicPayload.scans_list = autoUploadedScansList;
+        }
+
         const { error: recErr } = await supabase
           .from('medical_records')
           .insert([{
@@ -1236,34 +1427,23 @@ Return JSON ONLY:
             diagnosis: finalDiagnosis,
             prescriptions: prescribedMeds,
             qr_verification_code: 'VERIFY-' + patientRealCode,
-            dynamic_fields: { 
-              age, 
-              gender, 
-              chronicDiseases, 
-              familyHistory: familyHistoryText, 
-              symptoms: symptomsInput,
-              rheumaDetails: isRheumaSpecialty ? {
-                stiffnessType,
-                stiffnessDuration,
-                provisionalDiagnosis: isQueryDiagnosis ? combinedProvisional : null,
-                jointStates: selectedJointStates,
-                esrCrp: rheumaEsrCrp,
-                antiCCP: rheumaAntiCCP,
-                rf: rheumaRF,
-                ana: rheumaANA,
-                antiDsDNA: rheumaAntiDsDNA,
-                connective: rheumaConnective,
-                apl: rheumaAPL,
-                organSafety: rheumaOrganSafety,
-                tbScreening: rheumaTbScreening
-              } : null
-            }
+            dynamic_fields: dynamicPayload
           }]);
 
         if (recErr) throw new Error('خطأ في حفظ السجل الطبي: ' + recErr.message);
       }
 
-      showAlert("نجاح الحفظ السحابي ✅", `تم حفظ التقرير والسجل الطبي بنجاح!\nكود المريض: [${patientRealCode}]`);
+      const savedScansNote = autoUploadedScansList.length > 0
+        ? `\nتم حفظ (${autoUploadedScansList.length}) صورة تحليل/أشعة تلقائياً في ملف المريض.`
+        : '';
+
+      // تفريغ صور التحاليل المؤقتة بعد حفظها في السحابة
+      if (autoUploadedScansList.length > 0) {
+        setAiScanItems([]);
+        setManualLabsUnlocked(false);
+      }
+
+      showAlert("نجاح الحفظ السحابي ✅", `تم حفظ التقرير والسجل الطبي بنجاح!\nكود المريض: [${patientRealCode}]${savedScansNote}`);
 
       await generatePrescriptionPDF(
         { name: patientName, phone: patientPhone, code: patientRealCode },
@@ -1748,7 +1928,7 @@ Return JSON ONLY:
                         </TouchableOpacity>
                         <Text style={styles.scanGridTitle} numberOfLines={1}>{sc.title}</Text>
                         <TouchableOpacity 
-                          style={styles.scanGridDeleteBtn}
+                          style={styles.scanGridDeleteBtn} 
                           onPress={() => handleDeleteSavedScanFromRecord(sc.recordId, sc.url)}
                         >
                           <Text style={styles.scanGridDeleteText}>🗑️ حذف</Text>
@@ -1804,7 +1984,7 @@ Return JSON ONLY:
                             <Image source={{ uri: item.previewUrl }} style={styles.scanPreviewImg} />
                           )}
                           <TouchableOpacity 
-                            style={styles.deleteScanBtn}
+                            style={styles.deleteScanBtn} 
                             onPress={() => handleRemoveSingleScan(item.id)}
                           >
                             <Text style={styles.deleteScanBtnText}>إزالة ✕</Text>
@@ -1855,6 +2035,105 @@ Return JSON ONLY:
               </View>
             </>
           )}
+
+          {/* الكارت الذكي: التقاط ورفع صور متعددة للتحاليل والأشعة بدقة فائقة + معاينة + حفظ تلقائي */}
+          <View style={styles.card}>
+            <View style={styles.cardHeaderRow}>
+              <Text style={styles.sectionTitle}>📷 تصوير ورفع التحاليل والأشعة بدقة عالية (AI OCR)</Text>
+              {hasAiScanImages && (
+                <TouchableOpacity onPress={handleClearAllAiScanItems} style={styles.deleteScanBtn}>
+                  <Text style={styles.deleteScanBtnText}>🗑️ مسح الكل ({aiScanItems.length})</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+
+            <Text style={styles.label}>
+              التقط بالكاميرا أو ارفع عدة صور للتحاليل والأشعة؛ تُحسّن دقتها تلقائياً لقراءتها بالـ AI وتُحفظ في ملف المريض عند اعتماد الكشف:
+            </Text>
+
+            {Platform.OS === 'web' ? (
+              <View style={styles.aiUploadButtonsRow}>
+                <label style={styles.aiFilePickerLabel}>
+                  📁 اختيار صور من الجهاز (متعدد)
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    onChange={handleSelectMultipleAiScanImages}
+                    style={{ display: 'none' }}
+                  />
+                </label>
+
+                <label style={styles.aiCameraPickerLabel}>
+                  📸 تصوير ورقة تحليل / أشعة بالكاميرا
+                  <input
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    onChange={handleSelectMultipleAiScanImages}
+                    style={{ display: 'none' }}
+                  />
+                </label>
+              </View>
+            ) : null}
+
+            {processingAiImages && (
+              <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 8, marginVertical: 10 }}>
+                <ActivityIndicator color="#00F2FE" size="small" />
+                <Text style={{ color: '#00F2FE', fontSize: 12, fontWeight: 'bold' }}>
+                  جاري رفع دقة الصور وتحسين التباين لقراءة الأرقام بدقة فائقة...
+                </Text>
+              </View>
+            )}
+
+            {hasAiScanImages && (
+              <View style={{ marginTop: 10 }}>
+                <Text style={styles.selectedCodeBadge}>
+                  ✅ تم تجهيز ({aiScanItems.length}) صورة بدقة عالية للقراءة بالـ AI والحفظ التلقائي في ملف المريض:
+                </Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 8 }}>
+                  {aiScanItems.map((item, index) => (
+                    <View key={item.id} style={styles.scanPreviewCard}>
+                      <TouchableOpacity
+                        onPress={() => {
+                          setViewingImageModal({ url: item.previewUrl, title: item.title || `صورة ${index + 1}` });
+                          setZoomScale(1);
+                        }}
+                      >
+                        {Platform.OS === 'web' ? (
+                          <img
+                            src={item.previewUrl}
+                            alt={item.title}
+                            style={{ width: '115px', height: '115px', borderRadius: '8px', objectFit: 'cover', border: '1px solid #0284C7' }}
+                          />
+                        ) : (
+                          <Image source={{ uri: item.previewUrl }} style={styles.scanPreviewImg} />
+                        )}
+                      </TouchableOpacity>
+                      <Text style={styles.scanGridTitle} numberOfLines={1}>{item.title || `صورة ${index + 1}`}</Text>
+                      <View style={{ flexDirection: 'row-reverse', gap: 4, marginTop: 4 }}>
+                        <TouchableOpacity
+                          style={styles.zoomMiniBtn}
+                          onPress={() => {
+                            setViewingImageModal({ url: item.previewUrl, title: item.title || `صورة ${index + 1}` });
+                            setZoomScale(1);
+                          }}
+                        >
+                          <Text style={styles.zoomMiniBtnText}>🔍 معاينة</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={styles.deleteScanBtn}
+                          onPress={() => handleRemoveAiScanItem(item.id)}
+                        >
+                          <Text style={styles.deleteScanBtnText}>✕</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  ))}
+                </ScrollView>
+              </View>
+            )}
+          </View>
 
           {/* اختصاص الروماتيزم والمناعة: التاريخ المرضي (History) أولاً ثم الفحص الإكلينيكي (O/E) */}
           {isRheumaSpecialty && (
@@ -2029,89 +2308,132 @@ Return JSON ONLY:
                 ))}
               </View>
 
-              {/* القسم الثالث: التحاليل والفحوصات المناعية (Serology) */}
-              <Text style={styles.subSectionTitle}>🔬 ثالثاً: التحاليل المناعية ودلالات الالتهاب (Serology & Labs):</Text>
-
-              <Text style={styles.label}>1. سرعة الترسيب والبروتين الالتهابي (ESR / CRP) - الأساس:</Text>
-              <View style={styles.chipsContainer}>
-                {RHEUMA_OPTIONS.esrCrp.map((opt, i) => (
-                  <TouchableOpacity key={i} style={[styles.selectChip, rheumaEsrCrp === opt && styles.selectChipActive]} onPress={() => setRheumaEsrCrp(opt)}>
-                    <Text style={[styles.selectChipText, rheumaEsrCrp === opt && styles.selectChipTextActive]}>{opt}</Text>
+              {/* القسم الثالث: التحاليل والفحوصات المناعية (Serology) مع القفل التلقائي الذكي عند رفع الصور */}
+              <View style={styles.labsSectionHeader}>
+                <Text style={styles.subSectionTitle}>🔬 ثالثاً: التحاليل المناعية ودلالات الالتهاب (Serology & Labs):</Text>
+                {hasAiScanImages && (
+                  <TouchableOpacity
+                    style={[styles.manualLockToggleBtn, manualLabsUnlocked ? styles.manualLockToggleBtnOpen : styles.manualLockToggleBtnLocked]}
+                    onPress={() => setManualLabsUnlocked(prev => !prev)}
+                  >
+                    <Text style={styles.manualLockToggleBtnText}>
+                      {manualLabsUnlocked
+                        ? '🔒 إغلاق الإدخال اليدوي والاعتماد على الصور'
+                        : '🔓 فتح الإدخال اليدوي للتحاليل (بجانب الصور)'}
+                    </Text>
                   </TouchableOpacity>
-                ))}
+                )}
               </View>
 
-              <Text style={styles.label}>2. Anti-CCP:</Text>
-              <View style={styles.chipsContainer}>
-                {RHEUMA_OPTIONS.antiCCP.map((opt, i) => (
-                  <TouchableOpacity key={i} style={[styles.selectChip, rheumaAntiCCP === opt && styles.selectChipActive]} onPress={() => setRheumaAntiCCP(opt)}>
-                    <Text style={[styles.selectChipText, rheumaAntiCCP === opt && styles.selectChipTextActive]}>{opt}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
+              {isManualLabsLocked ? (
+                <View style={styles.lockedLabsBanner}>
+                  <Text style={styles.lockedLabsTitle}>
+                    🔒 الإدخال اليدوي للتحاليل مغلق تلقائياً لعدم التشتيت
+                  </Text>
+                  <Text style={styles.lockedLabsSub}>
+                    تم التقاط/رفع ({aiScanItems.length}) صورة تحليل/أشعة وسيقوم الذكاء الاصطناعي بقراءتها تلقائياً. إذا أردت إدخال أو تعديل تحليل معين يدوياً اضغط على زر "🔓 فتح الإدخال اليدوي" بالأعلى.
+                  </Text>
+                </View>
+              ) : (
+                <View style={styles.labsWrapperBox}>
+                  <Text style={styles.label}>1. سرعة الترسيب والبروتين الالتهابي (ESR / CRP) - اضغط لإلغاء الاختيار:</Text>
+                  <View style={styles.chipsContainer}>
+                    {RHEUMA_OPTIONS.esrCrp.map((opt, i) => (
+                      <TouchableOpacity key={i} style={[styles.selectChip, rheumaEsrCrp === opt && styles.selectChipActive]} onPress={() => toggleSingleChip(opt, rheumaEsrCrp, setRheumaEsrCrp)}>
+                        <Text style={[styles.selectChipText, rheumaEsrCrp === opt && styles.selectChipTextActive]}>{rheumaEsrCrp === opt ? '✓ ' : ''}{opt}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
 
-              <Text style={styles.label}>3. Rheumatoid Factor (RF):</Text>
-              <View style={styles.chipsContainer}>
-                {RHEUMA_OPTIONS.rf.map((opt, i) => (
-                  <TouchableOpacity key={i} style={[styles.selectChip, rheumaRF === opt && styles.selectChipActive]} onPress={() => setRheumaRF(opt)}>
-                    <Text style={[styles.selectChipText, rheumaRF === opt && styles.selectChipTextActive]}>{opt}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
+                  <Text style={styles.label}>2. Anti-CCP:</Text>
+                  <View style={styles.chipsContainer}>
+                    {RHEUMA_OPTIONS.antiCCP.map((opt, i) => (
+                      <TouchableOpacity key={i} style={[styles.selectChip, rheumaAntiCCP === opt && styles.selectChipActive]} onPress={() => toggleSingleChip(opt, rheumaAntiCCP, setRheumaAntiCCP)}>
+                        <Text style={[styles.selectChipText, rheumaAntiCCP === opt && styles.selectChipTextActive]}>{rheumaAntiCCP === opt ? '✓ ' : ''}{opt}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
 
-              <Text style={styles.label}>4. الأجسام المضادة للنوية (ANA):</Text>
-              <View style={styles.chipsContainer}>
-                {RHEUMA_OPTIONS.ana.map((opt, i) => (
-                  <TouchableOpacity key={i} style={[styles.selectChip, rheumaANA === opt && styles.selectChipActive]} onPress={() => setRheumaANA(opt)}>
-                    <Text style={[styles.selectChipText, rheumaANA === opt && styles.selectChipTextActive]}>{opt}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
+                  <Text style={styles.label}>3. Rheumatoid Factor (RF):</Text>
+                  <View style={styles.chipsContainer}>
+                    {RHEUMA_OPTIONS.rf.map((opt, i) => (
+                      <TouchableOpacity key={i} style={[styles.selectChip, rheumaRF === opt && styles.selectChipActive]} onPress={() => toggleSingleChip(opt, rheumaRF, setRheumaRF)}>
+                        <Text style={[styles.selectChipText, rheumaRF === opt && styles.selectChipTextActive]}>{rheumaRF === opt ? '✓ ' : ''}{opt}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
 
-              <Text style={styles.label}>5. أضداد الذئبة (Anti-dsDNA):</Text>
-              <View style={styles.chipsContainer}>
-                {RHEUMA_OPTIONS.antiDsDNA.map((opt, i) => (
-                  <TouchableOpacity key={i} style={[styles.selectChip, rheumaAntiDsDNA === opt && styles.selectChipActive]} onPress={() => setRheumaAntiDsDNA(opt)}>
-                    <Text style={[styles.selectChipText, rheumaAntiDsDNA === opt && styles.selectChipTextActive]}>{opt}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
+                  <Text style={styles.label}>4. الأجسام المضادة للنوية (ANA):</Text>
+                  <View style={styles.chipsContainer}>
+                    {RHEUMA_OPTIONS.ana.map((opt, i) => (
+                      <TouchableOpacity key={i} style={[styles.selectChip, rheumaANA === opt && styles.selectChipActive]} onPress={() => toggleSingleChip(opt, rheumaANA, setRheumaANA)}>
+                        <Text style={[styles.selectChipText, rheumaANA === opt && styles.selectChipTextActive]}>{rheumaANA === opt ? '✓ ' : ''}{opt}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
 
-              <Text style={styles.label}>6. تحاليل الأنسجة المتقدمة (Connective Tissue Profile):</Text>
-              <View style={styles.chipsContainer}>
-                {RHEUMA_OPTIONS.connectiveTissue.map((opt, i) => (
-                  <TouchableOpacity key={i} style={[styles.selectChip, rheumaConnective === opt && styles.selectChipActive]} onPress={() => setRheumaConnective(opt)}>
-                    <Text style={[styles.selectChipText, rheumaConnective === opt && styles.selectChipTextActive]}>{opt}</Text>
+                  {/* زر طي وفتح التحاليل المناعية المتقدمة والأمان */}
+                  <TouchableOpacity
+                    style={styles.advancedLabsToggleBtn}
+                    onPress={() => setShowAdvancedLabs(prev => !prev)}
+                  >
+                    <Text style={styles.advancedLabsToggleText}>
+                      {showAdvancedLabs
+                        ? '▲ إخفاء التحاليل المناعية المتقدمة وفحوصات الأمان (5 - 9)'
+                        : '▼ إظهار التحاليل المناعية المتقدمة وفحوصات الأمان (Anti-dsDNA, APL, LFTs, TB)'}
+                    </Text>
                   </TouchableOpacity>
-                ))}
-              </View>
 
-              <Text style={styles.label}>7. أضداد الأنتيفوسفوليبيد (Anti-Phospholipid):</Text>
-              <View style={styles.chipsContainer}>
-                {RHEUMA_OPTIONS.antiPhospholipid.map((opt, i) => (
-                  <TouchableOpacity key={i} style={[styles.selectChip, rheumaAPL === opt && styles.selectChipActive]} onPress={() => setRheumaAPL(opt)}>
-                    <Text style={[styles.selectChipText, rheumaAPL === opt && styles.selectChipTextActive]}>{opt}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
+                  {showAdvancedLabs && (
+                    <View style={styles.advancedLabsDrawer}>
+                      <Text style={styles.label}>5. أضداد الذئبة (Anti-dsDNA):</Text>
+                      <View style={styles.chipsContainer}>
+                        {RHEUMA_OPTIONS.antiDsDNA.map((opt, i) => (
+                          <TouchableOpacity key={i} style={[styles.selectChip, rheumaAntiDsDNA === opt && styles.selectChipActive]} onPress={() => toggleSingleChip(opt, rheumaAntiDsDNA, setRheumaAntiDsDNA)}>
+                            <Text style={[styles.selectChipText, rheumaAntiDsDNA === opt && styles.selectChipTextActive]}>{rheumaAntiDsDNA === opt ? '✓ ' : ''}{opt}</Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
 
-              <Text style={styles.label}>8. فحص الأمان الكبدي والكلوي (Liver & Kidney Safety):</Text>
-              <View style={styles.chipsContainer}>
-                {RHEUMA_OPTIONS.organSafety.map((opt, i) => (
-                  <TouchableOpacity key={i} style={[styles.selectChip, rheumaOrganSafety === opt && styles.selectChipActive]} onPress={() => setRheumaOrganSafety(opt)}>
-                    <Text style={[styles.selectChipText, rheumaOrganSafety === opt && styles.selectChipTextActive]}>{opt}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
+                      <Text style={styles.label}>6. تحاليل الأنسجة المتقدمة (Connective Tissue Profile):</Text>
+                      <View style={styles.chipsContainer}>
+                        {RHEUMA_OPTIONS.connectiveTissue.map((opt, i) => (
+                          <TouchableOpacity key={i} style={[styles.selectChip, rheumaConnective === opt && styles.selectChipActive]} onPress={() => toggleSingleChip(opt, rheumaConnective, setRheumaConnective)}>
+                            <Text style={[styles.selectChipText, rheumaConnective === opt && styles.selectChipTextActive]}>{rheumaConnective === opt ? '✓ ' : ''}{opt}</Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
 
-              <Text style={styles.label}>9. فحص الدرن وفيروسات الكبد (قبل البيولوجي):</Text>
-              <View style={styles.chipsContainer}>
-                {RHEUMA_OPTIONS.tbScreening.map((opt, i) => (
-                  <TouchableOpacity key={i} style={[styles.selectChip, rheumaTbScreening === opt && styles.selectChipActive]} onPress={() => setRheumaTbScreening(opt)}>
-                    <Text style={[styles.selectChipText, rheumaTbScreening === opt && styles.selectChipTextActive]}>{opt}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
+                      <Text style={styles.label}>7. أضداد الأنتيفوسفوليبيد (Anti-Phospholipid):</Text>
+                      <View style={styles.chipsContainer}>
+                        {RHEUMA_OPTIONS.antiPhospholipid.map((opt, i) => (
+                          <TouchableOpacity key={i} style={[styles.selectChip, rheumaAPL === opt && styles.selectChipActive]} onPress={() => toggleSingleChip(opt, rheumaAPL, setRheumaAPL)}>
+                            <Text style={[styles.selectChipText, rheumaAPL === opt && styles.selectChipTextActive]}>{rheumaAPL === opt ? '✓ ' : ''}{opt}</Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+
+                      <Text style={styles.label}>8. فحص الأمان الكبدي والكلوي (Liver & Kidney Safety):</Text>
+                      <View style={styles.chipsContainer}>
+                        {RHEUMA_OPTIONS.organSafety.map((opt, i) => (
+                          <TouchableOpacity key={i} style={[styles.selectChip, rheumaOrganSafety === opt && styles.selectChipActive]} onPress={() => toggleSingleChip(opt, rheumaOrganSafety, setRheumaOrganSafety)}>
+                            <Text style={[styles.selectChipText, rheumaOrganSafety === opt && styles.selectChipTextActive]}>{rheumaOrganSafety === opt ? '✓ ' : ''}{opt}</Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+
+                      <Text style={styles.label}>9. فحص الدرن وفيروسات الكبد (قبل البيولوجي):</Text>
+                      <View style={styles.chipsContainer}>
+                        {RHEUMA_OPTIONS.tbScreening.map((opt, i) => (
+                          <TouchableOpacity key={i} style={[styles.selectChip, rheumaTbScreening === opt && styles.selectChipActive]} onPress={() => toggleSingleChip(opt, rheumaTbScreening, setRheumaTbScreening)}>
+                            <Text style={[styles.selectChipText, rheumaTbScreening === opt && styles.selectChipTextActive]}>{rheumaTbScreening === opt ? '✓ ' : ''}{opt}</Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    </View>
+                  )}
+                </View>
+              )}
 
               {/* تصنيف التشخيص المبدئي بأيقونات جاهزة + خانة إضافية مرنة */}
               <TouchableOpacity 
@@ -2155,30 +2477,6 @@ Return JSON ONLY:
               )}
             </View>
           )}
-
-          {/* الكارت المخصص لرفع صورة الأشعة/التحاليل للقراءة التلقائية المباشرة بالذكاء الاصطناعي */}
-          <View style={styles.card}>
-            <Text style={styles.sectionTitle}>📷 قراءة الأشعة ورقة التحاليل تلقائياً بالـ AI</Text>
-            <Text style={styles.label}>ارفع ورقة التحليل أو الأشعة مباشرة ليقوم الذكاء الاصطناعي بقراءتها أثناء عملية التشخيص:</Text>
-            
-            {Platform.OS === 'web' ? (
-              <input 
-                type="file" 
-                accept="image/*" 
-                onChange={handleSelectAiScanImage}
-                style={{ marginBottom: 10, color: '#00F2FE' }}
-              />
-            ) : null}
-
-            {aiScanPreviewUrl ? (
-              <View style={styles.scanPreviewBox}>
-                <Image source={{ uri: aiScanPreviewUrl }} style={{ width: 140, height: 140, borderRadius: 8 }} resizeMode="contain" />
-                <TouchableOpacity onPress={() => { setAiScanFile(null); setAiScanPreviewUrl(''); setAiScanBase64(''); }} style={styles.deleteImgBtn}>
-                  <Text style={styles.deleteImgBtnText}>🗑️ إزالة الصورة</Text>
-                </TouchableOpacity>
-              </View>
-            ) : null}
-          </View>
 
           <View style={styles.card}>
             <Text style={styles.sectionTitle}>🩺 ملاحظات وتوجيهات إضافية (اختياري)</Text>
@@ -2469,6 +2767,128 @@ const styles = StyleSheet.create({
   chipRed: { backgroundColor: '#7F1D1D', borderWidth: 1, borderColor: '#EF4444' },
   chipBlue: { backgroundColor: '#1E3A8A', borderWidth: 1, borderColor: '#3B82F6' },
   selectedJointChipText: { color: '#FFFFFF', fontSize: 11, fontWeight: 'bold' },
+
+  // --- أنماط المرحلة 3: القفل التلقائي الذكي للتحاليل ورفع الصور المتعددة ---
+  aiUploadButtonsRow: {
+    flexDirection: 'row-reverse',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginTop: 6,
+    marginBottom: 10
+  },
+  aiFilePickerLabel: {
+    backgroundColor: '#0284C7',
+    color: '#FFFFFF',
+    padding: '10px 14px',
+    borderRadius: '8px',
+    fontSize: '12px',
+    fontWeight: 'bold',
+    cursor: 'pointer',
+    border: '1px solid #00F2FE',
+    display: 'inline-block',
+    textAlign: 'center'
+  },
+  aiCameraPickerLabel: {
+    backgroundColor: '#047857',
+    color: '#FFFFFF',
+    padding: '10px 14px',
+    borderRadius: '8px',
+    fontSize: '12px',
+    fontWeight: 'bold',
+    cursor: 'pointer',
+    border: '1px solid #10B981',
+    display: 'inline-block',
+    textAlign: 'center'
+  },
+  zoomMiniBtn: {
+    backgroundColor: '#0284C7',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+    marginTop: 4
+  },
+  zoomMiniBtnText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: 'bold'
+  },
+  labsSectionHeader: {
+    marginTop: 10,
+    marginBottom: 6
+  },
+  manualLockToggleBtn: {
+    paddingVertical: 9,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    alignItems: 'center',
+    marginTop: 4,
+    marginBottom: 8
+  },
+  manualLockToggleBtnLocked: {
+    backgroundColor: '#1E293B',
+    borderColor: '#00F2FE'
+  },
+  manualLockToggleBtnOpen: {
+    backgroundColor: '#7F1D1D',
+    borderColor: '#EF4444'
+  },
+  manualLockToggleBtnText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: 'bold'
+  },
+  lockedLabsBanner: {
+    backgroundColor: 'rgba(2, 132, 199, 0.14)',
+    borderWidth: 1,
+    borderColor: '#0284C7',
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 12
+  },
+  lockedLabsTitle: {
+    color: '#00F2FE',
+    fontSize: 12,
+    fontWeight: 'bold',
+    textAlign: 'right',
+    marginBottom: 4
+  },
+  lockedLabsSub: {
+    color: '#CBD5E1',
+    fontSize: 11,
+    textAlign: 'right',
+    lineHeight: 18
+  },
+  labsWrapperBox: {
+    backgroundColor: 'rgba(6, 9, 17, 0.45)',
+    padding: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#1E293B',
+    marginBottom: 10
+  },
+  advancedLabsToggleBtn: {
+    backgroundColor: '#1E293B',
+    paddingVertical: 9,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#334155',
+    alignItems: 'center',
+    marginTop: 4,
+    marginBottom: 8
+  },
+  advancedLabsToggleText: {
+    color: '#38BDF8',
+    fontSize: 11,
+    fontWeight: 'bold'
+  },
+  advancedLabsDrawer: {
+    marginTop: 6,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#1E293B'
+  },
 
   queryCheckBtn: { backgroundColor: '#1E293B', padding: 12, borderRadius: 8, borderWidth: 1, borderColor: '#334155', alignItems: 'center', marginTop: 8 },
   queryCheckBtnActive: { backgroundColor: '#0284C7', borderColor: '#00F2FE' },
