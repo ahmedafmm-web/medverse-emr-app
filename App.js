@@ -14,57 +14,73 @@ import DoctorDashboard from './screens/DoctorDashboard';
 import PatientPortal from './screens/PatientPortal';
 import { supabase } from './supabaseClient';
 
-// --- معالجة وتحسين دقة وتباين الصور على الهاتف قبل إرسالها للكمبيوتر ---
-const enhanceMobileScanImage = (file, maxWidth = 2800, quality = 0.95) => {
+// --- معالجة وتحسين دقة وتباين الصور على الهاتف قبل إرسالها للكمبيوتر بأمان ---
+const enhanceMobileScanImage = (file, maxWidth = 2200, quality = 0.92) => {
   return new Promise((resolve) => {
+    const rawPreviewUrl = URL.createObjectURL(file);
     try {
-      const objectUrl = URL.createObjectURL(file);
       const img = new window.Image();
-      img.src = objectUrl;
       img.onload = () => {
-        URL.revokeObjectURL(objectUrl);
-        const canvas = document.createElement('canvas');
-        let width = img.width;
-        let height = img.height;
+        try {
+          const canvas = document.createElement('canvas');
+          let width = img.naturalWidth || img.width;
+          let height = img.naturalHeight || img.height;
 
-        if (width > maxWidth) {
-          height = Math.round((height * maxWidth) / width);
-          width = maxWidth;
-        } else if (width < 1400) {
-          const scale = Math.min(1800 / width, 1.5);
-          width = Math.round(width * scale);
-          height = Math.round(height * scale);
+          if (!width || !height) {
+            resolve({ blob: file, previewUrl: rawPreviewUrl });
+            return;
+          }
+
+          if (width > maxWidth) {
+            height = Math.round((height * maxWidth) / width);
+            width = maxWidth;
+          } else if (width < 1400) {
+            const scale = Math.min(1800 / width, 1.5);
+            width = Math.round(width * scale);
+            height = Math.round(height * scale);
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            resolve({ blob: file, previewUrl: rawPreviewUrl });
+            return;
+          }
+
+          ctx.imageSmoothingEnabled = true;
+          ctx.imageSmoothingQuality = 'high';
+
+          if (typeof ctx.filter !== 'undefined') {
+            ctx.filter = 'contrast(1.18) brightness(1.04) saturate(1.05)';
+          }
+          ctx.drawImage(img, 0, 0, width, height);
+
+          canvas.toBlob(
+            (blob) => {
+              if (blob && blob.size > 0) {
+                URL.revokeObjectURL(rawPreviewUrl);
+                resolve({
+                  blob,
+                  previewUrl: URL.createObjectURL(blob)
+                });
+              } else {
+                resolve({ blob: file, previewUrl: rawPreviewUrl });
+              }
+            },
+            'image/jpeg',
+            quality
+          );
+        } catch (canvasErr) {
+          resolve({ blob: file, previewUrl: rawPreviewUrl });
         }
-
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        ctx.imageSmoothingEnabled = true;
-        ctx.imageSmoothingQuality = 'high';
-
-        if (typeof ctx.filter !== 'undefined') {
-          ctx.filter = 'contrast(1.18) brightness(1.04) saturate(1.05)';
-        }
-        ctx.drawImage(img, 0, 0, width, height);
-
-        canvas.toBlob(
-          (blob) => {
-            const finalBlob = blob || file;
-            resolve({
-              blob: finalBlob,
-              previewUrl: URL.createObjectURL(finalBlob)
-            });
-          },
-          'image/jpeg',
-          quality
-        );
       };
       img.onerror = () => {
-        URL.revokeObjectURL(objectUrl);
-        resolve({ blob: file, previewUrl: URL.createObjectURL(file) });
+        resolve({ blob: file, previewUrl: rawPreviewUrl });
       };
+      img.src = rawPreviewUrl;
     } catch (e) {
-      resolve({ blob: file, previewUrl: URL.createObjectURL(file) });
+      resolve({ blob: file, previewUrl: rawPreviewUrl });
     }
   });
 };
@@ -82,21 +98,43 @@ function MobileScannerBridge({ sessionId }) {
     setUploading(true);
     setStatusMessage(`جاري رفع وتحسين دقة (${files.length}) صورة وإرسالها للكمبيوتر...`);
 
-    try {
-      const newlyUploaded = [];
+    const batchTimestamp = Date.now();
+    let successCount = 0;
 
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        const enhanced = await enhanceMobileScanImage(file, 2800, 0.95);
-        const timestamp = Date.now();
-        const uniqueId = Math.random().toString(36).substring(2, 8);
-        const filePath = `qr_sessions/${sessionId}/${timestamp}_${uniqueId}_${i}.jpg`;
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const uniqueId = Math.random().toString(36).substring(2, 8);
+      const paddedIndex = String(i).padStart(3, '0');
+      const itemId = `${batchTimestamp}_${paddedIndex}_${uniqueId}`;
+      const instantLocalUrl = URL.createObjectURL(file);
+      const photoTitle = file.name
+        ? file.name.replace(/\.[^/.]+$/, '')
+        : `صورة من الهاتف ${sentPhotos.length + i + 1}`;
+
+      // 1. إظهار الصورة فوراً على شاشة الموبايل قبل انتظار السيرفر
+      setSentPhotos((prev) => [
+        ...prev,
+        {
+          id: itemId,
+          localUrl: instantLocalUrl,
+          url: '',
+          title: photoTitle,
+          status: 'uploading',
+          errorText: '',
+          createdAt: new Date().toISOString()
+        }
+      ]);
+
+      try {
+        const enhanced = await enhanceMobileScanImage(file, 2200, 0.92);
+        const fileName = `${itemId}.jpg`;
+        const filePath = `qr_sessions/${sessionId}/${fileName}`;
 
         const { error: uploadErr } = await supabase.storage
           .from('clinic-assets')
           .upload(filePath, enhanced.blob, {
             contentType: 'image/jpeg',
-            upsert: true
+            upsert: false
           });
 
         if (uploadErr) {
@@ -111,36 +149,47 @@ function MobileScannerBridge({ sessionId }) {
           urlData?.publicUrl ||
           `https://emynlqikbdwogijqfbfw.supabase.co/storage/v1/object/public/clinic-assets/${filePath}`;
 
-        newlyUploaded.push({
-          id: `${timestamp}_${uniqueId}_${i}`,
-          url: publicUrl,
-          title: file.name ? file.name.replace(/\.[^/.]+$/, '') : `صورة من الهاتف ${sentPhotos.length + i + 1}`,
-          createdAt: new Date().toISOString()
-        });
+        // 2. تسجيل الصورة في جدول الجلسات اللحظي لضمان التقاطها فوراً على اللابتوب بدون Cache
+        const { error: dbErr } = await supabase
+          .from('qr_session_photos')
+          .insert([
+            {
+              session_id: sessionId,
+              file_name: fileName,
+              public_url: publicUrl
+            }
+          ]);
+
+        if (dbErr) {
+          throw new Error(dbErr.message || 'فشل تسجيل الصورة في جلسة المزامنة');
+        }
+
+        successCount++;
+        setSentPhotos((prev) =>
+          prev.map((item) =>
+            item.id === itemId
+              ? { ...item, localUrl: enhanced.previewUrl, url: publicUrl, status: 'sent' }
+              : item
+          )
+        );
+      } catch (err) {
+        setSentPhotos((prev) =>
+          prev.map((item) =>
+            item.id === itemId
+              ? { ...item, status: 'error', errorText: err.message }
+              : item
+          )
+        );
+        setStatusMessage(`❌ خطأ أثناء الإرسال: ${err.message}`);
       }
-
-      const updatedAll = [...sentPhotos, ...newlyUploaded];
-      setSentPhotos(updatedAll);
-
-      // تحديث ملف الجلسة اللحظي (manifest.json) ليلتقطه اللابتوب في أقل من ثانية
-      const manifestBlob = new Blob([JSON.stringify({ sessionId, items: updatedAll, updatedAt: Date.now() })], {
-        type: 'application/json'
-      });
-
-      await supabase.storage
-        .from('clinic-assets')
-        .upload(`qr_sessions/${sessionId}/manifest.json`, manifestBlob, {
-          contentType: 'application/json',
-          upsert: true
-        });
-
-      setStatusMessage(`✅ تم إرسال (${newlyUploaded.length}) صورة بنجاح! ظهرت الآن على شاشة الطبيب. يمكنك تصوير المزيد...`);
-    } catch (err) {
-      setStatusMessage(`❌ خطأ أثناء الإرسال: ${err.message}`);
-    } finally {
-      setUploading(false);
-      if (event.target) event.target.value = '';
     }
+
+    if (successCount > 0) {
+      setStatusMessage(`✅ تم إرسال (${successCount}) صورة بنجاح! ظهرت الآن على شاشة الطبيب. يمكنك تصوير المزيد...`);
+    }
+
+    setUploading(false);
+    if (event.target) event.target.value = '';
   };
 
   return (
@@ -198,16 +247,34 @@ function MobileScannerBridge({ sessionId }) {
             </Text>
             <View style={scannerStyles.thumbsGrid}>
               {sentPhotos.map((item, idx) => (
-                <View key={item.id} style={scannerStyles.thumbCard}>
+                <View
+                  key={item.id}
+                  style={[
+                    scannerStyles.thumbCard,
+                    item.status === 'error' && { borderColor: '#EF4444' },
+                    item.status === 'uploading' && { borderColor: '#F59E0B' }
+                  ]}
+                >
                   {Platform.OS === 'web' && (
                     <img
-                      src={item.url}
+                      src={item.localUrl || item.url}
                       alt={item.title}
                       style={{ width: '100%', height: '85px', borderRadius: '6px', objectFit: 'cover' }}
                     />
                   )}
-                  <Text style={scannerStyles.thumbLabel} numberOfLines={1}>
-                    #{idx + 1} تم الإرسال ✓
+                  <Text
+                    style={[
+                      scannerStyles.thumbLabel,
+                      item.status === 'error' && { color: '#EF4444' },
+                      item.status === 'uploading' && { color: '#F59E0B' }
+                    ]}
+                    numberOfLines={2}
+                  >
+                    {item.status === 'uploading'
+                      ? `⏳ #${idx + 1} جاري الرفع...`
+                      : item.status === 'error'
+                      ? `❌ ${item.errorText}`
+                      : `#${idx + 1} تم الإرسال ✓`}
                   </Text>
                 </View>
               ))}
