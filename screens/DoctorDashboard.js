@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   StyleSheet, Text, View, TextInput, ScrollView, 
   TouchableOpacity, Alert, ActivityIndicator, Platform, Image, Linking, Modal
@@ -291,6 +291,22 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
   const [processingAiImages, setProcessingAiImages] = useState(false);
   const [manualLabsUnlocked, setManualLabsUnlocked] = useState(false);
 
+  // --- حالات نافذة الكاميرا الحية المدمجة للكمبيوتر واللابتوب (USB / External Webcam) ---
+  const [showLiveCameraModal, setShowLiveCameraModal] = useState(false);
+  const [cameraDevices, setCameraDevices] = useState([]);
+  const [selectedCameraId, setSelectedCameraId] = useState('');
+  const [cameraError, setCameraError] = useState('');
+  const [cameraStarting, setCameraStarting] = useState(false);
+  const liveVideoRef = useRef(null);
+  const liveStreamRef = useRef(null);
+
+  // --- حالات نافذة ربط كاميرا الهاتف الذكي عبر QR Code (Live Session Bridge) ---
+  const [showQrBridgeModal, setShowQrBridgeModal] = useState(false);
+  const [qrBridgeSessionId, setQrBridgeSessionId] = useState('');
+  const [qrReceivedCount, setQrReceivedCount] = useState(0);
+  const [qrSyncStatus, setQrSyncStatus] = useState('في انتظار مسح رمز الـ QR بكاميرا الهاتف...');
+  const syncedQrItemIdsRef = useRef(new Set());
+
   const [symptomsInput, setSymptomsInput] = useState('');
   const [doctorNotes, setDoctorNotes] = useState('');
   const [scanGroupTitle, setScanGroupTitle] = useState('');
@@ -441,6 +457,225 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
     }, 30000);
     return () => clearInterval(timer);
   }, [subscriptionAccess.expiryDate]);
+
+  // --- دوال تشغيل وإدارة الكاميرا الحية المدمجة والمنفصلة (USB / External Webcam) ---
+  const stopLiveCameraStream = () => {
+    if (liveStreamRef.current) {
+      liveStreamRef.current.getTracks().forEach(track => track.stop());
+      liveStreamRef.current = null;
+    }
+    if (liveVideoRef.current) {
+      liveVideoRef.current.srcObject = null;
+    }
+  };
+
+  const startLiveCameraStream = async (preferredDeviceId = '') => {
+    if (Platform.OS !== 'web' || typeof navigator === 'undefined' || !navigator.mediaDevices) {
+      setCameraError('الكاميرا الحية مدعومة في متصفح الويب على الكمبيوتر واللابتوب.');
+      return;
+    }
+    setCameraStarting(true);
+    setCameraError('');
+    stopLiveCameraStream();
+
+    try {
+      const videoConstraints = preferredDeviceId
+        ? { deviceId: { exact: preferredDeviceId }, width: { ideal: 1920 }, height: { ideal: 1080 } }
+        : { width: { ideal: 1920 }, height: { ideal: 1080 } };
+
+      const stream = await navigator.mediaDevices.getUserMedia({ video: videoConstraints, audio: false });
+      liveStreamRef.current = stream;
+
+      if (liveVideoRef.current) {
+        liveVideoRef.current.srcObject = stream;
+        await liveVideoRef.current.play().catch(() => {});
+      }
+
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const videoInputs = devices.filter(d => d.kind === 'videoinput');
+      setCameraDevices(videoInputs);
+
+      const activeTrack = stream.getVideoTracks()[0];
+      const activeSettings = activeTrack ? activeTrack.getSettings() : {};
+      if (activeSettings.deviceId) {
+        setSelectedCameraId(activeSettings.deviceId);
+      } else if (videoInputs.length > 0 && !preferredDeviceId) {
+        setSelectedCameraId(videoInputs[0].deviceId);
+      }
+    } catch (err) {
+      setCameraError(`تعذر تشغيل الكاميرا: ${err.message || 'تأكد من توصيل الكاميرا ومنح صلاحية الوصول للمتصفح.'}`);
+    } finally {
+      setCameraStarting(false);
+    }
+  };
+
+  const handleOpenLiveCameraModal = () => {
+    setShowLiveCameraModal(true);
+    setTimeout(() => {
+      startLiveCameraStream(selectedCameraId);
+    }, 150);
+  };
+
+  const handleCloseLiveCameraModal = () => {
+    stopLiveCameraStream();
+    setShowLiveCameraModal(false);
+    setCameraError('');
+  };
+
+  const handleSwitchCameraDevice = (newDeviceId) => {
+    setSelectedCameraId(newDeviceId);
+    startLiveCameraStream(newDeviceId);
+  };
+
+  const handleCaptureFromLiveCamera = async () => {
+    const videoEl = liveVideoRef.current;
+    if (!videoEl || !videoEl.videoWidth || !videoEl.videoHeight) {
+      showAlert('تنبيه', 'الكاميرا لم تكتمل تهيئتها بعد، انتظر لحظة ثم اضغط التقاط.');
+      return;
+    }
+
+    setProcessingAiImages(true);
+    try {
+      const rawCanvas = document.createElement('canvas');
+      rawCanvas.width = videoEl.videoWidth;
+      rawCanvas.height = videoEl.videoHeight;
+      const ctx = rawCanvas.getContext('2d');
+      ctx.drawImage(videoEl, 0, 0, rawCanvas.width, rawCanvas.height);
+
+      const rawBlob = await new Promise(resolve => rawCanvas.toBlob(resolve, 'image/jpeg', 0.96));
+      if (!rawBlob) throw new Error('فشل التقاط الإطار من الكاميرا');
+
+      const enhanced = await enhanceScanImageForAI(rawBlob, 2800, 0.95);
+      const captureNumber = aiScanItems.length + 1;
+      const newItem = {
+        id: `cam_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+        blob: enhanced.blob,
+        previewUrl: enhanced.previewUrl,
+        base64: enhanced.base64,
+        title: `لقطة كاميرا مباشرة #${captureNumber}`
+      };
+
+      setAiScanItems(prev => {
+        if (prev.length === 0) {
+          setManualLabsUnlocked(false);
+        }
+        return [...prev, newItem];
+      });
+    } catch (err) {
+      showAlert('خطأ في الالتقاط', err.message || 'تعذر التقاط الصورة من الكاميرا.');
+    } finally {
+      setProcessingAiImages(false);
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      stopLiveCameraStream();
+    };
+  }, []);
+
+  // --- دوال إدارة نافذة ربط كاميرا الهاتف الذكي عبر QR Code والمزامنة اللحظية ---
+  const handleOpenQrBridgeModal = () => {
+    const sessionCode = `SCAN-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+    syncedQrItemIdsRef.current = new Set();
+    setQrBridgeSessionId(sessionCode);
+    setQrReceivedCount(0);
+    setQrSyncStatus('امسح رمز الـ QR بكاميرا هاتفك، وكل صورة تلتقطها ستظهر هنا فوراً...');
+    setShowQrBridgeModal(true);
+  };
+
+  const handleCloseQrBridgeModal = () => {
+    setShowQrBridgeModal(false);
+  };
+
+  useEffect(() => {
+    if (!showQrBridgeModal || !qrBridgeSessionId) return;
+
+    let isCancelled = false;
+
+    const urlToScanItem = async (remoteItem, indexNumber) => {
+      const res = await fetch(remoteItem.url);
+      const blob = await res.blob();
+      const base64 = await new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result);
+        reader.readAsDataURL(blob);
+      });
+      return {
+        id: `qr_${remoteItem.id}`,
+        blob,
+        previewUrl: URL.createObjectURL(blob),
+        base64,
+        title: remoteItem.title || `صورة من الهاتف #${indexNumber}`
+      };
+    };
+
+    const pollQrManifest = async () => {
+      try {
+        const manifestPath = `qr_sessions/${qrBridgeSessionId}/manifest.json`;
+        const { data: urlData } = supabase.storage.from('clinic-assets').getPublicUrl(manifestPath);
+        const basePublicUrl =
+          urlData?.publicUrl ||
+          `https://emynlqikbdwogijqfbfw.supabase.co/storage/v1/object/public/clinic-assets/${manifestPath}`;
+
+        const response = await fetch(`${basePublicUrl}?t=${Date.now()}`, { cache: 'no-store' });
+        if (!response.ok) return;
+
+        const manifest = await response.json();
+        const remoteItems = Array.isArray(manifest?.items) ? manifest.items : [];
+        const unsynced = remoteItems.filter(item => item?.id && !syncedQrItemIdsRef.current.has(item.id));
+
+        if (unsynced.length > 0 && !isCancelled) {
+          setQrSyncStatus(`📥 جاري استلام (${unsynced.length}) صورة جديدة من الهاتف...`);
+          const convertedItems = [];
+
+          for (let i = 0; i < unsynced.length; i++) {
+            const rItem = unsynced[i];
+            syncedQrItemIdsRef.current.add(rItem.id);
+            try {
+              const converted = await urlToScanItem(rItem, syncedQrItemIdsRef.current.size);
+              convertedItems.push(converted);
+            } catch (fetchErr) {
+              syncedQrItemIdsRef.current.delete(rItem.id);
+            }
+          }
+
+          if (convertedItems.length > 0 && !isCancelled) {
+            setAiScanItems(prev => {
+              if (prev.length === 0) {
+                setManualLabsUnlocked(false);
+              }
+              return [...prev, ...convertedItems];
+            });
+            const totalNow = syncedQrItemIdsRef.current.size;
+            setQrReceivedCount(totalNow);
+            setQrSyncStatus(`✅ تم استلام (${totalNow}) صورة من الهاتف وإضافتها للمعاينة تلقائياً! الجلسة مستمرة لتصوير المزيد...`);
+          }
+        }
+      } catch (e) {
+        // انتظار إنشاء manifest.json من الهاتف
+      }
+    };
+
+    const intervalId = setInterval(pollQrManifest, 1500);
+    return () => {
+      isCancelled = true;
+      clearInterval(intervalId);
+    };
+  }, [showQrBridgeModal, qrBridgeSessionId]);
+
+  const qrTargetUrl = (() => {
+    if (!qrBridgeSessionId) return '';
+    const origin =
+      Platform.OS === 'web' && typeof window !== 'undefined'
+        ? window.location.origin.split('?')[0]
+        : 'https://medverse-emr-suite.vercel.app';
+    return `${origin}?scan_session=${encodeURIComponent(qrBridgeSessionId)}`;
+  })();
+
+  const qrCodeImageUrl = qrTargetUrl
+    ? `https://api.qrserver.com/v1/create-qr-code/?size=240x240&margin=10&data=${encodeURIComponent(qrTargetUrl)}`
+    : '';
 
   const compressImage = (file, maxWidth = 2400, quality = 0.92) => {
     return new Promise((resolve) => {
@@ -1603,6 +1838,135 @@ Return JSON ONLY:
 
   return (
     <ScrollView style={styles.container}>
+      {/* Live Desktop/USB Camera Modal */}
+      <Modal visible={showLiveCameraModal} transparent animationType="fade">
+        <View style={styles.bridgeModalOverlay}>
+          <View style={styles.bridgeModalCard}>
+            <View style={styles.bridgeModalHeader}>
+              <Text style={styles.bridgeModalTitle}>📸 الكاميرا الحية (لابتوب / كاميرا USB منفصلة)</Text>
+              <TouchableOpacity style={styles.bridgeCloseBtn} onPress={handleCloseLiveCameraModal}>
+                <Text style={styles.bridgeCloseBtnText}>إغلاق ✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            {Platform.OS === 'web' && cameraDevices.length > 0 && (
+              <View style={{ marginBottom: 10 }}>
+                <Text style={styles.label}>اختر مصدر الكاميرا (المدمجة أو كاميرا USB خارجية):</Text>
+                <select
+                  value={selectedCameraId}
+                  onChange={(e) => handleSwitchCameraDevice(e.target.value)}
+                  style={styles.cameraSelectDropdown}
+                >
+                  {cameraDevices.map((dev, idx) => (
+                    <option key={dev.deviceId || idx} value={dev.deviceId}>
+                      {dev.label || `كاميرا متصلة #${idx + 1}`}
+                    </option>
+                  ))}
+                </select>
+              </View>
+            )}
+
+            <View style={styles.liveVideoFrame}>
+              {cameraStarting && (
+                <View style={styles.cameraOverlayMsg}>
+                  <ActivityIndicator size="large" color="#00F2FE" />
+                  <Text style={{ color: '#00F2FE', fontSize: 12, marginTop: 8, fontWeight: 'bold' }}>
+                    جاري تشغيل الكاميرا بأعلى دقة...
+                  </Text>
+                </View>
+              )}
+              {cameraError ? (
+                <View style={styles.cameraOverlayMsg}>
+                  <Text style={{ color: '#FCA5A5', fontSize: 13, textAlign: 'center', lineHeight: 20 }}>
+                    ⚠️ {cameraError}
+                  </Text>
+                  <TouchableOpacity
+                    style={[styles.bridgePrimaryBtn, { marginTop: 12 }]}
+                    onPress={() => startLiveCameraStream(selectedCameraId)}
+                  >
+                    <Text style={styles.bridgeBtnText}>🔄 إعادة محاولة تشغيل الكاميرا</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : Platform.OS === 'web' ? (
+                <video
+                  ref={liveVideoRef}
+                  autoPlay
+                  playsInline
+                  muted
+                  style={{ width: '100%', height: '300px', objectFit: 'contain', backgroundColor: '#000', borderRadius: '10px' }}
+                />
+              ) : null}
+            </View>
+
+            <View style={styles.bridgeActionRow}>
+              <TouchableOpacity
+                style={[styles.bridgeCaptureBtn, (cameraStarting || !!cameraError || processingAiImages) && { opacity: 0.5 }]}
+                onPress={handleCaptureFromLiveCamera}
+                disabled={cameraStarting || !!cameraError || processingAiImages}
+              >
+                {processingAiImages ? (
+                  <ActivityIndicator color="#FFFFFF" size="small" />
+                ) : (
+                  <Text style={styles.bridgeBtnText}>📸 التقاط الصورة وإضافتها للمعاينة ({aiScanItems.length})</Text>
+                )}
+              </TouchableOpacity>
+
+              <TouchableOpacity style={styles.bridgeDoneBtn} onPress={handleCloseLiveCameraModal}>
+                <Text style={styles.bridgeBtnText}>✅ تم الانتهاء</Text>
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.bridgeHintText}>
+              💡 يمكنك التقاط عدة أوراق متتالية؛ كل لقطة تُحسّن دقتها فوراً وتُضاف لشبكة المعاينة مع قفل الإدخال اليدوي تلقائياً.
+            </Text>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Mobile QR Camera Bridge Modal */}
+      <Modal visible={showQrBridgeModal} transparent animationType="fade">
+        <View style={styles.bridgeModalOverlay}>
+          <View style={styles.bridgeModalCard}>
+            <View style={styles.bridgeModalHeader}>
+              <Text style={styles.bridgeModalTitle}>📱 ربط كاميرا الهاتف الذكي عبر QR Code</Text>
+              <TouchableOpacity style={styles.bridgeCloseBtn} onPress={handleCloseQrBridgeModal}>
+                <Text style={styles.bridgeCloseBtnText}>إنهاء وإغلاق ✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.bridgeSubText}>
+              امسح الرمز التالي بكاميرا هاتفك لفتح الماسح الضوئي السريع؛ أي صورة تلتقطها بهاتفك ستظهر فوراً في لوحة الكشف الحالية:
+            </Text>
+
+            <View style={styles.qrBoxContainer}>
+              {qrCodeImageUrl ? (
+                Platform.OS === 'web' ? (
+                  <img
+                    src={qrCodeImageUrl}
+                    alt="QR Code"
+                    style={{ width: '210px', height: '210px', borderRadius: '10px', backgroundColor: '#FFFFFF', padding: '6px' }}
+                  />
+                ) : (
+                  <Image source={{ uri: qrCodeImageUrl }} style={{ width: 210, height: 210, borderRadius: 10 }} />
+                )
+              ) : null}
+              <Text style={styles.qrSessionTag}>كود الجلسة الحية: {qrBridgeSessionId}</Text>
+            </View>
+
+            <View style={styles.qrStatusBanner}>
+              <Text style={styles.qrStatusBannerText}>{qrSyncStatus}</Text>
+              {qrReceivedCount > 0 && (
+                <Text style={styles.qrCounterBadge}>📥 إجمالي الصور المستلمة من الهاتف: {qrReceivedCount}</Text>
+              )}
+            </View>
+
+            <TouchableOpacity style={styles.bridgeDoneBtn} onPress={handleCloseQrBridgeModal}>
+              <Text style={styles.bridgeBtnText}>✅ إغلاق النافذة ومتابعة الكشف ({aiScanItems.length} صورة جاهزة)</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
       {/* Lightbox Ultra-Zoom Modal */}
       <Modal visible={!!viewingImageModal} transparent animationType="fade">
         <View style={styles.lightboxOverlay}>
@@ -1851,8 +2215,8 @@ Return JSON ONLY:
             <TextInput 
               style={styles.input} 
               placeholder="أدخل اسم المريض..." 
-              placeholderTextColor="#64748B"
-              value={patientName}
+              placeholderTextColor="#64748B" 
+              value={patientName} 
               onChangeText={handleSearchPatientByName}
             />
 
@@ -1871,10 +2235,10 @@ Return JSON ONLY:
                 <TextInput 
                   style={styles.input} 
                   placeholder="مثال: 58" 
-                  placeholderTextColor="#64748B"
-                  keyboardType="numeric"
-                  value={age}
-                  onChangeText={setAge}
+                  placeholderTextColor="#64748B" 
+                  keyboardType="numeric" 
+                  value={age} 
+                  onChangeText={setAge} 
                 />
               </View>
 
@@ -1883,10 +2247,10 @@ Return JSON ONLY:
                 <TextInput 
                   style={styles.input} 
                   placeholder="01xxxxxxxxx" 
-                  placeholderTextColor="#64748B"
-                  keyboardType="phone-pad"
-                  value={patientPhone}
-                  onChangeText={setPatientPhone}
+                  placeholderTextColor="#64748B" 
+                  keyboardType="phone-pad" 
+                  value={patientPhone} 
+                  onChangeText={setPatientPhone} 
                 />
               </View>
             </View>
@@ -2036,7 +2400,7 @@ Return JSON ONLY:
             </>
           )}
 
-          {/* الكارت الذكي: التقاط ورفع صور متعددة للتحاليل والأشعة بدقة فائقة + معاينة + حفظ تلقائي */}
+          {/* الكارت الذكي: التقاط ورفع صور متعددة للتحاليل والأشعة بدقة فائقة + كاميرا حية + ربط QR الهاتف */}
           <View style={styles.card}>
             <View style={styles.cardHeaderRow}>
               <Text style={styles.sectionTitle}>📷 تصوير ورفع التحاليل والأشعة بدقة عالية (AI OCR)</Text>
@@ -2048,7 +2412,7 @@ Return JSON ONLY:
             </View>
 
             <Text style={styles.label}>
-              التقط بالكاميرا أو ارفع عدة صور للتحاليل والأشعة؛ تُحسّن دقتها تلقائياً لقراءتها بالـ AI وتُحفظ في ملف المريض عند اعتماد الكشف:
+              اختر صور من الجهاز، أو افتح الكاميرا الحية (لابتوب / كاميرا USB)، أو اربط كاميرا هاتفك عبر QR Code للبث الفوري:
             </Text>
 
             {Platform.OS === 'web' ? (
@@ -2064,16 +2428,19 @@ Return JSON ONLY:
                   />
                 </label>
 
-                <label style={styles.aiCameraPickerLabel}>
-                  📸 تصوير ورقة تحليل / أشعة بالكاميرا
-                  <input
-                    type="file"
-                    accept="image/*"
-                    capture="environment"
-                    onChange={handleSelectMultipleAiScanImages}
-                    style={{ display: 'none' }}
-                  />
-                </label>
+                <TouchableOpacity
+                  style={styles.aiLiveCamBtn}
+                  onPress={handleOpenLiveCameraModal}
+                >
+                  <Text style={styles.aiActionBtnText}>📸 الكاميرا الحية (لابتوب / USB)</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.aiQrBridgeBtn}
+                  onPress={handleOpenQrBridgeModal}
+                >
+                  <Text style={styles.aiActionBtnText}>📱 ربط كاميرا الهاتف (QR)</Text>
+                </TouchableOpacity>
               </View>
             ) : null}
 
@@ -2788,18 +3155,194 @@ const styles = StyleSheet.create({
     display: 'inline-block',
     textAlign: 'center'
   },
-  aiCameraPickerLabel: {
+  aiLiveCamBtn: {
     backgroundColor: '#047857',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#10B981',
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
+  aiQrBridgeBtn: {
+    backgroundColor: '#6D28D9',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#A78BFA',
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
+  aiActionBtnText: {
     color: '#FFFFFF',
-    padding: '10px 14px',
+    fontSize: 12,
+    fontWeight: 'bold'
+  },
+
+  // --- أنماط نافذة الكاميرا الحية ونافذة ربط الهاتف QR ---
+  bridgeModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(6, 9, 17, 0.92)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16
+  },
+  bridgeModalCard: {
+    width: '100%',
+    maxWidth: 540,
+    backgroundColor: '#0F172A',
+    borderRadius: 18,
+    padding: 18,
+    borderWidth: 1,
+    borderColor: '#0284C7'
+  },
+  bridgeModalHeader: {
+    flexDirection: 'row-reverse',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#1E293B',
+    paddingBottom: 10
+  },
+  bridgeModalTitle: {
+    color: '#00F2FE',
+    fontSize: 14,
+    fontWeight: 'bold',
+    flex: 1,
+    textAlign: 'right'
+  },
+  bridgeCloseBtn: {
+    backgroundColor: '#991B1B',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 6
+  },
+  bridgeCloseBtnText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: 'bold'
+  },
+  bridgeSubText: {
+    color: '#CBD5E1',
+    fontSize: 12,
+    textAlign: 'right',
+    lineHeight: 19,
+    marginBottom: 12
+  },
+  cameraSelectDropdown: {
+    width: '100%',
+    backgroundColor: '#060911',
+    color: '#FFFFFF',
+    border: '1px solid #0284C7',
     borderRadius: '8px',
+    padding: '10px',
     fontSize: '12px',
     fontWeight: 'bold',
-    cursor: 'pointer',
-    border: '1px solid #10B981',
-    display: 'inline-block',
+    direction: 'rtl'
+  },
+  liveVideoFrame: {
+    width: '100%',
+    minHeight: 260,
+    backgroundColor: '#000000',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#1E293B',
+    overflow: 'hidden',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 12
+  },
+  cameraOverlayMsg: {
+    padding: 20,
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  bridgeActionRow: {
+    flexDirection: 'row-reverse',
+    gap: 8,
+    marginBottom: 10
+  },
+  bridgeCaptureBtn: {
+    flex: 2,
+    backgroundColor: '#059669',
+    paddingVertical: 12,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#10B981'
+  },
+  bridgePrimaryBtn: {
+    backgroundColor: '#0284C7',
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 8,
+    alignItems: 'center'
+  },
+  bridgeDoneBtn: {
+    flex: 1,
+    backgroundColor: '#1E293B',
+    paddingVertical: 12,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#38BDF8'
+  },
+  bridgeBtnText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: 'bold',
     textAlign: 'center'
   },
+  bridgeHintText: {
+    color: '#94A3B8',
+    fontSize: 11,
+    textAlign: 'right',
+    lineHeight: 17
+  },
+  qrBoxContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#060911',
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#1E293B',
+    marginBottom: 12
+  },
+  qrSessionTag: {
+    color: '#38BDF8',
+    fontSize: 11,
+    fontWeight: 'bold',
+    marginTop: 8
+  },
+  qrStatusBanner: {
+    backgroundColor: 'rgba(16, 185, 129, 0.12)',
+    borderWidth: 1,
+    borderColor: '#10B981',
+    borderRadius: 10,
+    padding: 10,
+    marginBottom: 12
+  },
+  qrStatusBannerText: {
+    color: '#E2E8F0',
+    fontSize: 12,
+    textAlign: 'center',
+    fontWeight: '600',
+    lineHeight: 18
+  },
+  qrCounterBadge: {
+    color: '#10B981',
+    fontSize: 12,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginTop: 4
+  },
+
   zoomMiniBtn: {
     backgroundColor: '#0284C7',
     paddingHorizontal: 8,
