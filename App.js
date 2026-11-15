@@ -14,11 +14,31 @@ import DoctorDashboard from './screens/DoctorDashboard';
 import PatientPortal from './screens/PatientPortal';
 import { supabase } from './supabaseClient';
 
-// --- معالجة وتحسين دقة وتباين الصور على الهاتف قبل إرسالها للكمبيوتر بأمان ---
-const enhanceMobileScanImage = (file, maxWidth = 2200, quality = 0.92) => {
-  return new Promise((resolve) => {
-    const rawPreviewUrl = URL.createObjectURL(file);
-    try {
+// --- تحويل DataURL (Base64) إلى Blob جاهز للرفع السحابي ---
+const dataURLtoBlob = (dataUrl) => {
+  const arr = dataUrl.split(',');
+  const mimeMatch = arr[0].match(/:(.*?);/);
+  const mime = mimeMatch ? mimeMatch[1] : 'image/jpeg';
+  const bstr = atob(arr[1]);
+  let n = bstr.length;
+  const u8arr = new Uint8Array(n);
+  while (n--) {
+    u8arr[n] = bstr.charCodeAt(n);
+  }
+  return new Blob([u8arr], { type: mime });
+};
+
+// --- معالجة وتحسين دقة وتباين الصور على الهاتف وإخراج Base64 مستقر يمنع اختفاء الصور ---
+const enhanceMobileScanImageToBase64 = (file, maxWidth = 1800, quality = 0.88) => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const rawDataUrl = e.target?.result;
+      if (!rawDataUrl) {
+        reject(new Error('تعذر قراءة ملف الصورة'));
+        return;
+      }
+
       const img = new window.Image();
       img.onload = () => {
         try {
@@ -27,15 +47,15 @@ const enhanceMobileScanImage = (file, maxWidth = 2200, quality = 0.92) => {
           let height = img.naturalHeight || img.height;
 
           if (!width || !height) {
-            resolve({ blob: file, previewUrl: rawPreviewUrl });
+            resolve(rawDataUrl);
             return;
           }
 
           if (width > maxWidth) {
             height = Math.round((height * maxWidth) / width);
             width = maxWidth;
-          } else if (width < 1400) {
-            const scale = Math.min(1800 / width, 1.5);
+          } else if (width < 1200) {
+            const scale = Math.min(1600 / width, 1.4);
             width = Math.round(width * scale);
             height = Math.round(height * scale);
           }
@@ -44,7 +64,7 @@ const enhanceMobileScanImage = (file, maxWidth = 2200, quality = 0.92) => {
           canvas.height = height;
           const ctx = canvas.getContext('2d');
           if (!ctx) {
-            resolve({ blob: file, previewUrl: rawPreviewUrl });
+            resolve(rawDataUrl);
             return;
           }
 
@@ -52,88 +72,142 @@ const enhanceMobileScanImage = (file, maxWidth = 2200, quality = 0.92) => {
           ctx.imageSmoothingQuality = 'high';
 
           if (typeof ctx.filter !== 'undefined') {
-            ctx.filter = 'contrast(1.18) brightness(1.04) saturate(1.05)';
+            ctx.filter = 'contrast(1.16) brightness(1.03) saturate(1.04)';
           }
           ctx.drawImage(img, 0, 0, width, height);
 
-          canvas.toBlob(
-            (blob) => {
-              if (blob && blob.size > 0) {
-                URL.revokeObjectURL(rawPreviewUrl);
-                resolve({
-                  blob,
-                  previewUrl: URL.createObjectURL(blob)
-                });
-              } else {
-                resolve({ blob: file, previewUrl: rawPreviewUrl });
-              }
-            },
-            'image/jpeg',
-            quality
-          );
-        } catch (canvasErr) {
-          resolve({ blob: file, previewUrl: rawPreviewUrl });
+          const compressedDataUrl = canvas.toDataURL('image/jpeg', quality);
+          resolve(compressedDataUrl || rawDataUrl);
+        } catch (err) {
+          resolve(rawDataUrl);
         }
       };
-      img.onerror = () => {
-        resolve({ blob: file, previewUrl: rawPreviewUrl });
-      };
-      img.src = rawPreviewUrl;
-    } catch (e) {
-      resolve({ blob: file, previewUrl: rawPreviewUrl });
-    }
+      img.onerror = () => resolve(rawDataUrl);
+      img.src = rawDataUrl;
+    };
+    reader.onerror = () => reject(new Error('فشل قراءة الصورة من الجهاز'));
+    reader.readAsDataURL(file);
   });
 };
 
-// --- واجهة الماسح السريع للهاتف المرتبطة بجلسة الطبيب عبر QR Code ---
+// --- واجهة الماسح السريع للهاتف: تجميع ومراجعة الصور ثم الإرسال دفعة واحدة ---
 function MobileScannerBridge({ sessionId }) {
-  const [uploading, setUploading] = useState(false);
-  const [sentPhotos, setSentPhotos] = useState([]);
-  const [statusMessage, setStatusMessage] = useState('جاهز لالتقاط أو اختيار صور التحاليل والأشعة وإرسالها فوراً لشاشة الطبيب');
+  const storageKey = `medverse_qr_queue_${sessionId}`;
 
-  const handleCaptureOrPickFiles = async (event) => {
+  // استرجاع الصور المجمعة من sessionStorage لحمايتها من الضياع إذا أعاد متصفح الهاتف تحميل الصفحة بعد الكاميرا
+  const [queuedPhotos, setQueuedPhotos] = useState(() => {
+    if (Platform.OS === 'web' && typeof window !== 'undefined' && window.sessionStorage) {
+      try {
+        const saved = sessionStorage.getItem(storageKey);
+        return saved ? JSON.parse(saved) : [];
+      } catch (e) {
+        return [];
+      }
+    }
+    return [];
+  });
+
+  const [sentPhotos, setSentPhotos] = useState([]);
+  const [preparing, setPreparing] = useState(false);
+  const [sendingBatch, setSendingBatch] = useState(false);
+  const [sendProgress, setSendProgress] = useState({ current: 0, total: 0 });
+  const [statusMessage, setStatusMessage] = useState(
+    'التقط صوراً بالكاميرا أو اخترها من الاستوديو لتجميعها هنا، ثم اضغط زر الإرسال دفعة واحدة'
+  );
+
+  // مزامنة قائمة الانتظار تلقائياً مع sessionStorage
+  useEffect(() => {
+    if (Platform.OS === 'web' && typeof window !== 'undefined' && window.sessionStorage) {
+      try {
+        sessionStorage.setItem(storageKey, JSON.stringify(queuedPhotos));
+      } catch (e) {
+        // تجاهل في حال امتلاء سعة التخزين المؤقتة
+      }
+    }
+  }, [queuedPhotos, storageKey]);
+
+  // 1. إضافة الصور الملتقطة أو المختارة إلى سلة التجميع دون مسح الصور السابقة
+  const handleAddFilesToQueue = async (event) => {
     const files = Array.from(event.target.files || []);
     if (files.length === 0) return;
 
-    setUploading(true);
-    setStatusMessage(`جاري رفع وتحسين دقة (${files.length}) صورة وإرسالها للكمبيوتر...`);
+    setPreparing(true);
+    setStatusMessage(`جاري تجهيز وتحسين دقة (${files.length}) صورة وإضافتها للقائمة...`);
 
-    const batchTimestamp = Date.now();
-    let successCount = 0;
+    try {
+      const newlyPrepared = [];
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const base64DataUrl = await enhanceMobileScanImageToBase64(file, 1800, 0.88);
+        const uniqueId = `${Date.now()}_${i}_${Math.random().toString(36).substring(2, 7)}`;
+        const title = file.name
+          ? file.name.replace(/\.[^/.]+$/, '')
+          : `ورقة فحص #${queuedPhotos.length + sentPhotos.length + i + 1}`;
 
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-      const uniqueId = Math.random().toString(36).substring(2, 8);
-      const paddedIndex = String(i).padStart(3, '0');
-      const itemId = `${batchTimestamp}_${paddedIndex}_${uniqueId}`;
-      const instantLocalUrl = URL.createObjectURL(file);
-      const photoTitle = file.name
-        ? file.name.replace(/\.[^/.]+$/, '')
-        : `صورة من الهاتف ${sentPhotos.length + i + 1}`;
+        newlyPrepared.push({
+          id: uniqueId,
+          base64: base64DataUrl,
+          title
+        });
+      }
 
-      // 1. إظهار الصورة فوراً على شاشة الموبايل قبل انتظار السيرفر
-      setSentPhotos((prev) => [
-        ...prev,
-        {
-          id: itemId,
-          localUrl: instantLocalUrl,
-          url: '',
-          title: photoTitle,
-          status: 'uploading',
-          errorText: '',
-          createdAt: new Date().toISOString()
-        }
-      ]);
+      setQueuedPhotos((prev) => {
+        const updated = [...prev, ...newlyPrepared];
+        setStatusMessage(
+          `📋 لديك الآن (${updated.length}) صورة جاهزة للمراجعة. يمكنك إضافة المزيد أو الضغط على زر الإرسال بالأسفل.`
+        );
+        return updated;
+      });
+    } catch (err) {
+      setStatusMessage(`⚠️ تعذر تجهيز بعض الصور: ${err.message}`);
+    } finally {
+      setPreparing(false);
+      if (event.target) event.target.value = '';
+    }
+  };
+
+  // 2. حذف صورة من سلة التجميع قبل الإرسال
+  const handleRemoveFromQueue = (id) => {
+    setQueuedPhotos((prev) => {
+      const updated = prev.filter((item) => item.id !== id);
+      if (updated.length === 0) {
+        setStatusMessage('تم مسح القائمة. يمكنك التقاط أو اختيار صور جديدة.');
+      } else {
+        setStatusMessage(`📋 متبقي (${updated.length}) صورة جاهزة للإرسال.`);
+      }
+      return updated;
+    });
+  };
+
+  // 3. إرسال جميع الصور المجمعة دفعة واحدة إلى نظام الطبيب بعد التأكيد
+  const handleSendAllQueuedPhotos = async () => {
+    if (queuedPhotos.length === 0 || sendingBatch) return;
+
+    setSendingBatch(true);
+    const totalToSend = queuedPhotos.length;
+    setSendProgress({ current: 0, total: totalToSend });
+    setStatusMessage(`🚀 جاري إرسال (${totalToSend}) صورة دفعة واحدة إلى شاشة الطبيب...`);
+
+    const successfullySent = [];
+    const failedItems = [];
+    const batchBaseTime = Date.now();
+
+    for (let i = 0; i < queuedPhotos.length; i++) {
+      const item = queuedPhotos[i];
+      setSendProgress({ current: i + 1, total: totalToSend });
 
       try {
-        const enhanced = await enhanceMobileScanImage(file, 2200, 0.92);
-        const fileName = `${itemId}.jpg`;
+        const blob = dataURLtoBlob(item.base64);
+        const paddedIndex = String(i).padStart(3, '0');
+        const uniqueSuffix = Math.random().toString(36).substring(2, 6);
+        const fileName = `${batchBaseTime}_${paddedIndex}_${uniqueSuffix}.jpg`;
         const filePath = `qr_sessions/${sessionId}/${fileName}`;
 
         const { error: uploadErr } = await supabase.storage
           .from('clinic-assets')
-          .upload(filePath, enhanced.blob, {
+          .upload(filePath, blob, {
             contentType: 'image/jpeg',
+            cacheControl: '0',
             upsert: false
           });
 
@@ -149,8 +223,8 @@ function MobileScannerBridge({ sessionId }) {
           urlData?.publicUrl ||
           `https://emynlqikbdwogijqfbfw.supabase.co/storage/v1/object/public/clinic-assets/${filePath}`;
 
-        // 2. تسجيل الصورة في جدول الجلسات اللحظي لضمان التقاطها فوراً على اللابتوب بدون Cache
-        const { error: dbErr } = await supabase
+        // محاولة التسجيل في جدول الجلسات إن وجد (مع عدم إيقاف العملية إذا لم يكن الجدول مفعلاً لأن اللابتوب يقرأ من Storage مباشرة)
+        await supabase
           .from('qr_session_photos')
           .insert([
             {
@@ -158,80 +232,80 @@ function MobileScannerBridge({ sessionId }) {
               file_name: fileName,
               public_url: publicUrl
             }
-          ]);
+          ])
+          .catch(() => {});
 
-        if (dbErr) {
-          throw new Error(dbErr.message || 'فشل تسجيل الصورة في جلسة المزامنة');
-        }
-
-        successCount++;
-        setSentPhotos((prev) =>
-          prev.map((item) =>
-            item.id === itemId
-              ? { ...item, localUrl: enhanced.previewUrl, url: publicUrl, status: 'sent' }
-              : item
-          )
-        );
+        successfullySent.push({
+          ...item,
+          publicUrl,
+          sentAt: new Date().toISOString()
+        });
       } catch (err) {
-        setSentPhotos((prev) =>
-          prev.map((item) =>
-            item.id === itemId
-              ? { ...item, status: 'error', errorText: err.message }
-              : item
-          )
-        );
-        setStatusMessage(`❌ خطأ أثناء الإرسال: ${err.message}`);
+        failedItems.push({
+          ...item,
+          errorText: err.message
+        });
       }
     }
 
-    if (successCount > 0) {
-      setStatusMessage(`✅ تم إرسال (${successCount}) صورة بنجاح! ظهرت الآن على شاشة الطبيب. يمكنك تصوير المزيد...`);
+    if (successfullySent.length > 0) {
+      setSentPhotos((prev) => [...prev, ...successfullySent]);
     }
 
-    setUploading(false);
-    if (event.target) event.target.value = '';
+    setQueuedPhotos(failedItems);
+
+    if (failedItems.length === 0) {
+      if (Platform.OS === 'web' && typeof window !== 'undefined' && window.sessionStorage) {
+        sessionStorage.removeItem(storageKey);
+      }
+      setStatusMessage(
+        `✅ تم إرسال (${successfullySent.length}) صورة دفعة واحدة بنجاح! ظهرت الآن على شاشة الطبيب. يمكنك تصوير دفعة جديدة إذا أردت.`
+      );
+    } else {
+      setStatusMessage(
+        `⚠️ تم إرسال (${successfullySent.length}) صورة، وتعذر إرسال (${failedItems.length}) صورة. اضغط زر الإرسال لإعادة محاولة المتبقي.`
+      );
+    }
+
+    setSendingBatch(false);
   };
 
   return (
     <ScrollView contentContainerStyle={scannerStyles.container}>
       <View style={scannerStyles.card}>
         <Text style={scannerStyles.badge}>📱 LIVE QR CAMERA BRIDGE</Text>
-        <Text style={scannerStyles.title}>ماسح التحاليل والأشعة السريع</Text>
+        <Text style={scannerStyles.title}>ماسح التحاليل والأشعة المجمع</Text>
         <Text style={scannerStyles.sessionCode}>كود الجلسة المتصلة: {sessionId}</Text>
 
         <View style={scannerStyles.statusBox}>
           <Text style={scannerStyles.statusText}>{statusMessage}</Text>
         </View>
 
-        {uploading ? (
-          <View style={{ marginVertical: 20, alignItems: 'center' }}>
-            <ActivityIndicator size="large" color="#00F2FE" />
-            <Text style={{ color: '#00F2FE', marginTop: 10, fontWeight: 'bold', fontSize: 13 }}>
-              جاري المعالجة فائقة الدقة والبث المباشر...
-            </Text>
-          </View>
-        ) : (
+        {/* أزرار الالتقاط والاختيار التراكمي */}
+        {!sendingBatch && (
           <View style={scannerStyles.buttonsColumn}>
             {Platform.OS === 'web' && (
               <>
                 <label style={scannerStyles.cameraBtnLabel}>
-                  📸 تصوير بالكاميرا الآن (إرسال فوري)
+                  📸 التقط صورة بالكاميرا وأضفها للقائمة
                   <input
                     type="file"
                     accept="image/*"
                     capture="environment"
-                    onChange={handleCaptureOrPickFiles}
+                    disabled={preparing}
+                    onChange={handleAddFilesToQueue}
                     style={{ display: 'none' }}
                   />
                 </label>
 
                 <label style={scannerStyles.galleryBtnLabel}>
-                  🖼️ اختيار عدة صور من الاستوديو
+                  🖼️ اختر صورة أو أكثر من الاستوديو
                   <input
                     type="file"
                     accept="image/*"
                     multiple
-                    onChange={handleCaptureOrPickFiles}
+                    disabled={preparing}
+                    onChange={handleAddFilesToQueue}
                     style={{ display: 'none' }}
                   />
                 </label>
@@ -240,41 +314,97 @@ function MobileScannerBridge({ sessionId }) {
           </View>
         )}
 
+        {preparing && (
+          <View style={{ marginVertical: 14, flexDirection: 'row-reverse', alignItems: 'center', gap: 8 }}>
+            <ActivityIndicator size="small" color="#00F2FE" />
+            <Text style={{ color: '#00F2FE', fontWeight: 'bold', fontSize: 12 }}>
+              جاري تحسين وضوح الصورة وإضافتها للسلة...
+            </Text>
+          </View>
+        )}
+
+        {/* قسم 1: الصور المجمعة في انتظار التأكيد والإرسال دفعة واحدة */}
+        {queuedPhotos.length > 0 && (
+          <View style={scannerStyles.queueSection}>
+            <View style={scannerStyles.queueHeaderRow}>
+              <Text style={scannerStyles.queueHeader}>
+                📋 صور جاهزة للإرسال ({queuedPhotos.length}) - راجعها قبل الإرسال:
+              </Text>
+              {!sendingBatch && (
+                <TouchableOpacity
+                  onPress={() => setQueuedPhotos([])}
+                  style={scannerStyles.clearQueueBtn}
+                >
+                  <Text style={scannerStyles.clearQueueText}>مسح الكل</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+
+            <View style={scannerStyles.thumbsGrid}>
+              {queuedPhotos.map((item, idx) => (
+                <View key={item.id} style={scannerStyles.queueThumbCard}>
+                  {Platform.OS === 'web' && (
+                    <img
+                      src={item.base64}
+                      alt={item.title}
+                      style={{ width: '100%', height: '90px', borderRadius: '6px', objectFit: 'cover' }}
+                    />
+                  )}
+                  <Text style={scannerStyles.queueThumbLabel} numberOfLines={1}>
+                    #{idx + 1} جاهزة
+                  </Text>
+                  {!sendingBatch && (
+                    <TouchableOpacity
+                      style={scannerStyles.removeThumbBtn}
+                      onPress={() => handleRemoveFromQueue(item.id)}
+                    >
+                      <Text style={scannerStyles.removeThumbText}>✕ حذف</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              ))}
+            </View>
+
+            {/* زر الإرسال المجمع دفعة واحدة */}
+            <TouchableOpacity
+              style={[scannerStyles.sendBatchBtn, sendingBatch && { opacity: 0.7 }]}
+              onPress={handleSendAllQueuedPhotos}
+              disabled={sendingBatch || preparing}
+            >
+              {sendingBatch ? (
+                <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 8 }}>
+                  <ActivityIndicator color="#FFFFFF" size="small" />
+                  <Text style={scannerStyles.sendBatchBtnText}>
+                    جاري إرسال ({sendProgress.current} من {sendProgress.total})...
+                  </Text>
+                </View>
+              ) : (
+                <Text style={scannerStyles.sendBatchBtnText}>
+                  🚀 تأكيد وإرسال ({queuedPhotos.length}) صورة دفعة واحدة للنظام
+                </Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* قسم 2: الصور التي تم إرسالها بنجاح بالفعل لشاشة الطبيب */}
         {sentPhotos.length > 0 && (
           <View style={scannerStyles.sentSection}>
             <Text style={scannerStyles.sentHeader}>
-              ✅ الصور المرسلة للكمبيوتر في هذه الجلسة ({sentPhotos.length}):
+              ✅ تم إرسالها بنجاح لشاشة الطبيب ({sentPhotos.length}):
             </Text>
             <View style={scannerStyles.thumbsGrid}>
               {sentPhotos.map((item, idx) => (
-                <View
-                  key={item.id}
-                  style={[
-                    scannerStyles.thumbCard,
-                    item.status === 'error' && { borderColor: '#EF4444' },
-                    item.status === 'uploading' && { borderColor: '#F59E0B' }
-                  ]}
-                >
+                <View key={item.id} style={scannerStyles.thumbCard}>
                   {Platform.OS === 'web' && (
                     <img
-                      src={item.localUrl || item.url}
+                      src={item.base64}
                       alt={item.title}
-                      style={{ width: '100%', height: '85px', borderRadius: '6px', objectFit: 'cover' }}
+                      style={{ width: '100%', height: '80px', borderRadius: '6px', objectFit: 'cover' }}
                     />
                   )}
-                  <Text
-                    style={[
-                      scannerStyles.thumbLabel,
-                      item.status === 'error' && { color: '#EF4444' },
-                      item.status === 'uploading' && { color: '#F59E0B' }
-                    ]}
-                    numberOfLines={2}
-                  >
-                    {item.status === 'uploading'
-                      ? `⏳ #${idx + 1} جاري الرفع...`
-                      : item.status === 'error'
-                      ? `❌ ${item.errorText}`
-                      : `#${idx + 1} تم الإرسال ✓`}
+                  <Text style={scannerStyles.thumbLabel} numberOfLines={1}>
+                    #{idx + 1} وصلت ✓
                   </Text>
                 </View>
               ))}
@@ -283,7 +413,7 @@ function MobileScannerBridge({ sessionId }) {
         )}
 
         <Text style={scannerStyles.footerNote}>
-          💡 تظل هذه الصفحة متصلة ومفتوحة لتتمكن من تصوير باقي الأوراق والأشعة تباعاً حتى تنتهي على شاشة الكمبيوتر.
+          💡 التقط كل الأوراق التي تريدها أولاً، تأكد من وضوحها في المعاينة، ثم اضغط زر الإرسال الأخضر لإرسالها دفعة واحدة.
         </Text>
       </View>
     </ScrollView>
@@ -566,15 +696,15 @@ const scannerStyles = StyleSheet.create({
     gap: 12
   },
   cameraBtnLabel: {
-    backgroundColor: '#047857',
-    color: '#FFFFFF',
-    padding: '16px',
+    backgroundColor: '#1E293B',
+    color: '#00F2FE',
+    padding: '15px',
     borderRadius: '12px',
-    fontSize: '15px',
+    fontSize: '14px',
     fontWeight: 'bold',
     textAlign: 'center',
     cursor: 'pointer',
-    border: '2px solid #10B981',
+    border: '1.5px solid #00F2FE',
     display: 'block'
   },
   galleryBtnLabel: {
@@ -586,8 +716,87 @@ const scannerStyles = StyleSheet.create({
     fontWeight: 'bold',
     textAlign: 'center',
     cursor: 'pointer',
-    border: '1px solid #00F2FE',
+    border: '1px solid #38BDF8',
     display: 'block'
+  },
+  queueSection: {
+    width: '100%',
+    marginTop: 18,
+    padding: 12,
+    backgroundColor: '#060911',
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: '#F59E0B'
+  },
+  queueHeaderRow: {
+    flexDirection: 'row-reverse',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10
+  },
+  queueHeader: {
+    color: '#FBBF24',
+    fontSize: 12.5,
+    fontWeight: 'bold',
+    textAlign: 'right',
+    flex: 1
+  },
+  clearQueueBtn: {
+    backgroundColor: '#7F1D1D',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6
+  },
+  clearQueueText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: 'bold'
+  },
+  queueThumbCard: {
+    width: '31%',
+    backgroundColor: '#0F172A',
+    padding: 5,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#F59E0B',
+    alignItems: 'center'
+  },
+  queueThumbLabel: {
+    color: '#FBBF24',
+    fontSize: 10,
+    fontWeight: 'bold',
+    marginTop: 4
+  },
+  removeThumbBtn: {
+    backgroundColor: '#991B1B',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 4,
+    marginTop: 4,
+    width: '100%',
+    alignItems: 'center'
+  },
+  removeThumbText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: 'bold'
+  },
+  sendBatchBtn: {
+    backgroundColor: '#059669',
+    paddingVertical: 15,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 14,
+    borderWidth: 2,
+    borderColor: '#10B981'
+  },
+  sendBatchBtnText: {
+    color: '#FFFFFF',
+    fontSize: 14.5,
+    fontWeight: '900',
+    textAlign: 'center'
   },
   sentSection: {
     width: '100%',
