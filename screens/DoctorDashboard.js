@@ -204,6 +204,14 @@ const getExactTimeLeftMessage = (expiryDateString) => {
   else return `متبقي ${minutes} دقيقة فقط!`;
 };
 
+const revokeBlobUrlSafely = (url) => {
+  if (Platform.OS === 'web' && url && typeof url === 'string' && url.startsWith('blob:')) {
+    try {
+      URL.revokeObjectURL(url);
+    } catch (e) {}
+  }
+};
+
 export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchPortal, onUpdateSpecialty }) {
   const [session, setSession] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
@@ -818,6 +826,8 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
 
   const handleRemoveAiScanItem = (id) => {
     setAiScanItems(prev => {
+      const target = prev.find(item => item.id === id);
+      if (target?.previewUrl) revokeBlobUrlSafely(target.previewUrl);
       const updated = prev.filter(item => item.id !== id);
       if (updated.length === 0) {
         setManualLabsUnlocked(false);
@@ -827,6 +837,7 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
   };
 
   const handleClearAllAiScanItems = () => {
+    aiScanItems.forEach(item => revokeBlobUrlSafely(item.previewUrl));
     setAiScanItems([]);
     setManualLabsUnlocked(false);
   };
@@ -844,7 +855,11 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
   };
 
   const handleRemoveSingleScan = (id) => {
-    setSelectedScanFiles(prev => prev.filter(item => item.id !== id));
+    setSelectedScanFiles(prev => {
+      const target = prev.find(item => item.id === id);
+      if (target?.previewUrl) revokeBlobUrlSafely(target.previewUrl);
+      return prev.filter(item => item.id !== id);
+    });
   };
 
   const fetchPatientScansByPatientId = async (pId) => {
@@ -1011,6 +1026,7 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
       if (insertErr) throw insertErr;
 
       showAlert('تم الحفظ بنجاح ✅', `تم حفظ (${uploadedList.length}) أشعة عالية الدقة في ملف المريض [${patientCode}].`);
+      selectedScanFiles.forEach(item => revokeBlobUrlSafely(item.previewUrl));
       setSelectedScanFiles([]);
       setScanGroupTitle('');
       await fetchPatientScansByPatientId(patientId);
@@ -1054,7 +1070,7 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
       const compressedBlob = await compressImage(file, 1000, 0.9);
       setLogoUploadProgress(50);
       const filePath = `logos/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
-      const { data, error } = await supabase.storage
+      const { error } = await supabase.storage
         .from('clinic-assets')
         .upload(filePath, compressedBlob, { upsert: true });
 
@@ -1672,8 +1688,9 @@ Return JSON ONLY:
         ? `\nتم حفظ (${autoUploadedScansList.length}) صورة تحليل/أشعة تلقائياً في ملف المريض.`
         : '';
 
-      // تفريغ صور التحاليل المؤقتة بعد حفظها في السحابة
-      if (autoUploadedScansList.length > 0) {
+      // تفريغ صور التحاليل المؤقتة وتنظيف الذاكرة بعد حفظها في السحابة
+      if (aiScanItems.length > 0) {
+        aiScanItems.forEach(item => revokeBlobUrlSafely(item.previewUrl));
         setAiScanItems([]);
         setManualLabsUnlocked(false);
       }
@@ -2861,11 +2878,14 @@ Return JSON ONLY:
                     {aiReport.warnings.map((w, idx) => <Text key={idx} style={styles.warningText}>⚠️ {w}</Text>)}
                   </View>
                 )}
-                <Text style={styles.aiDiagText}><strong>التشخيص المقترح:</strong> {aiReport.diagnosis}</Text>
+                <Text style={styles.aiDiagText}>
+                  <Text style={{ fontWeight: 'bold' }}>التشخيص المقترح: </Text>
+                  {aiReport.diagnosis}
+                </Text>
                 {aiReport.recommendedTests && aiReport.recommendedTests.length > 0 && (
                   <View style={{ marginTop: 6 }}>
-                    <Text style={{ color: '#00F2FE', fontSize: 11, fontWeight: 'bold' }}>🔬 التحاليل المطلوبة للتأكيد:</Text>
-                    {aiReport.recommendedTests.map((t, idx) => <Text key={idx} style={{ color: '#CBD5E1', fontSize: 11 }}>• {t}</Text>)}
+                    <Text style={{ color: '#00F2FE', fontSize: 11, fontWeight: 'bold', textAlign: 'right' }}>🔬 التحاليل المطلوبة للتأكيد:</Text>
+                    {aiReport.recommendedTests.map((t, idx) => <Text key={idx} style={{ color: '#CBD5E1', fontSize: 11, textAlign: 'right' }}>• {t}</Text>)}
                   </View>
                 )}
               </View>
@@ -2888,8 +2908,14 @@ Return JSON ONLY:
                     <Text style={styles.deleteText}>إزالة ✕</Text>
                   </TouchableOpacity>
                 </View>
-                <Text style={styles.medDetail}><strong>الجرعة:</strong> {med.dose}</Text>
-                <Text style={styles.medDetail}><strong>دواعي الاستعمال:</strong> {med.reason}</Text>
+                <Text style={styles.medDetail}>
+                  <Text style={{ fontWeight: 'bold' }}>الجرعة: </Text>
+                  {med.dose}
+                </Text>
+                <Text style={styles.medDetail}>
+                  <Text style={{ fontWeight: 'bold' }}>دواعي الاستعمال: </Text>
+                  {med.reason}
+                </Text>
               </View>
             ))}
 
@@ -3469,7 +3495,7 @@ const styles = StyleSheet.create({
 
   saveScansBtn: { backgroundColor: '#10B981', padding: 14, borderRadius: 10, alignItems: 'center' },
   saveScansBtnDisabled: { backgroundColor: '#334155', opacity: 0.6 },
-  saveScansBtnText: { color: '#FFFFFF', fontWeight: 'bold' , fontSize: 13 },
+  saveScansBtnText: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 13 },
 
   deleteImgBtn: { backgroundColor: '#991B1B', padding: 6, borderRadius: 6, marginTop: 6, alignItems: 'center' },
   deleteImgBtnText: { color: '#FFFFFF', fontSize: 11, fontWeight: 'bold' },
