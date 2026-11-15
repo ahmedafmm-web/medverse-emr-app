@@ -294,9 +294,10 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
   const [provisionalDiagnosisText, setProvisionalDiagnosisText] = useState('');
 
   // --- المرحلة 3: رفع صور متعددة للتحاليل/الأشعة بدقة عالية + معاينة + قفل تلقائي للإدخال اليدوي ---
-  // aiScanItems: [{ id, blob, previewUrl, base64, title }]
+  // aiScanItems: [{ id, blob, previewUrl, base64, title, remoteUrl? }]
   const [aiScanItems, setAiScanItems] = useState([]);
   const [processingAiImages, setProcessingAiImages] = useState(false);
+  const [savingAiScansDirectly, setSavingAiScansDirectly] = useState(false);
   const [manualLabsUnlocked, setManualLabsUnlocked] = useState(false);
 
   // --- حالات نافذة الكاميرا الحية المدمجة للكمبيوتر واللابتوب (USB / External Webcam) ---
@@ -558,7 +559,7 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
       const newItem = {
         id: `cam_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
         blob: enhanced.blob,
-        previewUrl: enhanced.previewUrl,
+        previewUrl: enhanced.base64 || enhanced.previewUrl,
         base64: enhanced.base64,
         title: `لقطة كاميرا مباشرة #${captureNumber}`
       };
@@ -582,13 +583,13 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
     };
   }, []);
 
-  // --- دوال إدارة نافذة ربط كاميرا الهاتف الذكي عبر QR Code والمزامنة اللحظية ---
+  // --- دوال إدارة نافذة ربط كاميرا الهاتف الذكي عبر QR Code والمزامنة اللحظية (qr_session_photos + Storage) ---
   const handleOpenQrBridgeModal = () => {
     const sessionCode = `SCAN-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
     syncedQrItemIdsRef.current = new Set();
     setQrBridgeSessionId(sessionCode);
     setQrReceivedCount(0);
-    setQrSyncStatus('امسح رمز الـ QR بكاميرا هاتفك، وكل صورة تلتقطها ستظهر هنا فوراً...');
+    setQrSyncStatus('امسح رمز الـ QR بكاميرا هاتفك، وكل دفعة صور ترسلها من هاتفك ستظهر هنا فوراً...');
     setShowQrBridgeModal(true);
   };
 
@@ -601,71 +602,112 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
 
     let isCancelled = false;
 
-    const urlToScanItem = async (remoteItem, indexNumber) => {
-      const res = await fetch(remoteItem.url);
-      const blob = await res.blob();
-      const base64 = await new Promise((resolve) => {
-        const reader = new FileReader();
-        reader.onloadend = () => resolve(reader.result);
-        reader.readAsDataURL(blob);
-      });
-      return {
-        id: `qr_${remoteItem.id}`,
-        blob,
-        previewUrl: URL.createObjectURL(blob),
-        base64,
-        title: remoteItem.title || `صورة من الهاتف #${indexNumber}`
-      };
-    };
-
-    const pollQrManifest = async () => {
+    const convertUrlToBase64 = async (imageUrl) => {
       try {
-        const manifestPath = `qr_sessions/${qrBridgeSessionId}/manifest.json`;
-        const { data: urlData } = supabase.storage.from('clinic-assets').getPublicUrl(manifestPath);
-        const basePublicUrl =
-          urlData?.publicUrl ||
-          `https://emynlqikbdwogijqfbfw.supabase.co/storage/v1/object/public/clinic-assets/${manifestPath}`;
-
-        const response = await fetch(`${basePublicUrl}?t=${Date.now()}`, { cache: 'no-store' });
-        if (!response.ok) return;
-
-        const manifest = await response.json();
-        const remoteItems = Array.isArray(manifest?.items) ? manifest.items : [];
-        const unsynced = remoteItems.filter(item => item?.id && !syncedQrItemIdsRef.current.has(item.id));
-
-        if (unsynced.length > 0 && !isCancelled) {
-          setQrSyncStatus(`📥 جاري استلام (${unsynced.length}) صورة جديدة من الهاتف...`);
-          const convertedItems = [];
-
-          for (let i = 0; i < unsynced.length; i++) {
-            const rItem = unsynced[i];
-            syncedQrItemIdsRef.current.add(rItem.id);
-            try {
-              const converted = await urlToScanItem(rItem, syncedQrItemIdsRef.current.size);
-              convertedItems.push(converted);
-            } catch (fetchErr) {
-              syncedQrItemIdsRef.current.delete(rItem.id);
-            }
-          }
-
-          if (convertedItems.length > 0 && !isCancelled) {
-            setAiScanItems(prev => {
-              if (prev.length === 0) {
-                setManualLabsUnlocked(false);
-              }
-              return [...prev, ...convertedItems];
-            });
-            const totalNow = syncedQrItemIdsRef.current.size;
-            setQrReceivedCount(totalNow);
-            setQrSyncStatus(`✅ تم استلام (${totalNow}) صورة من الهاتف وإضافتها للمعاينة تلقائياً! الجلسة مستمرة لتصوير المزيد...`);
-          }
-        }
+        const res = await fetch(imageUrl, { mode: 'cors' });
+        if (!res.ok) throw new Error('Fetch failed');
+        const blob = await res.blob();
+        const base64 = await new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result);
+          reader.readAsDataURL(blob);
+        });
+        return { blob, base64 };
       } catch (e) {
-        // انتظار إنشاء manifest.json من الهاتف
+        return { blob: null, base64: imageUrl };
       }
     };
 
-    const intervalId = setInterval(pollQrManifest, 1500);
+    const pollQrPhotos = async () => {
+      try {
+        const newBatchItems = [];
+
+        // 1. الاستعلام المباشر من جدول قاعدة البيانات qr_session_photos (المطابق لتحديث App.js)
+        const { data: dbRows, error: dbErr } = await supabase
+          .from('qr_session_photos')
+          .select('*')
+          .eq('session_id', qrBridgeSessionId)
+          .order('created_at', { ascending: true });
+
+        if (!dbErr && Array.isArray(dbRows) && dbRows.length > 0) {
+          for (let i = 0; i < dbRows.length; i++) {
+            const row = dbRows[i];
+            const rowKey = String(row.id || row.photo_url || row.url);
+            if (!rowKey || syncedQrItemIdsRef.current.has(rowKey)) continue;
+
+            const photoUrl = row.photo_url || row.url || row.image_url;
+            if (!photoUrl) continue;
+
+            syncedQrItemIdsRef.current.add(rowKey);
+            const { blob, base64 } = await convertUrlToBase64(photoUrl);
+            newBatchItems.push({
+              id: `qr_db_${rowKey}`,
+              blob: blob,
+              previewUrl: base64 || photoUrl,
+              base64: base64 || photoUrl,
+              remoteUrl: photoUrl,
+              title: row.title || `صورة من الهاتف #${syncedQrItemIdsRef.current.size}`
+            });
+          }
+        }
+
+        // 2. قراءة احتياطية مباشرة من مجلد التخزين qr_sessions/${qrBridgeSessionId} في clinic-assets
+        const folderPath = `qr_sessions/${qrBridgeSessionId}`;
+        const { data: storageFiles, error: listErr } = await supabase.storage
+          .from('clinic-assets')
+          .list(folderPath, { limit: 100, sortBy: { column: 'name', order: 'asc' } });
+
+        if (!listErr && Array.isArray(storageFiles) && storageFiles.length > 0) {
+          for (let i = 0; i < storageFiles.length; i++) {
+            const fileObj = storageFiles[i];
+            if (!fileObj?.name || fileObj.name === 'manifest.json' || fileObj.name.startsWith('.')) continue;
+
+            const fullPath = `${folderPath}/${fileObj.name}`;
+            const { data: urlData } = supabase.storage.from('clinic-assets').getPublicUrl(fullPath);
+            const publicUrl =
+              urlData?.publicUrl ||
+              `https://emynlqikbdwogijqfbfw.supabase.co/storage/v1/object/public/clinic-assets/${fullPath}`;
+
+            const storageKey = fileObj.id || fileObj.name;
+            const isAlreadySyncedByUrl = newBatchItems.some(it => it.remoteUrl === publicUrl);
+            if (syncedQrItemIdsRef.current.has(storageKey) || syncedQrItemIdsRef.current.has(publicUrl) || isAlreadySyncedByUrl) {
+              continue;
+            }
+
+            syncedQrItemIdsRef.current.add(storageKey);
+            syncedQrItemIdsRef.current.add(publicUrl);
+            const { blob, base64 } = await convertUrlToBase64(publicUrl);
+            newBatchItems.push({
+              id: `qr_st_${Date.now()}_${i}`,
+              blob: blob,
+              previewUrl: base64 || publicUrl,
+              base64: base64 || publicUrl,
+              remoteUrl: publicUrl,
+              title: `صورة من الهاتف #${syncedQrItemIdsRef.current.size}`
+            });
+          }
+        }
+
+        if (newBatchItems.length > 0 && !isCancelled) {
+          setAiScanItems(prev => {
+            if (prev.length === 0) {
+              setManualLabsUnlocked(false);
+            }
+            return [...prev, ...newBatchItems];
+          });
+          setQrReceivedCount(prevCount => {
+            const updatedTotal = prevCount + newBatchItems.length;
+            setQrSyncStatus(`✅ تم استلام (${newBatchItems.length}) صورة جديدة من الهاتف (الإجمالي: ${updatedTotal}) وإضافتها للمعاينة فوراً!`);
+            return updatedTotal;
+          });
+        }
+      } catch (e) {
+        // استمرار الفحص اللحظي بهدوء
+      }
+    };
+
+    pollQrPhotos();
+    const intervalId = setInterval(pollQrPhotos, 1500);
     return () => {
       isCancelled = true;
       clearInterval(intervalId);
@@ -755,7 +797,7 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
               const finalBlob = blob || file;
               resolve({
                 blob: finalBlob,
-                previewUrl: URL.createObjectURL(finalBlob),
+                previewUrl: base64DataUrl,
                 base64: base64DataUrl
               });
             },
@@ -769,7 +811,7 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
           reader.onloadend = () => {
             resolve({
               blob: file,
-              previewUrl: URL.createObjectURL(file),
+              previewUrl: reader.result,
               base64: reader.result
             });
           };
@@ -780,7 +822,7 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
         reader.onloadend = () => {
           resolve({
             blob: file,
-            previewUrl: URL.createObjectURL(file),
+            previewUrl: reader.result,
             base64: reader.result
           });
         };
@@ -803,7 +845,7 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
         processedItems.push({
           id: `${Date.now()}_${Math.random().toString(36).substring(2, 7)}_${i}`,
           blob: enhanced.blob,
-          previewUrl: enhanced.previewUrl,
+          previewUrl: enhanced.base64 || enhanced.previewUrl,
           base64: enhanced.base64,
           title: file.name ? file.name.replace(/\.[^/.]+$/, '') : `تحليل / أشعة ${i + 1}`
         });
@@ -840,6 +882,151 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
     aiScanItems.forEach(item => revokeBlobUrlSafely(item.previewUrl));
     setAiScanItems([]);
     setManualLabsUnlocked(false);
+  };
+
+  // --- زر الحفظ المباشر لصور التحاليل والأشعة الملتقطة (من كاميرا اللابتوب أو الهاتف أو الجهاز) في سجل المريض ---
+  const handleDirectSaveAiScansToPatient = async () => {
+    if (!patientName.trim()) {
+      showAlert('تنبيه هام', 'يرجى إدخال اسم المريض أولاً قبل حفظ الصور في سجله.');
+      return;
+    }
+    if (aiScanItems.length === 0) {
+      showAlert('تنبيه', 'لا توجد صور ملتقطة أو مرفوعة للحفظ.');
+      return;
+    }
+
+    setSavingAiScansDirectly(true);
+    try {
+      const userEmail = session?.user?.email?.toLowerCase();
+      const currentUserId = session?.user?.id;
+
+      // 1. جلب أو إنشاء العيادة
+      let clinicId = null;
+      let cQuery = supabase.from('clinics').select('id');
+      if (userEmail) cQuery = cQuery.ilike('email', userEmail);
+      else if (currentUserId) cQuery = cQuery.eq('user_id', currentUserId);
+
+      const { data: existingClinic } = await cQuery.limit(1).maybeSingle();
+      if (existingClinic) {
+        clinicId = existingClinic.id;
+      } else {
+        const { data: newClinic, error: cErr } = await supabase
+          .from('clinics')
+          .insert([{
+            doctor_name: clinicDoctorName,
+            specialty: specialty,
+            clinic_name: clinicName,
+            logo_url: clinicLogoUrl,
+            stamp_url: digitalStampUrl,
+            phone: clinicPhone,
+            address: clinicAddress,
+            email: userEmail || null,
+            user_id: currentUserId || null
+          }])
+          .select('id')
+          .single();
+        if (cErr) throw new Error('خطأ في بيانات العيادة: ' + cErr.message);
+        clinicId = newClinic?.id;
+      }
+
+      // 2. جلب أو إنشاء المريض تلقائياً إذا كان مريضاً جديداً
+      let patientRealId = currentPatientId;
+      let patientRealCode = selectedPatientCode || ('PAT-' + Math.floor(10000 + Math.random() * 90000));
+
+      if (!patientRealId) {
+        const { data: existingPatient } = await supabase
+          .from('patients')
+          .select('id, patient_code')
+          .ilike('full_name', patientName.trim())
+          .ilike('doctor_email', userEmail)
+          .maybeSingle();
+
+        if (existingPatient) {
+          patientRealId = existingPatient.id;
+          patientRealCode = existingPatient.patient_code;
+        } else {
+          const { data: newPatient, error: pErr } = await supabase
+            .from('patients')
+            .insert([{
+              full_name: patientName.trim(),
+              phone: patientPhone || null,
+              age: age ? parseInt(age) : null,
+              gender: gender,
+              patient_code: patientRealCode,
+              clinic_id: clinicId,
+              doctor_email: userEmail || null
+            }])
+            .select('id, patient_code')
+            .single();
+
+          if (pErr) throw new Error('خطأ في تسجيل المريض: ' + pErr.message);
+          patientRealId = newPatient?.id;
+          patientRealCode = newPatient?.patient_code || patientRealCode;
+        }
+      }
+
+      setSelectedPatientCode(patientRealCode);
+      setCurrentPatientId(patientRealId);
+
+      // 3. رفع الصور إلى مجلد المريض في التخزين السحابي clinic-assets
+      const savedScansList = [];
+      for (let i = 0; i < aiScanItems.length; i++) {
+        const item = aiScanItems[i];
+        let publicUrl = '';
+
+        if (item.blob) {
+          const uniqueId = Math.random().toString(36).substring(2, 9);
+          const filePath = `patient_scans/${patientRealCode}/${Date.now()}_${uniqueId}_${i}.jpg`;
+
+          const { error: uploadErr } = await supabase.storage
+            .from('clinic-assets')
+            .upload(filePath, item.blob, { upsert: true });
+
+          if (!uploadErr) {
+            const { data: urlData } = supabase.storage.from('clinic-assets').getPublicUrl(filePath);
+            publicUrl =
+              urlData?.publicUrl ||
+              (urlData?.data ? urlData.data.publicUrl : null) ||
+              `https://emynlqikbdwogijqfbfw.supabase.co/storage/v1/object/public/clinic-assets/${filePath}`;
+          } else {
+            publicUrl = item.remoteUrl || item.base64;
+          }
+        } else {
+          publicUrl = item.remoteUrl || item.base64;
+        }
+
+        savedScansList.push({
+          id: `${Date.now()}_${i}`,
+          title: item.title || `تحليل / أشعة (${new Date().toLocaleDateString('ar-EG')})`,
+          url: publicUrl,
+          created_at: new Date().toISOString()
+        });
+      }
+
+      // 4. حفظ الصور في سجل المريض medical_records
+      const { error: recErr } = await supabase.from('medical_records').insert([{
+        patient_id: patientRealId,
+        clinic_id: clinicId,
+        doctor_email: userEmail || null,
+        visit_date: new Date().toISOString().split('T')[0],
+        diagnosis: `مرفقات تحاليل وأشعة (${savedScansList.length} صورة)`,
+        qr_verification_code: 'VERIFY-' + patientRealCode,
+        dynamic_fields: { scans_list: savedScansList }
+      }]);
+
+      if (recErr) throw new Error('خطأ في حفظ الصور بالسجل الطبي: ' + recErr.message);
+
+      showAlert(
+        'تم الحفظ في سجل المريض ✅',
+        `تم حفظ (${savedScansList.length}) صورة تحليل/أشعة مباشرة في سجل المريض [${patientName} - ${patientRealCode}]!\nالصور لا تزال متاحة في المعاينة إذا أردت تشغيل تحليل الذكاء الاصطناعي عليها.`
+      );
+
+      await fetchPatientScansByPatientId(patientRealId);
+    } catch (err) {
+      showAlert('خطأ في الحفظ المباشر ❌', err.message || 'تعذر حفظ الصور في سجل المريض.');
+    } finally {
+      setSavingAiScansDirectly(false);
+    }
   };
 
   const handleSelectMultipleScans = (event) => {
@@ -1379,7 +1566,7 @@ Additional Doctor Notes & Symptoms: ${symptomsInput || 'None'} | ${doctorNotes |
           { type: "text", text: promptText + `\n[Attached ${aiScanItems.length} High-Resolution Lab/Scan Image(s) for Multi-Image OCR Analysis]` },
           ...aiScanItems.map(item => ({
             type: "image_url",
-            image_url: { url: item.base64 }
+            image_url: { url: item.base64 || item.remoteUrl || item.previewUrl }
           }))
         ];
 
@@ -1616,19 +1803,24 @@ Return JSON ONLY:
       if (aiScanItems.length > 0 && patientRealCode) {
         for (let i = 0; i < aiScanItems.length; i++) {
           const item = aiScanItems[i];
-          const uniqueId = Math.random().toString(36).substring(2, 9);
-          const filePath = `patient_scans/${patientRealCode}/${Date.now()}_${uniqueId}_${i}.jpg`;
-
-          const { error: uploadErr } = await supabase.storage
-            .from('clinic-assets')
-            .upload(filePath, item.blob, { upsert: true });
-
           let publicUrl = '';
-          if (!uploadErr) {
-            const { data: urlData } = supabase.storage.from('clinic-assets').getPublicUrl(filePath);
-            publicUrl = urlData?.publicUrl || (urlData?.data ? urlData.data.publicUrl : null) || `https://emynlqikbdwogijqfbfw.supabase.co/storage/v1/object/public/clinic-assets/${filePath}`;
+
+          if (item.blob) {
+            const uniqueId = Math.random().toString(36).substring(2, 9);
+            const filePath = `patient_scans/${patientRealCode}/${Date.now()}_${uniqueId}_${i}.jpg`;
+
+            const { error: uploadErr } = await supabase.storage
+              .from('clinic-assets')
+              .upload(filePath, item.blob, { upsert: true });
+
+            if (!uploadErr) {
+              const { data: urlData } = supabase.storage.from('clinic-assets').getPublicUrl(filePath);
+              publicUrl = urlData?.publicUrl || (urlData?.data ? urlData.data.publicUrl : null) || `https://emynlqikbdwogijqfbfw.supabase.co/storage/v1/object/public/clinic-assets/${filePath}`;
+            } else {
+              publicUrl = item.remoteUrl || item.base64;
+            }
           } else {
-            publicUrl = item.base64;
+            publicUrl = item.remoteUrl || item.base64;
           }
 
           autoUploadedScansList.push({
@@ -1952,7 +2144,7 @@ Return JSON ONLY:
             </View>
 
             <Text style={styles.bridgeSubText}>
-              امسح الرمز التالي بكاميرا هاتفك لفتح الماسح الضوئي السريع؛ أي صورة تلتقطها بهاتفك ستظهر فوراً في لوحة الكشف الحالية:
+              امسح الرمز التالي بكاميرا هاتفك لفتح الماسح الضوئي السريع؛ أي صورة أو دفعة صور تلتقطها وترسلها بهاتفك ستظهر فوراً في لوحة الكشف الحالية:
             </Text>
 
             <View style={styles.qrBoxContainer}>
@@ -2003,11 +2195,19 @@ Return JSON ONLY:
           </View>
           {viewingImageModal && (
             <ScrollView contentContainerStyle={{ alignItems: 'center', justifyContent: 'center', flexGrow: 1 }} maximumZoomScale={5} minimumZoomScale={0.5}>
-              <Image 
-                source={{ uri: viewingImageModal.url }} 
-                style={{ width: 340 * zoomScale, height: 340 * zoomScale, borderRadius: 8 }} 
-                resizeMode="contain"
-              />
+              {Platform.OS === 'web' ? (
+                <img
+                  src={viewingImageModal.url}
+                  alt={viewingImageModal.title}
+                  style={{ width: `${340 * zoomScale}px`, height: `${340 * zoomScale}px`, objectFit: 'contain', borderRadius: '8px' }}
+                />
+              ) : (
+                <Image 
+                  source={{ uri: viewingImageModal.url }} 
+                  style={{ width: 340 * zoomScale, height: 340 * zoomScale, borderRadius: 8 }} 
+                  resizeMode="contain"
+                />
+              )}
               <Text style={styles.lightboxTitle}>{viewingImageModal.title}</Text>
             </ScrollView>
           )}
@@ -2473,48 +2673,66 @@ Return JSON ONLY:
             {hasAiScanImages && (
               <View style={{ marginTop: 10 }}>
                 <Text style={styles.selectedCodeBadge}>
-                  ✅ تم تجهيز ({aiScanItems.length}) صورة بدقة عالية للقراءة بالـ AI والحفظ التلقائي في ملف المريض:
+                  ✅ تم تجهيز ({aiScanItems.length}) صورة بدقة عالية للقراءة بالـ AI والحفظ المباشر في ملف المريض:
                 </Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 8 }}>
-                  {aiScanItems.map((item, index) => (
-                    <View key={item.id} style={styles.scanPreviewCard}>
-                      <TouchableOpacity
-                        onPress={() => {
-                          setViewingImageModal({ url: item.previewUrl, title: item.title || `صورة ${index + 1}` });
-                          setZoomScale(1);
-                        }}
-                      >
-                        {Platform.OS === 'web' ? (
-                          <img
-                            src={item.previewUrl}
-                            alt={item.title}
-                            style={{ width: '115px', height: '115px', borderRadius: '8px', objectFit: 'cover', border: '1px solid #0284C7' }}
-                          />
-                        ) : (
-                          <Image source={{ uri: item.previewUrl }} style={styles.scanPreviewImg} />
-                        )}
-                      </TouchableOpacity>
-                      <Text style={styles.scanGridTitle} numberOfLines={1}>{item.title || `صورة ${index + 1}`}</Text>
-                      <View style={{ flexDirection: 'row-reverse', gap: 4, marginTop: 4 }}>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 10 }}>
+                  {aiScanItems.map((item, index) => {
+                    const displaySrc = item.base64 || item.previewUrl || item.remoteUrl;
+                    return (
+                      <View key={item.id} style={styles.scanPreviewCard}>
                         <TouchableOpacity
-                          style={styles.zoomMiniBtn}
                           onPress={() => {
-                            setViewingImageModal({ url: item.previewUrl, title: item.title || `صورة ${index + 1}` });
+                            setViewingImageModal({ url: displaySrc, title: item.title || `صورة ${index + 1}` });
                             setZoomScale(1);
                           }}
                         >
-                          <Text style={styles.zoomMiniBtnText}>🔍 معاينة</Text>
+                          {Platform.OS === 'web' ? (
+                            <img
+                              src={displaySrc}
+                              alt={item.title}
+                              style={{ width: '115px', height: '115px', borderRadius: '8px', objectFit: 'cover', border: '1px solid #0284C7' }}
+                            />
+                          ) : (
+                            <Image source={{ uri: displaySrc }} style={styles.scanPreviewImg} />
+                          )}
                         </TouchableOpacity>
-                        <TouchableOpacity
-                          style={styles.deleteScanBtn}
-                          onPress={() => handleRemoveAiScanItem(item.id)}
-                        >
-                          <Text style={styles.deleteScanBtnText}>✕</Text>
-                        </TouchableOpacity>
+                        <Text style={styles.scanGridTitle} numberOfLines={1}>{item.title || `صورة ${index + 1}`}</Text>
+                        <View style={{ flexDirection: 'row-reverse', gap: 4, marginTop: 4 }}>
+                          <TouchableOpacity
+                            style={styles.zoomMiniBtn}
+                            onPress={() => {
+                              setViewingImageModal({ url: displaySrc, title: item.title || `صورة ${index + 1}` });
+                              setZoomScale(1);
+                            }}
+                          >
+                            <Text style={styles.zoomMiniBtnText}>🔍 معاينة</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={styles.deleteScanBtn}
+                            onPress={() => handleRemoveAiScanItem(item.id)}
+                          >
+                            <Text style={styles.deleteScanBtnText}>✕</Text>
+                          </TouchableOpacity>
+                        </View>
                       </View>
-                    </View>
-                  ))}
+                    );
+                  })}
                 </ScrollView>
+
+                {/* زر الحفظ المباشر في سجل المريض */}
+                <TouchableOpacity
+                  style={[styles.directSaveScansBtn, savingAiScansDirectly && { opacity: 0.6 }]}
+                  onPress={handleDirectSaveAiScansToPatient}
+                  disabled={savingAiScansDirectly}
+                >
+                  {savingAiScansDirectly ? (
+                    <ActivityIndicator color="#FFFFFF" size="small" />
+                  ) : (
+                    <Text style={styles.directSaveScansBtnText}>
+                      💾 حفظ الصور مباشرة في سجل المريض ({aiScanItems.length} صورة)
+                    </Text>
+                  )}
+                </TouchableOpacity>
               </View>
             )}
           </View>
@@ -3202,6 +3420,22 @@ const styles = StyleSheet.create({
     alignItems: 'center'
   },
   aiActionBtnText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: 'bold'
+  },
+  directSaveScansBtn: {
+    backgroundColor: '#059669',
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#10B981',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 4
+  },
+  directSaveScansBtnText: {
     color: '#FFFFFF',
     fontSize: 12,
     fontWeight: 'bold'
