@@ -69,7 +69,7 @@ const enhanceMobileScanImage = (file, maxWidth = 2800, quality = 0.95) => {
   });
 };
 
-// --- واجهة الماسح السريع للهاتف المرتبطة بجلسة الطبيب عبر QR Code ---
+// --- واجهة الماسح السريع للهاتف المرتبطة بجلسة الطبيب عبر QR Code (بث ملفات مستقلة بدون manifest) ---
 function MobileScannerBridge({ sessionId }) {
   const [uploading, setUploading] = useState(false);
   const [sentPhotos, setSentPhotos] = useState([]);
@@ -84,19 +84,21 @@ function MobileScannerBridge({ sessionId }) {
 
     try {
       const newlyUploaded = [];
+      const batchTimestamp = Date.now();
 
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
         const enhanced = await enhanceMobileScanImage(file, 2800, 0.95);
-        const timestamp = Date.now();
+        const paddedIndex = String(i).padStart(3, '0');
         const uniqueId = Math.random().toString(36).substring(2, 8);
-        const filePath = `qr_sessions/${sessionId}/${timestamp}_${uniqueId}_${i}.jpg`;
+        const fileName = `${batchTimestamp}_${paddedIndex}_${uniqueId}.jpg`;
+        const filePath = `qr_sessions/${sessionId}/${fileName}`;
 
         const { error: uploadErr } = await supabase.storage
           .from('clinic-assets')
           .upload(filePath, enhanced.blob, {
             contentType: 'image/jpeg',
-            upsert: true
+            upsert: false
           });
 
         if (uploadErr) {
@@ -112,29 +114,15 @@ function MobileScannerBridge({ sessionId }) {
           `https://emynlqikbdwogijqfbfw.supabase.co/storage/v1/object/public/clinic-assets/${filePath}`;
 
         newlyUploaded.push({
-          id: `${timestamp}_${uniqueId}_${i}`,
+          id: fileName,
           url: publicUrl,
           title: file.name ? file.name.replace(/\.[^/.]+$/, '') : `صورة من الهاتف ${sentPhotos.length + i + 1}`,
           createdAt: new Date().toISOString()
         });
       }
 
-      const updatedAll = [...sentPhotos, ...newlyUploaded];
-      setSentPhotos(updatedAll);
-
-      // تحديث ملف الجلسة اللحظي (manifest.json) ليلتقطه اللابتوب في أقل من ثانية
-      const manifestBlob = new Blob([JSON.stringify({ sessionId, items: updatedAll, updatedAt: Date.now() })], {
-        type: 'application/json'
-      });
-
-      await supabase.storage
-        .from('clinic-assets')
-        .upload(`qr_sessions/${sessionId}/manifest.json`, manifestBlob, {
-          contentType: 'application/json',
-          upsert: true
-        });
-
-      setStatusMessage(`✅ تم إرسال (${newlyUploaded.length}) صورة بنجاح! ظهرت الآن على شاشة الطبيب. يمكنك تصوير المزيد...`);
+      setSentPhotos(prev => [...prev, ...newlyUploaded]);
+      setStatusMessage(`✅ تم إرسال (${newlyUploaded.length}) صورة بنجاح! تظهر الآن على شاشة الطبيب. يمكنك تصوير المزيد...`);
     } catch (err) {
       setStatusMessage(`❌ خطأ أثناء الإرسال: ${err.message}`);
     } finally {
