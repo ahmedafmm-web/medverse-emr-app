@@ -848,7 +848,7 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
     : '';
   // =========================================================================
 
-  // --- استخراج جدول التحاليل وتقرير الأشعة تلقائياً عبر القارئ البصري عالي الدقة (OCR) + تنظيمه بنموذج Groq الفعال ---
+  // --- استخراج جدول التحاليل (OCR) + القراءة البصرية المباشرة لأفلام الأشعة (Multimodal Vision AI) ---
   const handleExtractStructuredLabsFromImages = async (itemsToRead = aiScanItems) => {
     if (!itemsToRead || itemsToRead.length === 0) return;
 
@@ -867,7 +867,7 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
       });
     };
 
-    // تجهيز نسخة عالية التباين (أبيض وأسود حاد) لتسهيل قراءة الأرقام المائلة والجدول بدقة
+    // 1. تجهيز نسخة أبيض وأسود عالية التباين لقراءة أرقام التحاليل بدقة
     const prepareHighContrastOcrImage = (srcUrl) => {
       return new Promise((resolve) => {
         if (Platform.OS !== 'web' || !srcUrl || typeof srcUrl !== 'string') {
@@ -898,8 +898,106 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
       });
     };
 
+    // 2. تجهيز نسخة JPEG واضحة لإرسالها لنموذج الرؤية البصرية لقراءة أفلام الأشعة (X-Ray / MRI / US)
+    const prepareImageForVisionAI = (srcUrl, maxDim = 1280) => {
+      return new Promise((resolve) => {
+        if (Platform.OS !== 'web' || !srcUrl || typeof srcUrl !== 'string') {
+          return resolve(srcUrl);
+        }
+        try {
+          const img = new window.Image();
+          img.crossOrigin = 'anonymous';
+          img.onload = () => {
+            try {
+              let w = img.width;
+              let h = img.height;
+              if (w > maxDim || h > maxDim) {
+                if (w > h) {
+                  h = Math.round((h * maxDim) / w);
+                  w = maxDim;
+                } else {
+                  w = Math.round((w * maxDim) / h);
+                  h = maxDim;
+                }
+              }
+              const canvas = document.createElement('canvas');
+              canvas.width = w;
+              canvas.height = h;
+              const ctx = canvas.getContext('2d');
+              ctx.drawImage(img, 0, 0, w, h);
+              resolve(canvas.toDataURL('image/jpeg', 0.9));
+            } catch (canvasErr) {
+              resolve(srcUrl);
+            }
+          };
+          img.onerror = () => resolve(srcUrl);
+          img.src = srcUrl;
+        } catch (e) {
+          resolve(srcUrl);
+        }
+      });
+    };
+
+    // 3. دالة تحليل أفلام الأشعة بصرياً عبر نموذج Groq Vision وربطها بمواضع الألم على الخريطة
+    const analyzeRadiologyFilmsWithVision = async (visionImages) => {
+      if (!visionImages || visionImages.length === 0) return '';
+
+      const activeJointsContext = Object.entries(selectedJointStates || {})
+        .map(([id, state]) => `${getJointDisplayName(id)} (${state === 'inflamed' ? 'Swollen/Red' : 'Painful/Blue'})`)
+        .join(', ');
+
+      const visionPrompt = `You are an expert Musculoskeletal & Clinical Radiologist AI assisting a physician (${specialty}).
+Analyze the attached medical imaging scan(s) (X-Ray, MRI, Ultrasound, or CT) visually in detail.
+Patient Context: Age ${age || 'Unspecified'}, Gender: ${gender}, Chronic Diseases: ${chronicDiseases || 'None'}.
+Doctor's Selected Painful/Swollen Joints on Skeleton Map: ${activeJointsContext || 'None specified yet'}.
+
+Instructions:
+1. Identify the anatomical region and imaging modality visible in each image.
+2. Describe key radiological findings objectively (e.g., joint space narrowing, marginal bone erosions, periarticular osteopenia, osteophytes, subchondral sclerosis, sacroiliitis, soft tissue swelling, alignment, or normal appearance).
+3. Correlate findings with the doctor's selected painful/swollen joints if applicable.
+4. Write a clear, concise, professional summary in Arabic with key English radiological terms in parentheses. Do NOT return JSON, return clean structured text only.`;
+
+      const userContentArray = [
+        { type: 'text', text: visionPrompt },
+        ...visionImages.map(imgDataUrl => ({
+          type: 'image_url',
+          image_url: { url: imgDataUrl }
+        }))
+      ];
+
+      const visionModels = [
+        'meta-llama/llama-4-scout-17b-16e-instruct',
+        'meta-llama/llama-4-maverick-17b-128e-instruct'
+      ];
+
+      for (const modelName of visionModels) {
+        try {
+          const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${GROQ_API_KEY}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              model: modelName,
+              messages: [{ role: 'user', content: userContentArray }],
+              temperature: 0.1
+            })
+          });
+          if (res.ok) {
+            const vData = await res.json();
+            const vText = vData?.choices?.[0]?.message?.content?.trim();
+            if (vText) return vText;
+          }
+        } catch (e) {
+          // الانتقال للنموذج الاحتياطي
+        }
+      }
+      return '';
+    };
+
     const extractionSystemPrompt = `You are a strict Medical Laboratory & Radiology OCR Parser.
-You will receive raw OCR text extracted from medical lab reports and radiology scans.
+You will receive raw OCR text extracted from medical lab reports and written radiology reports.
 CRITICAL RULES:
 1. Extract ONLY exact numbers and reference ranges explicitly present in the OCR text. NEVER invent or assume standard reference ranges if a range is written in the text (e.g., if the text says 0 - 15, output "0 - 15", NOT "0 - 20").
 2. Compare the extracted numeric value against the extracted reference range accurately to set "status" ("High", "Low", "Normal", "Positive", "Negative"). For example, if value is 25 and referenceRange is "0 - 15", status MUST be "High".
@@ -916,7 +1014,7 @@ Respond ONLY with a valid JSON object without Markdown formatting:
       "status": "High"
     }
   ],
-  "radiologySummary": "ملخص تقرير الأشعة بالعربي أو الإنجليزي إن وجد، أو نص فارغ إذا كانت الصور تحاليل فقط"
+  "radiologySummary": "ملخص تقرير الأشعة المكتوب بالعربي أو الإنجليزي إن وجد، أو نص فارغ إذا كانت الصور تحاليل فقط"
 }`;
 
     try {
@@ -928,81 +1026,111 @@ Respond ONLY with a valid JSON object without Markdown formatting:
       });
 
       let combinedOcrText = '';
+      const visionCandidateImages = [];
+
       for (let i = 0; i < itemsToRead.length; i++) {
         const item = itemsToRead[i];
         const rawSrc = item.base64 || item.previewUrl || item.remoteUrl;
         if (!rawSrc) continue;
+
         const processedSrc = await prepareHighContrastOcrImage(rawSrc);
         const { data: { text } } = await worker.recognize(processedSrc);
-        if (text && text.trim()) {
-          combinedOcrText += `\n--- Document ${i + 1} (${item.title || 'Scan'}) ---\n${text.trim()}\n`;
+        const cleanText = (text || '').trim();
+        const alphaNumCount = cleanText.replace(/[^a-zA-Z0-9]/g, '').length;
+        const isRadiologyTitle = /x-?ray|mri|ct|scan|ultrasound|أشعة|رنين|مقطعية|سونار/i.test(item.title || '');
+
+        if (alphaNumCount >= 35) {
+          combinedOcrText += `\n--- Document ${i + 1} (${item.title || 'Report'}) ---\n${cleanText}\n`;
+        }
+
+        // إذا كانت الصورة فيلم أشعة (نصها قليل جداً أو عنوانها يدل على أشعة) نجهزها للرؤية البصرية المباشرة
+        if (alphaNumCount < 60 || isRadiologyTitle) {
+          const visionReadyUrl = await prepareImageForVisionAI(rawSrc);
+          if (visionReadyUrl && (visionReadyUrl.startsWith('data:image') || visionReadyUrl.startsWith('http'))) {
+            visionCandidateImages.push(visionReadyUrl);
+          }
         }
       }
       await worker.terminate();
 
-      if (!combinedOcrText.trim()) {
-        throw new Error('لم يتم العثور على نصوص واضحة في الصورة. تأكد من إضاءة ووضوح الورقة أو أضف القيم يدوياً.');
+      let parsedLabs = [];
+      let textRadiologySummary = '';
+
+      // أ) استخراج جدول التحاليل والتقارير المكتوبة إن وجد نص
+      if (combinedOcrText.trim()) {
+        const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${GROQ_API_KEY}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            model: "openai/gpt-oss-120b",
+            messages: [
+              { role: "system", content: extractionSystemPrompt },
+              { role: "user", content: `Parse the following raw OCR text from ${itemsToRead.length} medical document(s) into structured JSON without guessing values:\n${combinedOcrText}` }
+            ],
+            temperature: 0.0
+          })
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          const rawContent = data?.choices?.[0]?.message?.content || '{}';
+          const jsonMatch = rawContent.match(/\{[\s\S]*\}/);
+          const cleanJson = jsonMatch
+            ? jsonMatch[0]
+            : rawContent.replace(/```json/g, '').replace(/```/g, '').trim();
+          const parsed = JSON.parse(cleanJson);
+
+          parsedLabs = Array.isArray(parsed.labs)
+            ? parsed.labs.map((r, idx) => ({
+                id: `lab_${Date.now()}_${idx}`,
+                testName: r.testName || '',
+                value: String(r.value ?? ''),
+                unit: r.unit || '',
+                referenceRange: r.referenceRange || '',
+                status: r.status || 'Normal'
+              }))
+            : [];
+          textRadiologySummary = (parsed.radiologySummary || '').trim();
+        }
       }
 
-      const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${GROQ_API_KEY}`,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          model: "openai/gpt-oss-120b",
-          messages: [
-            { role: "system", content: extractionSystemPrompt },
-            { role: "user", content: `Parse the following raw OCR text from ${itemsToRead.length} medical document(s) into structured JSON without guessing values:\n${combinedOcrText}` }
-          ],
-          temperature: 0.0
-        })
-      });
-
-      if (!response.ok) {
-        const errObj = await response.json().catch(() => ({}));
-        throw new Error(errObj?.error?.message || `خطأ في الخادم (${response.status})`);
+      // ب) القراءة البصرية لأفلام الأشعة (X-Ray / MRI) عبر نموذج الرؤية
+      let visualRadiologyReading = '';
+      if (visionCandidateImages.length > 0) {
+        visualRadiologyReading = await analyzeRadiologyFilmsWithVision(visionCandidateImages);
       }
 
-      const data = await response.json();
-      const rawContent = data?.choices?.[0]?.message?.content || '{}';
-      const jsonMatch = rawContent.match(/\{[\s\S]*\}/);
-      const cleanJson = jsonMatch
-        ? jsonMatch[0]
-        : rawContent.replace(/```json/g, '').replace(/```/g, '').trim();
-      const parsed = JSON.parse(cleanJson);
+      if (parsedLabs.length === 0 && !textRadiologySummary && !visualRadiologyReading) {
+        throw new Error('لم يتم العثور على نصوص واضحة أو تفاصيل إشعاعية مقروءة. تأكد من إضاءة ووضوح الصورة.');
+      }
 
-      const allExtractedRows = Array.isArray(parsed.labs)
-        ? parsed.labs.map((r, idx) => ({
-            id: `lab_${Date.now()}_${idx}`,
-            testName: r.testName || '',
-            value: String(r.value ?? ''),
-            unit: r.unit || '',
-            referenceRange: r.referenceRange || '',
-            status: r.status || 'Normal'
-          }))
-        : [];
+      setExtractedLabs(parsedLabs);
 
-      setExtractedLabs(allExtractedRows);
+      const combinedRadiologyNotes = [
+        visualRadiologyReading ? `🩻 القراءة البصرية للأشعة (Vision AI):\n${visualRadiologyReading}` : '',
+        textRadiologySummary ? `📄 ملخص التقرير المكتوب:\n${textRadiologySummary}` : ''
+      ].filter(Boolean).join('\n\n');
 
-      if (parsed.radiologySummary && parsed.radiologySummary.trim()) {
-        setExtractedRadiologyNotes(parsed.radiologySummary.trim());
+      if (combinedRadiologyNotes) {
+        setExtractedRadiologyNotes(combinedRadiologyNotes);
       }
 
       // تغذية حاسبة DAS28 تلقائياً بقيم ESR أو CRP المستخرجة من الجدول إن وجدت
-      const foundEsr = allExtractedRows.find(r => /\besr\b|sedimentation|الترسيب/i.test(r.testName));
+      const foundEsr = parsedLabs.find(r => /\besr\b|sedimentation|الترسيب/i.test(r.testName));
       if (foundEsr && foundEsr.value) {
         const num = String(foundEsr.value).replace(/[^0-9.]/g, '');
         if (num) setDasEsrInput(num);
       }
-      const foundCrp = allExtractedRows.find(r => /\bcrp\b|c-reactive|البروتين التفاعلي/i.test(r.testName));
+      const foundCrp = parsedLabs.find(r => /\bcrp\b|c-reactive|البروتين التفاعلي/i.test(r.testName));
       if (foundCrp && foundCrp.value) {
         const num = String(foundCrp.value).replace(/[^0-9.]/g, '');
         if (num) setDasCrpInput(num);
       }
     } catch (err) {
-      setLabsExtractionError(err.message || 'تعذر استخراج الجدول تلقائياً، يمكنك إعادة المحاولة أو إضافة القيم يدوياً.');
+      setLabsExtractionError(err.message || 'تعذر استخراج البيانات تلقائياً، يمكنك إعادة المحاولة أو الإضافة يدوياً.');
     } finally {
       setExtractingLabsTable(false);
     }
@@ -1228,6 +1356,77 @@ Respond ONLY with a valid JSON object without Markdown formatting:
     setExtractedRadiologyNotes('');
     setLabsExtractionError('');
     setManualLabsUnlocked(false);
+  };
+
+  // --- إرسال صورة (أو كل الصور) من أرشيف أشعة المريض إلى الذكاء الاصطناعي لقراءتها فوراً ---
+  const prepareArchivedScanItem = async (scanObj, idx = 0) => {
+    let base64Data = scanObj.url;
+    if (scanObj.url.startsWith('http')) {
+      try {
+        const res = await fetch(scanObj.url, { mode: 'cors' });
+        if (res.ok) {
+          const blob = await res.blob();
+          base64Data = await new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result);
+            reader.readAsDataURL(blob);
+          });
+        }
+      } catch (e) {
+        // استخدام الرابط المباشر كاحتياط
+      }
+    }
+    return {
+      id: `arch_${Date.now()}_${idx}_${Math.random().toString(36).substring(2, 6)}`,
+      blob: null,
+      previewUrl: base64Data,
+      base64: base64Data,
+      remoteUrl: scanObj.url,
+      title: scanObj.title || 'أشعة من أرشيف المريض'
+    };
+  };
+
+  const handleSendArchivedScanToAI = async (scanObj) => {
+    if (!scanObj || !scanObj.url) return;
+    if (aiScanItems.some(item => item.remoteUrl === scanObj.url)) {
+      showAlert('تنبيه', 'هذه الصورة مضافة بالفعل في قائمة قراءة الذكاء الاصطناعي.');
+      return;
+    }
+    setProcessingAiImages(true);
+    try {
+      const preparedItem = await prepareArchivedScanItem(scanObj, 0);
+      setAiScanItems(prev => {
+        if (prev.some(item => item.remoteUrl === scanObj.url)) return prev;
+        if (prev.length === 0) setManualLabsUnlocked(false);
+        return [...prev, preparedItem];
+      });
+    } finally {
+      setProcessingAiImages(false);
+    }
+  };
+
+  const handleSendAllArchivedScansToAI = async () => {
+    const newScans = patientScansGrid.filter(
+      sc => sc?.url && !aiScanItems.some(item => item.remoteUrl === sc.url)
+    );
+    if (newScans.length === 0) {
+      showAlert('تنبيه', 'جميع صور أرشيف المريض مضافة بالفعل في قائمة قراءة الذكاء الاصطناعي.');
+      return;
+    }
+    setProcessingAiImages(true);
+    try {
+      const preparedBatch = [];
+      for (let i = 0; i < newScans.length; i++) {
+        const item = await prepareArchivedScanItem(newScans[i], i);
+        preparedBatch.push(item);
+      }
+      setAiScanItems(prev => {
+        if (prev.length === 0) setManualLabsUnlocked(false);
+        return [...prev, ...preparedBatch];
+      });
+    } finally {
+      setProcessingAiImages(false);
+    }
   };
 
   // --- زر الحفظ المباشر لصور التحاليل والأشعة الملتقطة (من كاميرا اللابتوب أو الهاتف أو الجهاز) في سجل المريض ---
@@ -1870,6 +2069,23 @@ Respond ONLY with a valid JSON object without Markdown formatting:
       ? `NOTE: This is a PROVISIONAL / QUERY DIAGNOSIS (تشخيص مبدئي محتمل). Doctor's suspected provisional diagnosis: "${combinedProvisional || 'Unspecified'}". Evaluate this provisional suspicion against the clinical findings, suggest probable differential diagnoses, and recommend specific required laboratory tests/radiology to confirm.`
       : "";
 
+    // تجميع ملخص آخر 3 زيارات سابقة للمريض (التشخيص، الأدوية السابقة، ودرجة نشاط DAS28 السابقة)
+    const previousVisitsSummary = Array.isArray(patientHistory) && patientHistory.length > 0
+      ? patientHistory.slice(0, 3).map((rec, idx) => {
+          let df = rec.dynamic_fields;
+          if (typeof df === 'string') {
+            try { df = JSON.parse(df); } catch (e) { df = {}; }
+          }
+          const prevDas = df?.rheumaDetails?.diseaseActivity;
+          const prevDasText = prevDas ? ` | ${prevDas.formula}: ${prevDas.score}` : '';
+          const prevMeds = Array.isArray(rec.prescriptions) && rec.prescriptions.length > 0
+            ? ` | Meds: ${rec.prescriptions.map(m => m.name).join(', ')}`
+            : '';
+          const vDate = rec.visit_date || (rec.created_at ? rec.created_at.split('T')[0] : '');
+          return `Visit ${idx + 1} (${vDate}): Diagnosis="${rec.diagnosis || 'N/A'}"${prevDasText}${prevMeds}`;
+        }).join('\n')
+      : 'First recorded visit (No prior visit history)';
+
     const multiImageInstruction = aiScanItems.length > 0
       ? `\nIMPORTANT: The doctor has uploaded/scanned ${aiScanItems.length} lab/radiology image(s) which were OCR-extracted and verified in the structured lab table below. Integrate all abnormal lab values, DAS28 disease activity score, and radiology notes directly into your clinical assessment and warnings.`
       : "";
@@ -1919,6 +2135,9 @@ ${extractedRadiologyNotes ? `\n-- Extracted Radiology Notes --\n${extractedRadio
 
 -- Core Serology & Safety Quick Chips --
 ${manualLabsSummary.length > 0 ? manualLabsSummary.map(l => `- ${l}`).join('\n') : '- None selected'}
+
+-- Previous Visits & Treatment History (For Disease Progression & Treatment Response) --
+${previousVisitsSummary}
 
 ${isQueryDiagnosis ? `Doctor's Provisional / Query Diagnosis: ${combinedProvisional || 'Suspected autoimmune/rheumatic condition'}` : ''}
 Additional Doctor Notes & Symptoms: ${symptomsInput || 'None'} | ${doctorNotes || ''}`;
@@ -2836,7 +3055,18 @@ Return JSON ONLY:
           {patientName.trim() !== '' && (
             <>
               <View style={styles.card}>
-                <Text style={styles.sectionTitle}>🖼️ شبكة أشعة ومرفقات المريض (Grid View)</Text>
+                <View style={styles.cardHeaderRow}>
+                  <Text style={styles.sectionTitle}>🖼️ شبكة أشعة ومرفقات المريض (Grid View)</Text>
+                  {patientScansGrid.length > 0 && (
+                    <TouchableOpacity
+                      style={styles.reExtractBtn}
+                      onPress={handleSendAllArchivedScansToAI}
+                      disabled={processingAiImages}
+                    >
+                      <Text style={styles.reExtractBtnText}>🧠 قراءة كل الأرشيف بالـ AI</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
                 
                 {searchingHistory ? (
                   <ActivityIndicator color="#00F2FE" style={{ marginVertical: 10 }} />
@@ -2862,6 +3092,12 @@ Return JSON ONLY:
                           )}
                         </TouchableOpacity>
                         <Text style={styles.scanGridTitle} numberOfLines={1}>{sc.title}</Text>
+                        <TouchableOpacity 
+                          style={[styles.zoomMiniBtn, { width: '100%', alignItems: 'center', marginTop: 4 }]} 
+                          onPress={() => handleSendArchivedScanToAI(sc)}
+                        >
+                          <Text style={styles.zoomMiniBtnText}>🧠 قراءة بالـ AI</Text>
+                        </TouchableOpacity>
                         <TouchableOpacity 
                           style={styles.scanGridDeleteBtn} 
                           onPress={() => handleDeleteSavedScanFromRecord(sc.recordId, sc.url)}
@@ -3089,7 +3325,7 @@ Return JSON ONLY:
           </View>
 
           {/* الكارت الذكي 2: جدول التحاليل وتقرير الأشعة المستخرج من الصور */}
-          {(hasAiScanImages || extractedLabs.length > 0 || extractingLabsTable) && (
+          {(hasAiScanImages || extractedLabs.length > 0 || Boolean(extractedRadiologyNotes) || extractingLabsTable) && (
             <View style={[styles.card, { borderColor: '#0284C7' }]}>
               <View style={styles.cardHeaderRow}>
                 <Text style={styles.sectionTitle}>📊 2. جدول التحاليل والأشعة المستخرج من الصور (AI Table)</Text>
