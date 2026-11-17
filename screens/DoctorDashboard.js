@@ -846,7 +846,7 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
     : '';
   // =========================================================================
 
-  // --- استخراج جدول التحاليل وتقرير الأشعة تلقائياً فور وصول أي صورة (يدعم أي عدد من الصور بتقسيمها إلى دفعات من 5) ---
+  // --- استخراج جدول التحاليل وتقرير الأشعة تلقائياً فور وصول أي صورة (مع التبديل التلقائي بين نماذج الرؤية المتاحة في Groq) ---
   const handleExtractStructuredLabsFromImages = async (itemsToRead = aiScanItems) => {
     if (!itemsToRead || itemsToRead.length === 0) return;
 
@@ -871,12 +871,56 @@ Respond ONLY with a valid JSON object without Markdown formatting:
   "radiologySummary": "ملخص تقرير الأشعة بالعربي أو الإنجليزي إن وجد، أو نص فارغ إذا كانت الصور تحاليل فقط"
 }`;
 
-    // تقسيم الصور إلى دفعات كل دفعة 5 صور كحد أقصى لتجاوز حد Groq (5 صور لكل طلب Vision)
+    // قائمة نماذج الرؤية بالترتيب لضمان استمرار العمل تلقائياً إذا تم إيقاف أحدها في Groq
+    const VISION_MODELS = [
+      "meta-llama/llama-4-maverick-17b-128e-instruct",
+      "meta-llama/llama-4-scout-17b-16e-instruct",
+      "llama-3.2-90b-vision-preview",
+      "llama-3.2-11b-vision-preview"
+    ];
+
+    // تقسيم الصور إلى دفعات كل دفعة 5 صور كحد أقصى
     const chunkSize = 5;
     const chunks = [];
     for (let i = 0; i < itemsToRead.length; i += chunkSize) {
       chunks.push(itemsToRead.slice(i, i + chunkSize));
     }
+
+    const callVisionWithFallback = async (userContentArray, batchIndex) => {
+      let lastError = null;
+      for (const modelName of VISION_MODELS) {
+        const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${GROQ_API_KEY}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            model: modelName,
+            messages: [
+              { role: "system", content: extractionSystemPrompt },
+              { role: "user", content: userContentArray }
+            ],
+            temperature: 0.1
+          })
+        });
+
+        if (response.ok) {
+          return await response.json();
+        }
+
+        const errObj = await response.json().catch(() => ({}));
+        const errMsg = errObj?.error?.message || `HTTP ${response.status}`;
+        lastError = new Error(`خطأ في الدفعة ${batchIndex + 1}: ${errMsg}`);
+
+        // إذا كان الخطأ بسبب عدم توفر اسم النموذج أو إيقافه، ننتقل تلقائياً للنموذج التالي في القائمة
+        if (/does not exist|decommissioned|not found|access/i.test(errMsg)) {
+          continue;
+        }
+        throw lastError;
+      }
+      throw lastError || new Error("لا يوجد نموذج رؤية متاح حالياً على Groq.");
+    };
 
     try {
       let allExtractedRows = [];
@@ -895,28 +939,7 @@ Respond ONLY with a valid JSON object without Markdown formatting:
           }))
         ];
 
-        const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            "Authorization": `Bearer ${GROQ_API_KEY}`,
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            model: "meta-llama/llama-4-scout-17b-16e-instruct",
-            messages: [
-              { role: "system", content: extractionSystemPrompt },
-              { role: "user", content: userContentArray }
-            ],
-            temperature: 0.1
-          })
-        });
-
-        if (!response.ok) {
-          const errObj = await response.json().catch(() => ({}));
-          throw new Error(errObj?.error?.message || `خطأ في قراءة الدفعة ${cIndex + 1} (${response.status})`);
-        }
-
-        const data = await response.json();
+        const data = await callVisionWithFallback(userContentArray, cIndex);
         const rawContent = data?.choices?.[0]?.message?.content || '{}';
         const cleanJson = rawContent.replace(/```json/g, '').replace(/```/g, '').trim();
         const parsed = JSON.parse(cleanJson);
