@@ -942,6 +942,10 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
     const analyzeRadiologyFilmsWithVision = async (visionImages) => {
       if (!visionImages || visionImages.length === 0) return '';
 
+      if (!GROQ_API_KEY) {
+        throw new Error('مفتاح GROQ_API_KEY غير مفعّل في إعدادات Vercel (تأكد من إضافته في Environment Variables ثم عمل Redeploy).');
+      }
+
       const activeJointsContext = Object.entries(selectedJointStates || {})
         .map(([id, state]) => `${getJointDisplayName(id)} (${state === 'inflamed' ? 'Swollen/Red' : 'Painful/Blue'})`)
         .join(', ');
@@ -970,6 +974,8 @@ Instructions:
         'meta-llama/llama-4-maverick-17b-128e-instruct'
       ];
 
+      let lastApiError = '';
+
       for (const modelName of visionModels) {
         try {
           const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -984,14 +990,24 @@ Instructions:
               temperature: 0.1
             })
           });
+
           if (res.ok) {
             const vData = await res.json();
             const vText = vData?.choices?.[0]?.message?.content?.trim();
             if (vText) return vText;
+          } else {
+            const errJson = await res.json().catch(() => ({}));
+            lastApiError = `Groq Error (${res.status}): ${errJson?.error?.message || res.statusText}`;
+            console.error('Groq Vision API Error:', modelName, lastApiError);
           }
         } catch (e) {
-          // الانتقال للنموذج الاحتياطي
+          lastApiError = e.message || 'خطأ في الاتصال بخادم Groq';
+          console.error('Groq Vision Fetch Error:', modelName, e);
         }
+      }
+
+      if (lastApiError) {
+        throw new Error(lastApiError);
       }
       return '';
     };
@@ -1388,7 +1404,10 @@ Respond ONLY with a valid JSON object without Markdown formatting:
 
   const handleSendArchivedScanToAI = async (scanObj) => {
     if (!scanObj || !scanObj.url) return;
-    if (aiScanItems.some(item => item.remoteUrl === scanObj.url)) {
+    const isDuplicate = aiScanItems.some(
+      item => item.remoteUrl === scanObj.url || (scanObj.title && item.title === scanObj.title)
+    );
+    if (isDuplicate) {
       showAlert('تنبيه', 'هذه الصورة مضافة بالفعل في قائمة قراءة الذكاء الاصطناعي.');
       return;
     }
@@ -1396,7 +1415,6 @@ Respond ONLY with a valid JSON object without Markdown formatting:
     try {
       const preparedItem = await prepareArchivedScanItem(scanObj, 0);
       setAiScanItems(prev => {
-        if (prev.some(item => item.remoteUrl === scanObj.url)) return prev;
         if (prev.length === 0) setManualLabsUnlocked(false);
         return [...prev, preparedItem];
       });
