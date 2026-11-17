@@ -846,7 +846,7 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
     : '';
   // =========================================================================
 
-  // --- استخراج جدول التحاليل وتقرير الأشعة تلقائياً فور وصول أي صورة (مع التبديل التلقائي بين نماذج الرؤية المتاحة في Groq) ---
+ // --- استخراج جدول التحاليل وتقرير الأشعة تلقائياً فور وصول أي صورة (مع ضغط ذكي والتبديل التلقائي بين نماذج الرؤية الفعالة في Groq) ---
   const handleExtractStructuredLabsFromImages = async (itemsToRead = aiScanItems) => {
     if (!itemsToRead || itemsToRead.length === 0) return;
 
@@ -871,13 +871,48 @@ Respond ONLY with a valid JSON object without Markdown formatting:
   "radiologySummary": "ملخص تقرير الأشعة بالعربي أو الإنجليزي إن وجد، أو نص فارغ إذا كانت الصور تحاليل فقط"
 }`;
 
-    // قائمة نماذج الرؤية بالترتيب لضمان استمرار العمل تلقائياً إذا تم إيقاف أحدها في Groq
+    // النماذج الفعالة حالياً للرؤية في Groq فقط
     const VISION_MODELS = [
-      "meta-llama/llama-4-maverick-17b-128e-instruct",
       "meta-llama/llama-4-scout-17b-16e-instruct",
-      "llama-3.2-90b-vision-preview",
-      "llama-3.2-11b-vision-preview"
+      "meta-llama/llama-4-maverick-17b-128e-instruct"
     ];
+
+    // تجهيز نسخة خفيفة وعالية الوضوح (1600px) من الصورة لتجاوز حد حجم الطلب 4MB في Groq API
+    const prepareApiImageUrl = (srcUrl) => {
+      return new Promise((resolve) => {
+        if (Platform.OS !== 'web' || !srcUrl || typeof srcUrl !== 'string') {
+          return resolve(srcUrl);
+        }
+        try {
+          const img = new window.Image();
+          img.crossOrigin = 'anonymous';
+          img.onload = () => {
+            const maxDim = 1600;
+            let w = img.width;
+            let h = img.height;
+            if (w > maxDim || h > maxDim) {
+              if (w > h) {
+                h = Math.round((h * maxDim) / w);
+                w = maxDim;
+              } else {
+                w = Math.round((w * maxDim) / h);
+                h = maxDim;
+              }
+            }
+            const canvas = document.createElement('canvas');
+            canvas.width = w;
+            canvas.height = h;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, w, h);
+            resolve(canvas.toDataURL('image/jpeg', 0.85));
+          };
+          img.onerror = () => resolve(srcUrl);
+          img.src = srcUrl;
+        } catch (e) {
+          resolve(srcUrl);
+        }
+      });
+    };
 
     // تقسيم الصور إلى دفعات كل دفعة 5 صور كحد أقصى
     const chunkSize = 5;
@@ -887,39 +922,38 @@ Respond ONLY with a valid JSON object without Markdown formatting:
     }
 
     const callVisionWithFallback = async (userContentArray, batchIndex) => {
-      let lastError = null;
+      const errorsLog = [];
       for (const modelName of VISION_MODELS) {
-        const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            "Authorization": `Bearer ${GROQ_API_KEY}`,
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            model: modelName,
-            messages: [
-              { role: "system", content: extractionSystemPrompt },
-              { role: "user", content: userContentArray }
-            ],
-            temperature: 0.1
-          })
-        });
+        try {
+          const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+            method: "POST",
+            headers: {
+              "Authorization": `Bearer ${GROQ_API_KEY}`,
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+              model: modelName,
+              messages: [
+                { role: "system", content: extractionSystemPrompt },
+                { role: "user", content: userContentArray }
+              ],
+              temperature: 0.1,
+              max_tokens: 4096
+            })
+          });
 
-        if (response.ok) {
-          return await response.json();
+          if (response.ok) {
+            return await response.json();
+          }
+
+          const errObj = await response.json().catch(() => ({}));
+          const errMsg = errObj?.error?.message || `HTTP ${response.status}`;
+          errorsLog.push(`${modelName}: ${errMsg}`);
+        } catch (netErr) {
+          errorsLog.push(`${modelName}: ${netErr.message}`);
         }
-
-        const errObj = await response.json().catch(() => ({}));
-        const errMsg = errObj?.error?.message || `HTTP ${response.status}`;
-        lastError = new Error(`خطأ في الدفعة ${batchIndex + 1}: ${errMsg}`);
-
-        // إذا كان الخطأ بسبب عدم توفر اسم النموذج أو إيقافه، ننتقل تلقائياً للنموذج التالي في القائمة
-        if (/does not exist|decommissioned|not found|access/i.test(errMsg)) {
-          continue;
-        }
-        throw lastError;
       }
-      throw lastError || new Error("لا يوجد نموذج رؤية متاح حالياً على Groq.");
+      throw new Error(`خطأ في الدفعة ${batchIndex + 1} -> ${errorsLog.join(' | ')}`);
     };
 
     try {
@@ -928,20 +962,27 @@ Respond ONLY with a valid JSON object without Markdown formatting:
 
       for (let cIndex = 0; cIndex < chunks.length; cIndex++) {
         const batch = chunks[cIndex];
+        const optimizedUrls = await Promise.all(
+          batch.map(item => prepareApiImageUrl(item.base64 || item.remoteUrl || item.previewUrl))
+        );
+
         const userContentArray = [
           {
             type: "text",
             text: `Extract all laboratory test rows and radiology findings from these ${batch.length} image(s) (Batch ${cIndex + 1} of ${chunks.length}) into structured JSON.`
           },
-          ...batch.map(item => ({
+          ...optimizedUrls.map(url => ({
             type: "image_url",
-            image_url: { url: item.base64 || item.remoteUrl || item.previewUrl }
+            image_url: { url }
           }))
         ];
 
         const data = await callVisionWithFallback(userContentArray, cIndex);
         const rawContent = data?.choices?.[0]?.message?.content || '{}';
-        const cleanJson = rawContent.replace(/```json/g, '').replace(/```/g, '').trim();
+        const jsonMatch = rawContent.match(/\{[\s\S]*\}/);
+        const cleanJson = jsonMatch
+          ? jsonMatch[0]
+          : rawContent.replace(/```json/g, '').replace(/```/g, '').trim();
         const parsed = JSON.parse(cleanJson);
 
         if (Array.isArray(parsed.labs)) {
