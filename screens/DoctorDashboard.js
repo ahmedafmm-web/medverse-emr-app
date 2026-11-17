@@ -846,17 +846,30 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
     : '';
   // =========================================================================
 
- // --- استخراج جدول التحاليل وتقرير الأشعة تلقائياً فور وصول أي صورة (مع ضغط ذكي والتبديل التلقائي بين نماذج الرؤية الفعالة في Groq) ---
+// --- استخراج جدول التحاليل وتقرير الأشعة تلقائياً عبر القارئ البصري (OCR) + تنظيمه بنموذج Groq الفعال ---
   const handleExtractStructuredLabsFromImages = async (itemsToRead = aiScanItems) => {
     if (!itemsToRead || itemsToRead.length === 0) return;
 
     setExtractingLabsTable(true);
     setLabsExtractionError('');
 
-    const extractionSystemPrompt = `You are a high-precision Medical Laboratory & Radiology OCR Extractor.
-Read ALL attached medical lab reports and radiology scans carefully.
-Extract every single lab test parameter, value, unit, reference range, and status (Normal, High, Low, Positive, Negative).
-Also extract any radiology/imaging report summary.
+    const loadTesseractScript = () => {
+      return new Promise((resolve, reject) => {
+        if (typeof window === 'undefined') return reject(new Error('مدعوم على الويب فقط'));
+        if (window.Tesseract) return resolve(window.Tesseract);
+        const script = document.createElement('script');
+        script.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
+        script.onload = () => resolve(window.Tesseract);
+        script.onerror = () => reject(new Error('تعذر تحميل محرك القراءة البصرية OCR، تأكد من الاتصال بالإنترنت.'));
+        document.head.appendChild(script);
+      });
+    };
+
+    const extractionSystemPrompt = `You are a high-precision Medical Laboratory & Radiology OCR Parser.
+You will receive raw OCR text extracted from medical lab reports and radiology scans.
+Parse and organize every single lab test parameter, value, unit, reference range, and status (Normal, High, Low, Positive, Negative).
+Fix minor OCR typos in medical test names (e.g., E5R -> ESR, CRp -> CRP, Anti-CCP, RF, ANA, CBC, Hb, WBC, Platelets, ALT, AST, Creatinine, Uric Acid).
+Also extract any radiology/imaging report summary if present.
 Respond ONLY with a valid JSON object without Markdown formatting:
 {
   "labs": [
@@ -871,140 +884,70 @@ Respond ONLY with a valid JSON object without Markdown formatting:
   "radiologySummary": "ملخص تقرير الأشعة بالعربي أو الإنجليزي إن وجد، أو نص فارغ إذا كانت الصور تحاليل فقط"
 }`;
 
-    // النماذج الفعالة حالياً للرؤية في Groq فقط
-    const VISION_MODELS = [
-      "meta-llama/llama-4-scout-17b-16e-instruct",
-      "meta-llama/llama-4-maverick-17b-128e-instruct"
-    ];
+    try {
+      const Tesseract = await loadTesseractScript();
+      const worker = await Tesseract.createWorker('eng+ara');
 
-    // تجهيز نسخة خفيفة وعالية الوضوح (1600px) من الصورة لتجاوز حد حجم الطلب 4MB في Groq API
-    const prepareApiImageUrl = (srcUrl) => {
-      return new Promise((resolve) => {
-        if (Platform.OS !== 'web' || !srcUrl || typeof srcUrl !== 'string') {
-          return resolve(srcUrl);
-        }
-        try {
-          const img = new window.Image();
-          img.crossOrigin = 'anonymous';
-          img.onload = () => {
-            const maxDim = 1600;
-            let w = img.width;
-            let h = img.height;
-            if (w > maxDim || h > maxDim) {
-              if (w > h) {
-                h = Math.round((h * maxDim) / w);
-                w = maxDim;
-              } else {
-                w = Math.round((w * maxDim) / h);
-                h = maxDim;
-              }
-            }
-            const canvas = document.createElement('canvas');
-            canvas.width = w;
-            canvas.height = h;
-            const ctx = canvas.getContext('2d');
-            ctx.drawImage(img, 0, 0, w, h);
-            resolve(canvas.toDataURL('image/jpeg', 0.85));
-          };
-          img.onerror = () => resolve(srcUrl);
-          img.src = srcUrl;
-        } catch (e) {
-          resolve(srcUrl);
-        }
-      });
-    };
-
-    // تقسيم الصور إلى دفعات كل دفعة 5 صور كحد أقصى
-    const chunkSize = 5;
-    const chunks = [];
-    for (let i = 0; i < itemsToRead.length; i += chunkSize) {
-      chunks.push(itemsToRead.slice(i, i + chunkSize));
-    }
-
-    const callVisionWithFallback = async (userContentArray, batchIndex) => {
-      const errorsLog = [];
-      for (const modelName of VISION_MODELS) {
-        try {
-          const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-            method: "POST",
-            headers: {
-              "Authorization": `Bearer ${GROQ_API_KEY}`,
-              "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-              model: modelName,
-              messages: [
-                { role: "system", content: extractionSystemPrompt },
-                { role: "user", content: userContentArray }
-              ],
-              temperature: 0.1,
-              max_tokens: 4096
-            })
-          });
-
-          if (response.ok) {
-            return await response.json();
-          }
-
-          const errObj = await response.json().catch(() => ({}));
-          const errMsg = errObj?.error?.message || `HTTP ${response.status}`;
-          errorsLog.push(`${modelName}: ${errMsg}`);
-        } catch (netErr) {
-          errorsLog.push(`${modelName}: ${netErr.message}`);
+      let combinedOcrText = '';
+      for (let i = 0; i < itemsToRead.length; i++) {
+        const item = itemsToRead[i];
+        const imgSrc = item.base64 || item.previewUrl || item.remoteUrl;
+        if (!imgSrc) continue;
+        const { data: { text } } = await worker.recognize(imgSrc);
+        if (text && text.trim()) {
+          combinedOcrText += `\n--- Document ${i + 1} (${item.title || 'Scan'}) ---\n${text.trim()}\n`;
         }
       }
-      throw new Error(`خطأ في الدفعة ${batchIndex + 1} -> ${errorsLog.join(' | ')}`);
-    };
+      await worker.terminate();
 
-    try {
-      let allExtractedRows = [];
-      let combinedRadiologySummaries = [];
+      if (!combinedOcrText.trim()) {
+        throw new Error('لم يتم العثور على نصوص واضحة في الصورة. تأكد من إضاءة ووضوح الورقة أو أضف القيم يدوياً.');
+      }
 
-      for (let cIndex = 0; cIndex < chunks.length; cIndex++) {
-        const batch = chunks[cIndex];
-        const optimizedUrls = await Promise.all(
-          batch.map(item => prepareApiImageUrl(item.base64 || item.remoteUrl || item.previewUrl))
-        );
+      const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${GROQ_API_KEY}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          model: "openai/gpt-oss-120b",
+          messages: [
+            { role: "system", content: extractionSystemPrompt },
+            { role: "user", content: `Parse the following raw OCR text from ${itemsToRead.length} medical document(s) into structured JSON:\n${combinedOcrText}` }
+          ],
+          temperature: 0.1
+        })
+      });
 
-        const userContentArray = [
-          {
-            type: "text",
-            text: `Extract all laboratory test rows and radiology findings from these ${batch.length} image(s) (Batch ${cIndex + 1} of ${chunks.length}) into structured JSON.`
-          },
-          ...optimizedUrls.map(url => ({
-            type: "image_url",
-            image_url: { url }
-          }))
-        ];
+      if (!response.ok) {
+        const errObj = await response.json().catch(() => ({}));
+        throw new Error(errObj?.error?.message || `خطأ في الخادم (${response.status})`);
+      }
 
-        const data = await callVisionWithFallback(userContentArray, cIndex);
-        const rawContent = data?.choices?.[0]?.message?.content || '{}';
-        const jsonMatch = rawContent.match(/\{[\s\S]*\}/);
-        const cleanJson = jsonMatch
-          ? jsonMatch[0]
-          : rawContent.replace(/```json/g, '').replace(/```/g, '').trim();
-        const parsed = JSON.parse(cleanJson);
+      const data = await response.json();
+      const rawContent = data?.choices?.[0]?.message?.content || '{}';
+      const jsonMatch = rawContent.match(/\{[\s\S]*\}/);
+      const cleanJson = jsonMatch
+        ? jsonMatch[0]
+        : rawContent.replace(/```json/g, '').replace(/```/g, '').trim();
+      const parsed = JSON.parse(cleanJson);
 
-        if (Array.isArray(parsed.labs)) {
-          const batchRows = parsed.labs.map((r, idx) => ({
-            id: `lab_${Date.now()}_${cIndex}_${idx}`,
+      const allExtractedRows = Array.isArray(parsed.labs)
+        ? parsed.labs.map((r, idx) => ({
+            id: `lab_${Date.now()}_${idx}`,
             testName: r.testName || '',
             value: String(r.value ?? ''),
             unit: r.unit || '',
             referenceRange: r.referenceRange || '',
             status: r.status || 'Normal'
-          }));
-          allExtractedRows = [...allExtractedRows, ...batchRows];
-        }
-
-        if (parsed.radiologySummary && parsed.radiologySummary.trim()) {
-          combinedRadiologySummaries.push(parsed.radiologySummary.trim());
-        }
-      }
+          }))
+        : [];
 
       setExtractedLabs(allExtractedRows);
-      if (combinedRadiologySummaries.length > 0) {
-        setExtractedRadiologyNotes(combinedRadiologySummaries.join('\n---\n'));
+
+      if (parsed.radiologySummary && parsed.radiologySummary.trim()) {
+        setExtractedRadiologyNotes(parsed.radiologySummary.trim());
       }
 
       // تغذية حاسبة DAS28 تلقائياً بقيم ESR أو CRP المستخرجة من الجدول إن وجدت
@@ -1024,7 +967,6 @@ Respond ONLY with a valid JSON object without Markdown formatting:
       setExtractingLabsTable(false);
     }
   };
-
   // تشغيل استخراج الجدول تلقائياً عند إضافة أو تحديث صور التحاليل
   useEffect(() => {
     if (aiScanItems.length === 0) {
