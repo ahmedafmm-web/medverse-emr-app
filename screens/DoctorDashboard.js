@@ -846,7 +846,7 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
     : '';
   // =========================================================================
 
-  // --- استخراج جدول التحاليل وتقرير الأشعة تلقائياً فور وصول أي صورة ---
+  // --- استخراج جدول التحاليل وتقرير الأشعة تلقائياً فور وصول أي صورة (يدعم أي عدد من الصور بتقسيمها إلى دفعات من 5) ---
   const handleExtractStructuredLabsFromImages = async (itemsToRead = aiScanItems) => {
     if (!itemsToRead || itemsToRead.length === 0) return;
 
@@ -871,64 +871,85 @@ Respond ONLY with a valid JSON object without Markdown formatting:
   "radiologySummary": "ملخص تقرير الأشعة بالعربي أو الإنجليزي إن وجد، أو نص فارغ إذا كانت الصور تحاليل فقط"
 }`;
 
+    // تقسيم الصور إلى دفعات كل دفعة 5 صور كحد أقصى لتجاوز حد Groq (5 صور لكل طلب Vision)
+    const chunkSize = 5;
+    const chunks = [];
+    for (let i = 0; i < itemsToRead.length; i += chunkSize) {
+      chunks.push(itemsToRead.slice(i, i + chunkSize));
+    }
+
     try {
-      const userContentArray = [
-        { type: "text", text: `Extract all laboratory test rows and radiology findings from these ${itemsToRead.length} image(s) into structured JSON.` },
-        ...itemsToRead.map(item => ({
-          type: "image_url",
-          image_url: { url: item.base64 || item.remoteUrl || item.previewUrl }
-        }))
-      ];
+      let allExtractedRows = [];
+      let combinedRadiologySummaries = [];
 
-      const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${GROQ_API_KEY}`,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          model: "openai/gpt-oss-120b",
-          messages: [
-            { role: "system", content: extractionSystemPrompt },
-            { role: "user", content: userContentArray }
-          ],
-          temperature: 0.1
-        })
-      });
+      for (let cIndex = 0; cIndex < chunks.length; cIndex++) {
+        const batch = chunks[cIndex];
+        const userContentArray = [
+          {
+            type: "text",
+            text: `Extract all laboratory test rows and radiology findings from these ${batch.length} image(s) (Batch ${cIndex + 1} of ${chunks.length}) into structured JSON.`
+          },
+          ...batch.map(item => ({
+            type: "image_url",
+            image_url: { url: item.base64 || item.remoteUrl || item.previewUrl }
+          }))
+        ];
 
-      if (!response.ok) {
-        const errObj = await response.json().catch(() => ({}));
-        throw new Error(errObj?.error?.message || `خطأ في قراءة الصور (${response.status})`);
-      }
+        const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${GROQ_API_KEY}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            model: "meta-llama/llama-4-scout-17b-16e-instruct",
+            messages: [
+              { role: "system", content: extractionSystemPrompt },
+              { role: "user", content: userContentArray }
+            ],
+            temperature: 0.1
+          })
+        });
 
-      const data = await response.json();
-      const rawContent = data?.choices?.[0]?.message?.content || '{}';
-      const cleanJson = rawContent.replace(/```json/g, '').replace(/```/g, '').trim();
-      const parsed = JSON.parse(cleanJson);
+        if (!response.ok) {
+          const errObj = await response.json().catch(() => ({}));
+          throw new Error(errObj?.error?.message || `خطأ في قراءة الدفعة ${cIndex + 1} (${response.status})`);
+        }
 
-      const rows = Array.isArray(parsed.labs)
-        ? parsed.labs.map((r, idx) => ({
-            id: `lab_${Date.now()}_${idx}`,
+        const data = await response.json();
+        const rawContent = data?.choices?.[0]?.message?.content || '{}';
+        const cleanJson = rawContent.replace(/```json/g, '').replace(/```/g, '').trim();
+        const parsed = JSON.parse(cleanJson);
+
+        if (Array.isArray(parsed.labs)) {
+          const batchRows = parsed.labs.map((r, idx) => ({
+            id: `lab_${Date.now()}_${cIndex}_${idx}`,
             testName: r.testName || '',
             value: String(r.value ?? ''),
             unit: r.unit || '',
             referenceRange: r.referenceRange || '',
             status: r.status || 'Normal'
-          }))
-        : [];
+          }));
+          allExtractedRows = [...allExtractedRows, ...batchRows];
+        }
 
-      setExtractedLabs(rows);
-      if (parsed.radiologySummary) {
-        setExtractedRadiologyNotes(parsed.radiologySummary);
+        if (parsed.radiologySummary && parsed.radiologySummary.trim()) {
+          combinedRadiologySummaries.push(parsed.radiologySummary.trim());
+        }
+      }
+
+      setExtractedLabs(allExtractedRows);
+      if (combinedRadiologySummaries.length > 0) {
+        setExtractedRadiologyNotes(combinedRadiologySummaries.join('\n---\n'));
       }
 
       // تغذية حاسبة DAS28 تلقائياً بقيم ESR أو CRP المستخرجة من الجدول إن وجدت
-      const foundEsr = rows.find(r => /\besr\b|sedimentation|الترسيب/i.test(r.testName));
+      const foundEsr = allExtractedRows.find(r => /\besr\b|sedimentation|الترسيب/i.test(r.testName));
       if (foundEsr && foundEsr.value) {
         const num = String(foundEsr.value).replace(/[^0-9.]/g, '');
         if (num) setDasEsrInput(num);
       }
-      const foundCrp = rows.find(r => /\bcrp\b|c-reactive|البروتين التفاعلي/i.test(r.testName));
+      const foundCrp = allExtractedRows.find(r => /\bcrp\b|c-reactive|البروتين التفاعلي/i.test(r.testName));
       if (foundCrp && foundCrp.value) {
         const num = String(foundCrp.value).replace(/[^0-9.]/g, '');
         if (num) setDasCrpInput(num);
@@ -1717,10 +1738,15 @@ Respond ONLY with a valid JSON object without Markdown formatting:
     handleSearchPatientByName(dummyName);
   };
 
-  // --- نموذج الاستنتاج الطبي المعتمد على الجدول الظاهر وحساب DAS28 وخريطة المفاصل ---
+  // --- نموذج الاستنتاج الطبي المعتمد على الجدول الظاهر وحساب DAS28 وخريطة المفاصل (يدعم أي عدد من الصور عبر النصوص المستخرجة) ---
   const handleClinicalAnalysis = async () => {
     if (!patientName.trim()) {
       showAlert('تنبيه', 'يرجى إدخال اسم المريض أولاً.');
+      return;
+    }
+
+    if (extractingLabsTable) {
+      showAlert('يرجى الانتظار', 'جاري استخراج نتائج التحاليل من الصور حالياً، انتظر ثوانٍ معدودة ثم اضغط تحليل.');
       return;
     }
 
@@ -1771,7 +1797,7 @@ Respond ONLY with a valid JSON object without Markdown formatting:
       : "";
 
     const multiImageInstruction = aiScanItems.length > 0
-      ? `\nIMPORTANT: The doctor has attached ${aiScanItems.length} lab/radiology image(s) AND verified the extracted lab table provided in the prompt. Cross-check the verified extracted lab table and attached images, integrate all abnormal lab values, DAS28 disease activity score, and radiology notes directly into your clinical assessment and warnings.`
+      ? `\nIMPORTANT: The doctor has uploaded/scanned ${aiScanItems.length} lab/radiology image(s) which were OCR-extracted and verified in the structured lab table below. Integrate all abnormal lab values, DAS28 disease activity score, and radiology notes directly into your clinical assessment and warnings.`
       : "";
 
     const systemPrompt = `You are an expert AI Clinical Rheumatologist & Immunologist.
@@ -1813,7 +1839,7 @@ Family History: ${familyHistoryText || 'None'} | Family Risk Signs: ${familySign
 -- Physical & Clinical Tests --
 - Physical Examination Findings: ${clinicalTestsNames.join(', ') || 'None'}
 
--- Verified Extracted Lab Table (Doctor-Reviewed OCR Results) --
+-- Verified Extracted Lab Table (Doctor-Reviewed OCR Results from ${aiScanItems.length} Scanned Document(s)) --
 ${structuredTableSummary || 'No structured lab table rows extracted'}
 ${extractedRadiologyNotes ? `\n-- Extracted Radiology Notes --\n${extractedRadiologyNotes}` : ''}
 
@@ -1824,34 +1850,14 @@ ${isQueryDiagnosis ? `Doctor's Provisional / Query Diagnosis: ${combinedProvisio
 Additional Doctor Notes & Symptoms: ${symptomsInput || 'None'} | ${doctorNotes || ''}`;
 
     try {
-      let requestBody;
-      if (aiScanItems.length > 0) {
-        const userContentArray = [
-          { type: "text", text: promptText + `\n[Attached ${aiScanItems.length} High-Resolution Lab/Scan Image(s) alongside the Verified Lab Table]` },
-          ...aiScanItems.map(item => ({
-            type: "image_url",
-            image_url: { url: item.base64 || item.remoteUrl || item.previewUrl }
-          }))
-        ];
-
-        requestBody = {
-          model: "openai/gpt-oss-120b",
-          messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: userContentArray }
-          ],
-          temperature: 0.2
-        };
-      } else {
-        requestBody = {
-          model: "openai/gpt-oss-120b",
-          messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: promptText }
-          ],
-          temperature: 0.2
-        };
-      }
+      const requestBody = {
+        model: "openai/gpt-oss-120b",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: promptText }
+        ],
+        temperature: 0.2
+      };
 
       const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
         method: "POST",
@@ -2009,8 +2015,8 @@ Return JSON ONLY:
           .insert([{ 
             doctor_name: clinicDoctorName, 
             specialty: specialty, 
-            clinic_name: clinicName,
-            logo_url: clinicLogoUrl,
+            clinic_name: clinicName, 
+            logo_url: clinicLogoUrl, 
             stamp_url: digitalStampUrl,
             phone: clinicPhone,
             address: clinicAddress,
@@ -2894,7 +2900,7 @@ Return JSON ONLY:
               )}
             </View>
 
-            <ClinicalHint text="الخطوة الأولى: صوّر أوراق التحاليل والأشعة بالموبايل (QR) أو بكاميرا اللابتوب أو ارفعها من جهازك؛ سيقوم الذكاء الاصطناعي بقراءتها وتحويلها لجدول أرقام منظم يظهر أمامك مباشرة." />
+            <ClinicalHint text="الخطوة الأولى: صوّر أوراق التحاليل والأشعة بالموبايل (QR) أو بكاميرا اللابتوب أو ارفعها من جهازك (بأي عدد من الصور)؛ سيقوم الذكاء الاصطناعي بقراءتها وتحويلها لجدول أرقام منظم يظهر أمامك مباشرة." />
 
             {Platform.OS === 'web' ? (
               <View style={styles.aiUploadButtonsRow}>
