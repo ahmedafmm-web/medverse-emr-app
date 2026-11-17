@@ -403,6 +403,8 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
   const [extractedRadiologyNotes, setExtractedRadiologyNotes] = useState('');
   const [extractingLabsTable, setExtractingLabsTable] = useState(false);
   const [labsExtractionError, setLabsExtractionError] = useState('');
+  const [showPrevLabsComparison, setShowPrevLabsComparison] = useState(false);
+  const [includeLabsInPdf, setIncludeLabsInPdf] = useState(false);
   const lastExtractedSignatureRef = useRef('');
 
   // --- حالات نافذة الكاميرا الحية المدمجة للكمبيوتر واللابتوب (USB / External Webcam) ---
@@ -846,7 +848,7 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
     : '';
   // =========================================================================
 
-// --- استخراج جدول التحاليل وتقرير الأشعة تلقائياً عبر القارئ البصري (OCR) + تنظيمه بنموذج Groq الفعال ---
+  // --- استخراج جدول التحاليل وتقرير الأشعة تلقائياً عبر القارئ البصري عالي الدقة (OCR) + تنظيمه بنموذج Groq الفعال ---
   const handleExtractStructuredLabsFromImages = async (itemsToRead = aiScanItems) => {
     if (!itemsToRead || itemsToRead.length === 0) return;
 
@@ -865,19 +867,52 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
       });
     };
 
-    const extractionSystemPrompt = `You are a high-precision Medical Laboratory & Radiology OCR Parser.
+    // تجهيز نسخة عالية التباين (أبيض وأسود حاد) لتسهيل قراءة الأرقام المائلة والجدول بدقة
+    const prepareHighContrastOcrImage = (srcUrl) => {
+      return new Promise((resolve) => {
+        if (Platform.OS !== 'web' || !srcUrl || typeof srcUrl !== 'string') {
+          return resolve(srcUrl);
+        }
+        try {
+          const img = new window.Image();
+          img.crossOrigin = 'anonymous';
+          img.onload = () => {
+            const scale = img.width < 2000 ? 2 : 1;
+            const canvas = document.createElement('canvas');
+            canvas.width = img.width * scale;
+            canvas.height = img.height * scale;
+            const ctx = canvas.getContext('2d');
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
+            if (typeof ctx.filter !== 'undefined') {
+              ctx.filter = 'grayscale(100%) contrast(1.45) brightness(1.05)';
+            }
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            resolve(canvas.toDataURL('image/png'));
+          };
+          img.onerror = () => resolve(srcUrl);
+          img.src = srcUrl;
+        } catch (e) {
+          resolve(srcUrl);
+        }
+      });
+    };
+
+    const extractionSystemPrompt = `You are a strict Medical Laboratory & Radiology OCR Parser.
 You will receive raw OCR text extracted from medical lab reports and radiology scans.
-Parse and organize every single lab test parameter, value, unit, reference range, and status (Normal, High, Low, Positive, Negative).
-Fix minor OCR typos in medical test names (e.g., E5R -> ESR, CRp -> CRP, Anti-CCP, RF, ANA, CBC, Hb, WBC, Platelets, ALT, AST, Creatinine, Uric Acid).
-Also extract any radiology/imaging report summary if present.
+CRITICAL RULES:
+1. Extract ONLY exact numbers and reference ranges explicitly present in the OCR text. NEVER invent or assume standard reference ranges if a range is written in the text (e.g., if the text says 0 - 15, output "0 - 15", NOT "0 - 20").
+2. Compare the extracted numeric value against the extracted reference range accurately to set "status" ("High", "Low", "Normal", "Positive", "Negative"). For example, if value is 25 and referenceRange is "0 - 15", status MUST be "High".
+3. Do NOT confuse patient age, date (e.g. 17/11/2026), or phone numbers with lab test results.
+4. Fix minor OCR typos in medical test names only (e.g., E5R -> ESR, CRp -> CRP).
 Respond ONLY with a valid JSON object without Markdown formatting:
 {
   "labs": [
     {
-      "testName": "ESR (1st hr)",
-      "value": "48",
+      "testName": "Erythrocyte Sedimentation Rate (ESR)",
+      "value": "25",
       "unit": "mm/hr",
-      "referenceRange": "0 - 20",
+      "referenceRange": "0 - 15",
       "status": "High"
     }
   ],
@@ -886,14 +921,19 @@ Respond ONLY with a valid JSON object without Markdown formatting:
 
     try {
       const Tesseract = await loadTesseractScript();
-      const worker = await Tesseract.createWorker('eng+ara');
+      const worker = await Tesseract.createWorker('eng');
+      await worker.setParameters({
+        tessedit_pageseg_mode: '6',
+        preserve_interword_spaces: '1'
+      });
 
       let combinedOcrText = '';
       for (let i = 0; i < itemsToRead.length; i++) {
         const item = itemsToRead[i];
-        const imgSrc = item.base64 || item.previewUrl || item.remoteUrl;
-        if (!imgSrc) continue;
-        const { data: { text } } = await worker.recognize(imgSrc);
+        const rawSrc = item.base64 || item.previewUrl || item.remoteUrl;
+        if (!rawSrc) continue;
+        const processedSrc = await prepareHighContrastOcrImage(rawSrc);
+        const { data: { text } } = await worker.recognize(processedSrc);
         if (text && text.trim()) {
           combinedOcrText += `\n--- Document ${i + 1} (${item.title || 'Scan'}) ---\n${text.trim()}\n`;
         }
@@ -914,9 +954,9 @@ Respond ONLY with a valid JSON object without Markdown formatting:
           model: "openai/gpt-oss-120b",
           messages: [
             { role: "system", content: extractionSystemPrompt },
-            { role: "user", content: `Parse the following raw OCR text from ${itemsToRead.length} medical document(s) into structured JSON:\n${combinedOcrText}` }
+            { role: "user", content: `Parse the following raw OCR text from ${itemsToRead.length} medical document(s) into structured JSON without guessing values:\n${combinedOcrText}` }
           ],
-          temperature: 0.1
+          temperature: 0.0
         })
       });
 
@@ -978,6 +1018,34 @@ Respond ONLY with a valid JSON object without Markdown formatting:
     lastExtractedSignatureRef.current = sig;
     handleExtractStructuredLabsFromImages(aiScanItems);
   }, [aiScanItems]);
+
+  // جلب نتيجة نفس التحليل من آخر زيارة سابقة مسجلة للمريض للمقارنة الجانبية
+  const getPreviousLabValue = (testName) => {
+    if (!testName || !Array.isArray(patientHistory) || patientHistory.length === 0) return null;
+    const cleanTarget = testName.toLowerCase().replace(/[^a-z0-9\u0600-\u06FF]/g, '');
+    if (!cleanTarget) return null;
+
+    for (const rec of patientHistory) {
+      let df = rec.dynamic_fields;
+      if (typeof df === 'string') {
+        try { df = JSON.parse(df); } catch (e) { df = {}; }
+      }
+      const prevList = df?.extractedLabs || df?.extracted_labs;
+      if (Array.isArray(prevList) && prevList.length > 0) {
+        const match = prevList.find(item => {
+          const cleanPrev = (item.testName || '').toLowerCase().replace(/[^a-z0-9\u0600-\u06FF]/g, '');
+          return cleanPrev && (cleanPrev === cleanTarget || cleanPrev.includes(cleanTarget) || cleanTarget.includes(cleanPrev));
+        });
+        if (match && match.value) {
+          return {
+            value: match.value,
+            date: rec.visit_date || (rec.created_at ? rec.created_at.split('T')[0] : '')
+          };
+        }
+      }
+    }
+    return null;
+  };
 
   const handleUpdateExtractedLabCell = (rowId, field, newValue) => {
     setExtractedLabs(prev =>
@@ -2173,7 +2241,15 @@ Return JSON ONLY:
           'الأمراض المزمنة': chronicDiseases || 'لا يوجد',
           'ملاحظات التشخيص': isQueryDiagnosis
             ? `تشخيص محتمل (${combinedProvisional || 'Query Diagnosis'}) - يحتاج متابعة`
-            : 'فحص معتمد'
+            : 'فحص معتمد',
+          ...(includeLabsInPdf && extractedLabs.length > 0
+            ? {
+                'ملخص التحاليل': extractedLabs
+                  .filter(r => r.testName && r.value)
+                  .map(r => `${r.testName}: ${r.value} ${r.unit || ''} (${r.status})`)
+                  .join(' | ')
+              }
+            : {})
         },
         prescribedMeds,
         {
@@ -3017,17 +3093,47 @@ Return JSON ONLY:
             <View style={[styles.card, { borderColor: '#0284C7' }]}>
               <View style={styles.cardHeaderRow}>
                 <Text style={styles.sectionTitle}>📊 2. جدول التحاليل والأشعة المستخرج من الصور (AI Table)</Text>
-                {hasAiScanImages && (
-                  <TouchableOpacity
-                    style={styles.reExtractBtn}
-                    onPress={() => handleExtractStructuredLabsFromImages(aiScanItems)}
-                    disabled={extractingLabsTable}
-                  >
-                    <Text style={styles.reExtractBtnText}>
-                      {extractingLabsTable ? 'جاري القراءة...' : '🔄 إعادة استخراج الجدول'}
-                    </Text>
-                  </TouchableOpacity>
-                )}
+                <View style={{ flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 6 }}>
+                  {patientHistory.length > 0 && extractedLabs.length > 0 && (
+                    <TouchableOpacity
+                      style={[
+                        styles.reExtractBtn,
+                        showPrevLabsComparison && { backgroundColor: '#0284C7', borderColor: '#00F2FE' }
+                      ]}
+                      onPress={() => setShowPrevLabsComparison(prev => !prev)}
+                    >
+                      <Text style={[styles.reExtractBtnText, showPrevLabsComparison && { color: '#FFFFFF' }]}>
+                        {showPrevLabsComparison ? '✓ إخفاء المقارنة السابقة' : '📈 مقارنة بالزيارة السابقة'}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+
+                  {extractedLabs.length > 0 && (
+                    <TouchableOpacity
+                      style={[
+                        styles.reExtractBtn,
+                        includeLabsInPdf && { backgroundColor: '#047857', borderColor: '#10B981' }
+                      ]}
+                      onPress={() => setIncludeLabsInPdf(prev => !prev)}
+                    >
+                      <Text style={[styles.reExtractBtnText, includeLabsInPdf && { color: '#FFFFFF' }]}>
+                        {includeLabsInPdf ? '✓ مُدرج في الطباعة PDF' : '🖨️ إرفاق بالروشتة PDF'}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+
+                  {hasAiScanImages && (
+                    <TouchableOpacity
+                      style={styles.reExtractBtn}
+                      onPress={() => handleExtractStructuredLabsFromImages(aiScanItems)}
+                      disabled={extractingLabsTable}
+                    >
+                      <Text style={styles.reExtractBtnText}>
+                        {extractingLabsTable ? 'جاري القراءة...' : '🔄 إعادة استخراج الجدول'}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
               </View>
 
               <ClinicalHint text="هذا الجدول يعرض كل القيم التي قرأها الذكاء الاصطناعي من الصور بوضوح أمامك. يمكنك تعديل أي رقم مباشرة بلمسة واحدة، وسيعتمد نموذج التشخيص النهائي على هذه القيم الظاهرة هنا." />
@@ -3055,6 +3161,9 @@ Return JSON ONLY:
                     <Text style={[styles.labTableHeaderCell, { flex: 0.9 }]}>الوحدة</Text>
                     <Text style={[styles.labTableHeaderCell, { flex: 1.1 }]}>الطبيعي</Text>
                     <Text style={[styles.labTableHeaderCell, { flex: 0.9 }]}>الحالة</Text>
+                    {showPrevLabsComparison && (
+                      <Text style={[styles.labTableHeaderCell, { flex: 1.1 }]}>الزيارة السابقة</Text>
+                    )}
                     <Text style={[styles.labTableHeaderCell, { width: 28 }]}>✕</Text>
                   </View>
 
@@ -3095,6 +3204,29 @@ Return JSON ONLY:
                           value={row.status}
                           onChangeText={(val) => handleUpdateExtractedLabCell(row.id, 'status', val)}
                         />
+                        {showPrevLabsComparison && (() => {
+                          const prevData = getPreviousLabValue(row.testName);
+                          if (!prevData) {
+                            return (
+                              <Text style={[styles.labCellInput, { flex: 1.1, color: '#64748B', fontSize: 10 }]}>
+                                أول مرة
+                              </Text>
+                            );
+                          }
+                          const currNum = parseFloat(String(row.value).replace(/[^0-9.]/g, ''));
+                          const prevNum = parseFloat(String(prevData.value).replace(/[^0-9.]/g, ''));
+                          let trendIcon = '';
+                          if (!isNaN(currNum) && !isNaN(prevNum)) {
+                            if (currNum < prevNum) trendIcon = ' 📉';
+                            else if (currNum > prevNum) trendIcon = ' 📈';
+                            else trendIcon = ' ➖';
+                          }
+                          return (
+                            <Text style={[styles.labCellInput, { flex: 1.1, color: '#38BDF8', fontSize: 10 }]}>
+                              {prevData.value}{trendIcon}
+                            </Text>
+                          );
+                        })()}
                         <TouchableOpacity
                           style={styles.labRowDeleteBtn}
                           onPress={() => handleRemoveExtractedLabRow(row.id)}
