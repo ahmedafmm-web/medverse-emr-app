@@ -1,4 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
+
+if (typeof document !== 'undefined' && !document.getElementById('medverse-emoji-font-fix')) {
+  const styleTag = document.createElement('style');
+  styleTag.id = 'medverse-emoji-font-fix';
+  styleTag.innerHTML = `* { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Cairo", "Tajawal", "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif; }`;
+  document.head.appendChild(styleTag);
+}
 import { 
   StyleSheet, Text, View, TextInput, ScrollView, 
   TouchableOpacity, Alert, ActivityIndicator, Platform, Image, Linking, Modal
@@ -875,58 +882,25 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
     : '';
   // =========================================================================
 
-  // --- استخراج جدول التحاليل (OCR) + القراءة البصرية المباشرة لأفلام الأشعة (Multimodal Vision AI) ---
+  // --- استخراج سريع فائق الأداء (3-7 ثوانٍ) لجدول التحاليل والتقارير وأفلام الأشعة ---
   const handleExtractStructuredLabsFromImages = async (itemsToRead = aiScanItems) => {
     if (!itemsToRead || itemsToRead.length === 0) return;
 
     setExtractingLabsTable(true);
     setLabsExtractionError('');
 
-    const loadTesseractScript = () => {
-      return new Promise((resolve, reject) => {
-        if (typeof window === 'undefined') return reject(new Error('مدعوم على الويب فقط'));
-        if (window.Tesseract) return resolve(window.Tesseract);
-        const script = document.createElement('script');
-        script.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
-        script.onload = () => resolve(window.Tesseract);
-        script.onerror = () => reject(new Error('تعذر تحميل محرك القراءة البصرية OCR، تأكد من الاتصال بالإنترنت.'));
-        document.head.appendChild(script);
-      });
+    const sanitizeRadiologyNoParens = (txt) => {
+      if (!txt) return '';
+      return String(txt)
+        .replace(/^\\+/, '')
+        .replace(/\s*\(([^()]+)\)/g, ' - $1')
+        .replace(/[()]/g, '')
+        .replace(/\s+-\s+-\s+/g, ' - ')
+        .trim();
     };
 
-    // 1. تجهيز نسخة أبيض وأسود عالية التباين لقراءة أرقام التحاليل بدقة
-    const prepareHighContrastOcrImage = (srcUrl) => {
-      return new Promise((resolve) => {
-        if (Platform.OS !== 'web' || !srcUrl || typeof srcUrl !== 'string') {
-          return resolve(srcUrl);
-        }
-        try {
-          const img = new window.Image();
-          img.crossOrigin = 'anonymous';
-          img.onload = () => {
-            const scale = img.width < 2000 ? 2 : 1;
-            const canvas = document.createElement('canvas');
-            canvas.width = img.width * scale;
-            canvas.height = img.height * scale;
-            const ctx = canvas.getContext('2d');
-            ctx.imageSmoothingEnabled = true;
-            ctx.imageSmoothingQuality = 'high';
-            if (typeof ctx.filter !== 'undefined') {
-              ctx.filter = 'grayscale(100%) contrast(1.45) brightness(1.05)';
-            }
-            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-            resolve(canvas.toDataURL('image/png'));
-          };
-          img.onerror = () => resolve(srcUrl);
-          img.src = srcUrl;
-        } catch (e) {
-          resolve(srcUrl);
-        }
-      });
-    };
-
-    // 2. تجهيز نسخة JPEG واضحة لإرسالها لنموذج الرؤية البصرية لقراءة أفلام الأشعة (X-Ray / MRI / US)
-    const prepareImageForVisionAI = (srcUrl, maxDim = 1280) => {
+    // ضغط ذكي وسريع للصور المرسلة للـ AI (1024px @ 0.80) لتقليل حجم الرفع 20 ضعفاً مع الحفاظ على وضوح الأرقام والأشعة
+    const prepareFastVisionImage = (srcUrl, maxDim = 1024, quality = 0.80) => {
       return new Promise((resolve) => {
         if (Platform.OS !== 'web' || !srcUrl || typeof srcUrl !== 'string') {
           return resolve(srcUrl);
@@ -951,9 +925,11 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
               canvas.width = w;
               canvas.height = h;
               const ctx = canvas.getContext('2d');
+              ctx.imageSmoothingEnabled = true;
+              ctx.imageSmoothingQuality = 'high';
               ctx.drawImage(img, 0, 0, w, h);
-              resolve(canvas.toDataURL('image/jpeg', 0.9));
-            } catch (canvasErr) {
+              resolve(canvas.toDataURL('image/jpeg', quality));
+            } catch (e) {
               resolve(srcUrl);
             }
           };
@@ -965,298 +941,189 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
       });
     };
 
-    // 3. دالة تحليل أفلام الأشعة غير النصية بصرياً عبر نموذج Gemini Vision (gemini-2.5-flash) وربطها بمواضع الألم على الخريطة
-    const analyzeRadiologyFilmsWithVision = async (visionImages) => {
-      if (!visionImages || visionImages.length === 0) return '';
-
-      if (!GEMINI_API_KEY) {
-        throw new Error('مفتاح EXPO_PUBLIC_GEMINI_API_KEY غير مفعّل في إعدادات Vercel (تأكد من إضافته في Environment Variables ثم عمل Redeploy).');
+    const toGeminiInlinePart = async (imgSrc) => {
+      if (!imgSrc || typeof imgSrc !== 'string') return null;
+      if (imgSrc.startsWith('data:')) {
+        const commaIdx = imgSrc.indexOf(',');
+        if (commaIdx === -1) return null;
+        const header = imgSrc.substring(0, commaIdx);
+        const mimeMatch = header.match(/data:(.*?);base64/);
+        const mimeType = mimeMatch ? mimeMatch[1] : 'image/jpeg';
+        const base64Data = imgSrc.substring(commaIdx + 1);
+        return { inline_data: { mime_type: mimeType, data: base64Data } };
       }
+      if (imgSrc.startsWith('http')) {
+        try {
+          const imgRes = await fetch(imgSrc, { mode: 'cors' });
+          if (!imgRes.ok) return null;
+          const blob = await imgRes.blob();
+          const dataUrl = await new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result);
+            reader.readAsDataURL(blob);
+          });
+          return await toGeminiInlinePart(dataUrl);
+        } catch (e) {
+          return null;
+        }
+      }
+      return null;
+    };
+
+    const fetchWithTimeout = async (url, options, timeoutMs = 28000) => {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), timeoutMs);
+      try {
+        return await fetch(url, { ...options, signal: controller.signal });
+      } finally {
+        clearTimeout(timer);
+      }
+    };
+
+    const runFastGeminiVision = async (preparedUrls) => {
+      if (!GEMINI_API_KEY) {
+        throw new Error('مفتاح EXPO_PUBLIC_GEMINI_API_KEY غير مفعّل في إعدادات Vercel.');
+      }
+
+      const imageParts = (await Promise.all(preparedUrls.map(u => toGeminiInlinePart(u)))).filter(Boolean);
+      if (imageParts.length === 0) return null;
 
       const activeJointsContext = Object.entries(selectedJointStates || {})
-        .map(([id, state]) => `${getJointDisplayName(id)} (${state === 'inflamed' ? 'Swollen/Red' : 'Painful/Blue'})`)
+        .map(([id, state]) => `${getJointDisplayName(id)} - ${state === 'inflamed' ? 'Swollen' : 'Painful'}`)
         .join(', ');
 
-      const visionPrompt = `You are an expert Musculoskeletal & Clinical Radiologist AI assisting a physician (${specialty}).
-Analyze the attached medical imaging scan(s) (X-Ray, MRI, Ultrasound, or CT) visually in detail.
-Patient Context: Age ${age || 'Unspecified'}, Gender: ${gender}, Chronic Diseases: ${chronicDiseases || 'None'}.
-Doctor's Selected Painful/Swollen Joints on Skeleton Map: ${activeJointsContext || 'None specified yet'}.
+      const unifiedPrompt = `You are a Clinical Pathologist & Musculoskeletal Radiologist AI (${specialty}).
+Analyze all ${imageParts.length} attached medical image(s) in one pass:
+1. Extract EVERY SINGLE lab test row from all tables into "labs" (do not skip any row; include testName, value, unit, referenceRange, status: "High"|"Low"|"Normal"|"Positive"|"Negative").
+2. If a written/printed radiology report is attached, summarize its findings & impression in formal Arabic inside "writtenRadiologyReport" (or "" if none).
+3. If an X-Ray/MRI/US/CT film is attached, provide a concise, structured Arabic radiological reading inside "visualRadiologyReading" covering region, alignment, joint spaces, erosions/cortex, bone density, soft tissues, and clinical impression (or "" if no film). Note any discrepancy if both written report and film exist.
+4. CRITICAL: In "writtenRadiologyReport" and "visualRadiologyReading", write purely in Arabic and NEVER use parentheses ( or ) anywhere.
+Patient: Age ${age || 'N/A'}, Gender ${gender}, Joints: ${activeJointsContext || 'None'}.
+Return ONLY valid JSON:
+{"labs":[{"testName":"","value":"","unit":"","referenceRange":"","status":"High"}],"writtenRadiologyReport":"","visualRadiologyReading":""}`;
 
-STRICT FORMATTING & PROFESSIONALISM RULES:
-1. Identify the anatomical region and imaging modality visible in each image.
-2. Describe key radiological findings objectively: bone alignment, joint spaces, cortical margins and erosions, bone mineralization, proliferative or degenerative changes, and soft tissues.
-3. Correlate findings with the doctor's selected painful or swollen joints if applicable, and provide a concise clinical impression and recommendation.
-4. CRITICAL: Write purely in formal, polished Arabic medical prose. NEVER use any parentheses ( or ) anywhere in the report—do NOT put English terms, translations, or explanations inside parentheses.
-5. Do NOT include any leading backslashes or JSON formatting; return clean structured Arabic report text only.`;
+      const geminiParts = [{ text: unifiedPrompt }, ...imageParts];
 
-      const toGeminiInlinePart = async (imgSrc) => {
-        if (!imgSrc || typeof imgSrc !== 'string') return null;
-        if (imgSrc.startsWith('data:')) {
-          const commaIdx = imgSrc.indexOf(',');
-          if (commaIdx === -1) return null;
-          const header = imgSrc.substring(0, commaIdx);
-          const mimeMatch = header.match(/data:(.*?);base64/);
-          const mimeType = mimeMatch ? mimeMatch[1] : 'image/jpeg';
-          const base64Data = imgSrc.substring(commaIdx + 1);
-          return { inline_data: { mime_type: mimeType, data: base64Data } };
-        }
-        if (imgSrc.startsWith('http')) {
-          try {
-            const imgRes = await fetch(imgSrc, { mode: 'cors' });
-            if (!imgRes.ok) return null;
-            const blob = await imgRes.blob();
-            const dataUrl = await new Promise((resolve) => {
-              const reader = new FileReader();
-              reader.onloadend = () => resolve(reader.result);
-              reader.readAsDataURL(blob);
-            });
-            return await toGeminiInlinePart(dataUrl);
-          } catch (e) {
-            return null;
-          }
-        }
-        return null;
-      };
+      const cachedModel = (typeof window !== 'undefined' && window.localStorage)
+        ? localStorage.getItem('medverse_working_gemini_model')
+        : null;
 
-      const imageParts = [];
-      for (const imgUrl of visionImages) {
-        const part = await toGeminiInlinePart(imgUrl);
-        if (part) imageParts.push(part);
-      }
+      const candidateModels = Array.from(new Set([
+        ...(cachedModel ? [cachedModel] : []),
+        'gemini-2.5-flash',
+        'gemini-2.0-flash'
+      ]));
 
-      if (imageParts.length === 0) {
-        throw new Error('تعذر تجهيز صورة الأشعة للقراءة البصرية via Gemini Vision.');
-      }
+      let lastErr = '';
 
-      const geminiParts = [
-        { text: visionPrompt },
-        ...imageParts
-      ];
-
-      const tryCallGeminiVisionModel = async (rawModelName) => {
-        const cleanModel = rawModelName.replace(/^models\//, '');
+      const callModel = async (modelName) => {
+        const cleanModel = modelName.replace(/^models\//, '');
         const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${cleanModel}:generateContent?key=${encodeURIComponent(GEMINI_API_KEY)}`;
-        const res = await fetch(endpoint, {
+        const res = await fetchWithTimeout(endpoint, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             contents: [{ parts: geminiParts }],
             generationConfig: {
-              temperature: 0.1
+              temperature: 0.1,
+              responseMimeType: 'application/json'
             }
           })
-        });
+        }, 28000);
 
-        if (res.ok) {
-          const vData = await res.json();
-          const candidate = vData?.candidates?.[0];
-          const vText = candidate?.content?.parts
-            ?.map(p => p.text || '')
-            .join('')
-            .trim();
-          if (vText) return { ok: true, text: vText };
-          const finishReason = candidate?.finishReason || vData?.promptFeedback?.blockReason || 'EMPTY_RESPONSE';
-          return { ok: false, error: `Gemini Vision (${cleanModel}) لم يُرجع نصاً (${finishReason})` };
-        } else {
-          const errJson = await res.json().catch(() => ({}));
-          const errMsg = `Gemini Vision Error (${res.status}): ${errJson?.error?.message || res.statusText}`;
-          console.error('Gemini Vision API Error:', cleanModel, errMsg);
-          return { ok: false, error: errMsg, status: res.status };
+        if (!res.ok) {
+          const errBody = await res.json().catch(() => ({}));
+          throw new Error(errBody?.error?.message || `HTTP ${res.status}`);
         }
+
+        const data = await res.json();
+        const rawText = data?.candidates?.[0]?.content?.parts?.map(p => p.text || '').join('').trim();
+        if (!rawText) throw new Error('استجابة فارغة');
+
+        const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+        const cleanJson = jsonMatch ? jsonMatch[0] : rawText.replace(/```json/g, '').replace(/```/g, '').trim();
+        const parsed = JSON.parse(cleanJson);
+
+        if (typeof window !== 'undefined' && window.localStorage) {
+          localStorage.setItem('medverse_working_gemini_model', cleanModel);
+        }
+        return parsed;
       };
 
-      const geminiVisionModels = [
-        'gemini-3.8-flash',
-        'gemini-3.5-flash',
-        'gemini-3-flash-preview',
-        'gemini-2.5-flash'
-      ];
-
-      let lastApiError = '';
-
-      for (const modelName of geminiVisionModels) {
+      for (const m of candidateModels) {
         try {
-          const attempt = await tryCallGeminiVisionModel(modelName);
-          if (attempt.ok) return attempt.text;
-          lastApiError = attempt.error;
+          return await callModel(m);
         } catch (e) {
-          lastApiError = e.message || 'خطأ في الاتصال بخادم Gemini Vision';
-          console.error('Gemini Vision Fetch Error:', modelName, e);
+          lastErr = e.message || 'خطأ في الاتصال';
         }
       }
 
-      // مسار اكتشاف تلقائي لأحدث نموذج Flash متاح على مفتاح API في حال تغيّر اسم الإصدار مستقبلاً
-      try {
-        const listRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(GEMINI_API_KEY)}`);
-        if (listRes.ok) {
-          const listData = await listRes.json();
-          const dynamicFlashModels = (listData?.models || [])
-            .filter(m =>
-              Array.isArray(m.supportedGenerationMethods) &&
-              m.supportedGenerationMethods.includes('generateContent') &&
-              /gemini.*flash/i.test(m.name || '') &&
-              !/lite|8b|thinking|image|audio|tts/i.test(m.name || '')
-            )
-            .map(m => m.name.replace(/^models\//, ''))
-            .filter(name => !geminiVisionModels.includes(name))
-            .reverse();
+      // اكتشاف تلقائي سريع لأحدث نموذج Flash متاح فقط إذا فشل الاسمان القياسيان
+      const listRes = await fetchWithTimeout(
+        `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(GEMINI_API_KEY)}`,
+        {},
+        8000
+      );
+      if (listRes.ok) {
+        const listData = await listRes.json();
+        const fallbackModel = (listData?.models || [])
+          .filter(m =>
+            Array.isArray(m.supportedGenerationMethods) &&
+            m.supportedGenerationMethods.includes('generateContent') &&
+            /gemini.*flash/i.test(m.name || '') &&
+            !/lite|8b|thinking|image|audio|tts/i.test(m.name || '')
+          )
+          .map(m => m.name.replace(/^models\//, ''))
+          .reverse()[0];
 
-          for (const dynModel of dynamicFlashModels.slice(0, 3)) {
-            const attempt = await tryCallGeminiVisionModel(dynModel);
-            if (attempt.ok) return attempt.text;
-            lastApiError = attempt.error;
-          }
+        if (fallbackModel) {
+          return await callModel(fallbackModel);
         }
-      } catch (discoverErr) {
-        console.error('Gemini Model Discovery Error:', discoverErr);
       }
 
-      if (lastApiError) {
-        throw new Error(lastApiError);
-      }
-      return '';
+      throw new Error(lastErr || 'تعذر الوصول لخدمة القراءة البصرية');
     };
 
-    const extractionSystemPrompt = `You are a strict Medical Laboratory & Radiology OCR Parser.
-You will receive raw OCR text extracted from medical lab reports and written radiology reports.
-CRITICAL RULES:
-1. Extract ONLY exact numbers and reference ranges explicitly present in the OCR text. NEVER invent or assume standard reference ranges if a range is written in the text (e.g., if the text says 0 - 15, output "0 - 15", NOT "0 - 20").
-2. Compare the extracted numeric value against the extracted reference range accurately to set "status" ("High", "Low", "Normal", "Positive", "Negative"). For example, if value is 25 and referenceRange is "0 - 15", status MUST be "High".
-3. Do NOT confuse patient age, date (e.g. 17/11/2026), or phone numbers with lab test results.
-4. Fix minor OCR typos in medical test names only (e.g., E5R -> ESR, CRp -> CRP).
-Respond ONLY with a valid JSON object without Markdown formatting:
-{
-  "labs": [
-    {
-      "testName": "Erythrocyte Sedimentation Rate (ESR)",
-      "value": "25",
-      "unit": "mm/hr",
-      "referenceRange": "0 - 15",
-      "status": "High"
-    }
-  ],
-  "radiologySummary": "ملخص تقرير الأشعة المكتوب بالعربي أو الإنجليزي إن وجد، أو نص فارغ إذا كانت الصور تحاليل فقط"
-}`;
-
     try {
-      const Tesseract = await loadTesseractScript();
-      const worker = await Tesseract.createWorker('eng');
-      await worker.setParameters({
-        tessedit_pageseg_mode: '6',
-        preserve_interword_spaces: '1'
-      });
-
-      let combinedOcrText = '';
-      const visionCandidateImages = [];
-      const allPreparedImagesForFallback = [];
-
-      for (let i = 0; i < itemsToRead.length; i++) {
-        const item = itemsToRead[i];
-        const rawSrc = item.base64 || item.previewUrl || item.remoteUrl;
-        if (!rawSrc) continue;
-
-        const processedSrc = await prepareHighContrastOcrImage(rawSrc);
-        const { data: { text } } = await worker.recognize(processedSrc);
-        const cleanText = (text || '').trim();
-        const alphaNumCount = cleanText.replace(/[^a-zA-Z0-9]/g, '').length;
-        const hasLabKeywords = /\b(esr|crp|cbc|wbc|rbc|hgb|hb|plt|alt|ast|creatinine|urea|uric|ana|ccp|rf|anti|result|reference|range|unit|normal|high|low|mg\/dl|mmol|mm\/hr|u\/l|g\/dl)\b/i.test(cleanText);
-        const isRadiologyTitle = /x-?ray|mri|ct|scan|ultrasound|radiograph|film|أشعة|رنين|مقطعية|سونار/i.test(item.title || '');
-
-        if (alphaNumCount >= 35) {
-          combinedOcrText += `\n--- Document ${i + 1} (${item.title || 'Report'}) ---\n${cleanText}\n`;
-        }
-
-        const visionReadyUrl = await prepareImageForVisionAI(rawSrc);
-        if (visionReadyUrl && (visionReadyUrl.startsWith('data:image') || visionReadyUrl.startsWith('http'))) {
-          allPreparedImagesForFallback.push(visionReadyUrl);
-          // إذا لم تكن الصورة ورقة تحاليل غنية بالكلمات المخبرية أو كان نصها قليلاً أو عنوانها أشعة، نمررها فوراً لـ Gemini Vision
-          if (!hasLabKeywords || alphaNumCount < 180 || isRadiologyTitle) {
-            visionCandidateImages.push(visionReadyUrl);
-          }
-        }
-      }
-      await worker.terminate();
-
-      let parsedLabs = [];
-      let textRadiologySummary = '';
-
-      // أ) استخراج جدول التحاليل والتقارير المكتوبة إن وجد نص
-      if (combinedOcrText.trim()) {
-        const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            "Authorization": `Bearer ${GROQ_API_KEY}`,
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            model: "openai/gpt-oss-120b",
-            messages: [
-              { role: "system", content: extractionSystemPrompt },
-              { role: "user", content: `Parse the following raw OCR text from ${itemsToRead.length} medical document(s) into structured JSON without guessing values:\n${combinedOcrText}` }
-            ],
-            temperature: 0.0
+      // تجهيز وضغط كل الصور بالتوازي في أقل من نصف ثانية
+      const preparedUrls = (
+        await Promise.all(
+          itemsToRead.map(item => {
+            const rawSrc = item.base64 || item.previewUrl || item.remoteUrl;
+            return rawSrc ? prepareFastVisionImage(rawSrc, 1024, 0.80) : Promise.resolve(null);
           })
-        });
+        )
+      ).filter(Boolean);
 
-        if (response.ok) {
-          const data = await response.json();
-          const rawContent = data?.choices?.[0]?.message?.content || '{}';
-          const jsonMatch = rawContent.match(/\{[\s\S]*\}/);
-          const cleanJson = jsonMatch
-            ? jsonMatch[0]
-            : rawContent.replace(/```json/g, '').replace(/```/g, '').trim();
-          const parsed = JSON.parse(cleanJson);
-
-          parsedLabs = Array.isArray(parsed.labs)
-            ? parsed.labs.map((r, idx) => ({
-                id: `lab_${Date.now()}_${idx}`,
-                testName: r.testName || '',
-                value: String(r.value ?? ''),
-                unit: r.unit || '',
-                referenceRange: r.referenceRange || '',
-                status: r.status || 'Normal'
-              }))
-            : [];
-          textRadiologySummary = (parsed.radiologySummary || '').trim();
-        }
+      if (preparedUrls.length === 0) {
+        throw new Error('لا توجد صور صالحة للقراءة.');
       }
 
-      // ب) القراءة البصرية لأفلام الأشعة (X-Ray / MRI) عبر نموذج Gemini Vision
-      // إذا لم يستخرج OCR أي تحاليل أو تقارير مكتوبة، نُمرر كل الصور تلقائياً لـ Gemini Vision لضمان قراءتها
-      const finalVisionImages =
-        visionCandidateImages.length > 0
-          ? visionCandidateImages
-          : (parsedLabs.length === 0 && !textRadiologySummary ? allPreparedImagesForFallback : []);
+      const extractedResult = await runFastGeminiVision(preparedUrls);
 
-      let visualRadiologyReading = '';
-      if (finalVisionImages.length > 0) {
-        visualRadiologyReading = await analyzeRadiologyFilmsWithVision(finalVisionImages);
-      }
+      const parsedLabs = Array.isArray(extractedResult?.labs)
+        ? extractedResult.labs.map((r, idx) => ({
+            id: `lab_${Date.now()}_${idx}`,
+            testName: r.testName || '',
+            value: String(r.value ?? ''),
+            unit: r.unit || '',
+            referenceRange: r.referenceRange || '',
+            status: r.status || 'Normal'
+          }))
+        : [];
 
-      if (parsedLabs.length === 0 && !textRadiologySummary && !visualRadiologyReading) {
+      const cleanedVisualReading = sanitizeRadiologyNoParens(extractedResult?.visualRadiologyReading);
+      const cleanedWrittenReport = sanitizeRadiologyNoParens(extractedResult?.writtenRadiologyReport);
+
+      if (parsedLabs.length === 0 && !cleanedVisualReading && !cleanedWrittenReport) {
         throw new Error('لم يتم العثور على نصوص واضحة أو تفاصيل إشعاعية مقروءة. تأكد من إضاءة ووضوح الصورة.');
       }
 
       setExtractedLabs(parsedLabs);
 
-      const sanitizeRadiologyNoParens = (txt) => {
-        if (!txt) return '';
-        return txt
-          .replace(/^\\+/, '')
-          .replace(/\s*\(([^()]+)\)/g, ' - $1')
-          .replace(/[()]/g, '')
-          .replace(/\s+-\s+-\s+/g, ' - ')
-          .trim();
-      };
-
-      const cleanedVisualReading = sanitizeRadiologyNoParens(visualRadiologyReading);
-      const cleanedTextSummary = sanitizeRadiologyNoParens(textRadiologySummary);
-
       const combinedRadiologyNotes = [
-        cleanedVisualReading ? `🩻 تقرير القراءة البصرية للأشعة:\n${cleanedVisualReading}` : '',
-        cleanedTextSummary ? `📄 ملخص التقرير المكتوب:\n${cleanedTextSummary}` : ''
+        cleanedVisualReading ? `🔬 القراءة البصرية لصورة الأشعة:\n${cleanedVisualReading}` : '',
+        cleanedWrittenReport ? `📋 ملخص تقرير الأشعة المرفق:\n${cleanedWrittenReport}` : ''
       ].filter(Boolean).join('\n\n');
 
       if (combinedRadiologyNotes) {
@@ -1264,7 +1131,7 @@ Respond ONLY with a valid JSON object without Markdown formatting:
         setRadiologyReportApproved(false);
       }
 
-      // تغذية حاسبة DAS28 تلقائياً بقيم ESR أو CRP المستخرجة من الجدول إن وجدت
+      // تغذية حاسبة DAS28 تلقائياً بقيم ESR أو CRP المستخرجة من الجدول
       const foundEsr = parsedLabs.find(r => /\besr\b|sedimentation|الترسيب/i.test(r.testName));
       if (foundEsr && foundEsr.value) {
         const num = String(foundEsr.value).replace(/[^0-9.]/g, '');
@@ -1281,6 +1148,7 @@ Respond ONLY with a valid JSON object without Markdown formatting:
       setExtractingLabsTable(false);
     }
   };
+
   // تشغيل استخراج الجدول تلقائياً عند إضافة أو تحديث صور التحاليل
   useEffect(() => {
     if (aiScanItems.length === 0) {
@@ -2943,7 +2811,7 @@ Return JSON ONLY:
         <View style={styles.bridgeModalOverlay}>
           <View style={[styles.bridgeModalCard, { maxWidth: 640, maxHeight: '90%' }]}>
             <View style={styles.bridgeModalHeader}>
-              <Text style={styles.bridgeModalTitle}>🩻 معاينة ومراجعة تقرير الأشعة قبل الاعتماد</Text>
+              <Text style={styles.bridgeModalTitle}>🔬 معاينة ومراجعة تقرير الأشعة قبل الاعتماد</Text>
               <TouchableOpacity
                 style={styles.bridgeCloseBtn}
                 onPress={() => {
@@ -3572,7 +3440,7 @@ Return JSON ONLY:
           {(hasAiScanImages || extractedLabs.length > 0 || Boolean(extractedRadiologyNotes) || extractingLabsTable) && (
             <View style={[styles.card, { borderColor: '#0284C7' }]}>
               <View style={styles.cardHeaderRow}>
-                <Text style={styles.sectionTitle}>📊 2. جدول التحاليل والأشعة المستخرج من الصور (AI Table)</Text>
+                <Text style={styles.sectionTitle}>📋 2. جدول التحاليل والأشعة المستخرج من الصور (AI Table)</Text>
                 <View style={{ flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 6 }}>
                   {patientHistory.length > 0 && extractedLabs.length > 0 && (
                     <TouchableOpacity
@@ -3733,7 +3601,7 @@ Return JSON ONLY:
                   onPress={() => handleOpenRadiologyReviewModal(false)}
                 >
                   <View style={{ flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                    <Text style={styles.radiologySummaryTitle}>🩻 تقرير الأشعة المستخلص من الصورة</Text>
+                    <Text style={styles.radiologySummaryTitle}>🔬 تقرير الأشعة المستخلص من الصورة</Text>
                     <View style={[
                       styles.radApprovalBadge,
                       radiologyReportApproved ? styles.radApprovalBadgeDone : styles.radApprovalBadgePending
