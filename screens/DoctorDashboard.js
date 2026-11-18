@@ -1,11 +1,4 @@
 import React, { useState, useEffect, useRef } from 'react';
-
-if (typeof document !== 'undefined' && !document.getElementById('medverse-emoji-font-fix')) {
-  const styleTag = document.createElement('style');
-  styleTag.id = 'medverse-emoji-font-fix';
-  styleTag.innerHTML = `* { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Cairo", "Tajawal", "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif; }`;
-  document.head.appendChild(styleTag);
-}
 import { 
   StyleSheet, Text, View, TextInput, ScrollView, 
   TouchableOpacity, Alert, ActivityIndicator, Platform, Image, Linking, Modal
@@ -882,25 +875,58 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
     : '';
   // =========================================================================
 
-  // --- استخراج سريع فائق الأداء (3-7 ثوانٍ) لجدول التحاليل والتقارير وأفلام الأشعة ---
+  // --- استخراج جدول التحاليل (OCR) + القراءة البصرية المباشرة لأفلام الأشعة (Multimodal Vision AI) ---
   const handleExtractStructuredLabsFromImages = async (itemsToRead = aiScanItems) => {
     if (!itemsToRead || itemsToRead.length === 0) return;
 
     setExtractingLabsTable(true);
     setLabsExtractionError('');
 
-    const sanitizeRadiologyNoParens = (txt) => {
-      if (!txt) return '';
-      return String(txt)
-        .replace(/^\\+/, '')
-        .replace(/\s*\(([^()]+)\)/g, ' - $1')
-        .replace(/[()]/g, '')
-        .replace(/\s+-\s+-\s+/g, ' - ')
-        .trim();
+    const loadTesseractScript = () => {
+      return new Promise((resolve, reject) => {
+        if (typeof window === 'undefined') return reject(new Error('مدعوم على الويب فقط'));
+        if (window.Tesseract) return resolve(window.Tesseract);
+        const script = document.createElement('script');
+        script.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
+        script.onload = () => resolve(window.Tesseract);
+        script.onerror = () => reject(new Error('تعذر تحميل محرك القراءة البصرية OCR، تأكد من الاتصال بالإنترنت.'));
+        document.head.appendChild(script);
+      });
     };
 
-    // ضغط ذكي وسريع للصور المرسلة للـ AI (1024px @ 0.80) لتقليل حجم الرفع 20 ضعفاً مع الحفاظ على وضوح الأرقام والأشعة
-    const prepareFastVisionImage = (srcUrl, maxDim = 1024, quality = 0.80) => {
+    // 1. تجهيز نسخة أبيض وأسود عالية التباين لقراءة أرقام التحاليل بدقة
+    const prepareHighContrastOcrImage = (srcUrl) => {
+      return new Promise((resolve) => {
+        if (Platform.OS !== 'web' || !srcUrl || typeof srcUrl !== 'string') {
+          return resolve(srcUrl);
+        }
+        try {
+          const img = new window.Image();
+          img.crossOrigin = 'anonymous';
+          img.onload = () => {
+            const scale = img.width < 2000 ? 2 : 1;
+            const canvas = document.createElement('canvas');
+            canvas.width = img.width * scale;
+            canvas.height = img.height * scale;
+            const ctx = canvas.getContext('2d');
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
+            if (typeof ctx.filter !== 'undefined') {
+              ctx.filter = 'grayscale(100%) contrast(1.45) brightness(1.05)';
+            }
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            resolve(canvas.toDataURL('image/png'));
+          };
+          img.onerror = () => resolve(srcUrl);
+          img.src = srcUrl;
+        } catch (e) {
+          resolve(srcUrl);
+        }
+      });
+    };
+
+    // 2. تجهيز نسخة JPEG واضحة لإرسالها لنموذج الرؤية البصرية لقراءة أفلام الأشعة (X-Ray / MRI / US)
+    const prepareImageForVisionAI = (srcUrl, maxDim = 1280) => {
       return new Promise((resolve) => {
         if (Platform.OS !== 'web' || !srcUrl || typeof srcUrl !== 'string') {
           return resolve(srcUrl);
@@ -925,11 +951,9 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
               canvas.width = w;
               canvas.height = h;
               const ctx = canvas.getContext('2d');
-              ctx.imageSmoothingEnabled = true;
-              ctx.imageSmoothingQuality = 'high';
               ctx.drawImage(img, 0, 0, w, h);
-              resolve(canvas.toDataURL('image/jpeg', quality));
-            } catch (e) {
+              resolve(canvas.toDataURL('image/jpeg', 0.9));
+            } catch (canvasErr) {
               resolve(srcUrl);
             }
           };
@@ -941,197 +965,346 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
       });
     };
 
-    const toGeminiInlinePart = async (imgSrc) => {
-      if (!imgSrc || typeof imgSrc !== 'string') return null;
-      if (imgSrc.startsWith('data:')) {
-        const commaIdx = imgSrc.indexOf(',');
-        if (commaIdx === -1) return null;
-        const header = imgSrc.substring(0, commaIdx);
-        const mimeMatch = header.match(/data:(.*?);base64/);
-        const mimeType = mimeMatch ? mimeMatch[1] : 'image/jpeg';
-        const base64Data = imgSrc.substring(commaIdx + 1);
-        return { inline_data: { mime_type: mimeType, data: base64Data } };
-      }
-      if (imgSrc.startsWith('http')) {
-        try {
-          const imgRes = await fetch(imgSrc, { mode: 'cors' });
-          if (!imgRes.ok) return null;
-          const blob = await imgRes.blob();
-          const dataUrl = await new Promise((resolve) => {
-            const reader = new FileReader();
-            reader.onloadend = () => resolve(reader.result);
-            reader.readAsDataURL(blob);
-          });
-          return await toGeminiInlinePart(dataUrl);
-        } catch (e) {
-          return null;
-        }
-      }
-      return null;
-    };
-
-    const fetchWithTimeout = async (url, options, timeoutMs = 28000) => {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), timeoutMs);
-      try {
-        return await fetch(url, { ...options, signal: controller.signal });
-      } finally {
-        clearTimeout(timer);
-      }
-    };
-
-    const runFastGeminiVision = async (preparedUrls) => {
-      if (!GEMINI_API_KEY) {
-        throw new Error('مفتاح EXPO_PUBLIC_GEMINI_API_KEY غير مفعّل في إعدادات Vercel.');
-      }
-
-      const imageParts = (await Promise.all(preparedUrls.map(u => toGeminiInlinePart(u)))).filter(Boolean);
-      if (imageParts.length === 0) return null;
+    // 3. دالة تحليل أفلام الأشعة غير النصية بصرياً عبر نماذج Gemini Vision مع مسار احتياطي Groq Vision
+    const analyzeRadiologyFilmsWithVision = async (visionImages) => {
+      if (!visionImages || visionImages.length === 0) return '';
 
       const activeJointsContext = Object.entries(selectedJointStates || {})
-        .map(([id, state]) => `${getJointDisplayName(id)} - ${state === 'inflamed' ? 'Swollen' : 'Painful'}`)
+        .map(([id, state]) => `${getJointDisplayName(id)} (${state === 'inflamed' ? 'Swollen/Red' : 'Painful/Blue'})`)
         .join(', ');
 
-      const unifiedPrompt = `You are a Clinical Pathologist & Musculoskeletal Radiologist AI (${specialty}).
-Analyze all ${imageParts.length} attached medical image(s) in one pass:
-1. Extract EVERY SINGLE lab test row from all tables into "labs" (do not skip any row; include testName, value, unit, referenceRange, status: "High"|"Low"|"Normal"|"Positive"|"Negative").
-2. If a written/printed radiology report is attached, summarize its findings & impression in formal Arabic inside "writtenRadiologyReport" (or "" if none).
-3. If an X-Ray/MRI/US/CT film is attached, provide a concise, structured Arabic radiological reading inside "visualRadiologyReading" covering region, alignment, joint spaces, erosions/cortex, bone density, soft tissues, and clinical impression (or "" if no film). Note any discrepancy if both written report and film exist.
-4. CRITICAL: In "writtenRadiologyReport" and "visualRadiologyReading", write purely in Arabic and NEVER use parentheses ( or ) anywhere.
-Patient: Age ${age || 'N/A'}, Gender ${gender}, Joints: ${activeJointsContext || 'None'}.
-Return ONLY valid JSON:
-{"labs":[{"testName":"","value":"","unit":"","referenceRange":"","status":"High"}],"writtenRadiologyReport":"","visualRadiologyReading":""}`;
+      const visionPrompt = `You are an expert Musculoskeletal & Clinical Radiologist AI assisting a physician (${specialty}).
+Analyze the attached medical imaging scan(s) (X-Ray, MRI, Ultrasound, or CT) visually in detail.
+Patient Context: Age ${age || 'Unspecified'}, Gender: ${gender}, Chronic Diseases: ${chronicDiseases || 'None'}.
+Doctor's Selected Painful/Swollen Joints on Skeleton Map: ${activeJointsContext || 'None specified yet'}.
 
-      const geminiParts = [{ text: unifiedPrompt }, ...imageParts];
+STRICT FORMATTING & PROFESSIONALISM RULES:
+1. Identify the anatomical region and imaging modality visible in each image.
+2. Describe key radiological findings objectively: bone alignment, joint spaces, cortical margins and erosions, bone mineralization, proliferative or degenerative changes, and soft tissues.
+3. Correlate findings with the doctor's selected painful or swollen joints if applicable, and provide a concise clinical impression and recommendation.
+4. CRITICAL: Write purely in formal, polished Arabic medical prose. NEVER use any parentheses ( or ) anywhere in the report—do NOT put English terms, translations, or explanations inside parentheses.
+5. Do NOT include any leading backslashes or JSON formatting; return clean structured Arabic report text only.`;
 
-      const cachedModel = (typeof window !== 'undefined' && window.localStorage)
-        ? localStorage.getItem('medverse_working_gemini_model')
-        : null;
-
-      const candidateModels = Array.from(new Set([
-        ...(cachedModel ? [cachedModel] : []),
-        'gemini-2.5-flash',
-        'gemini-2.0-flash'
-      ]));
-
-      let lastErr = '';
-
-      const callModel = async (modelName) => {
-        const cleanModel = modelName.replace(/^models\//, '');
-        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${cleanModel}:generateContent?key=${encodeURIComponent(GEMINI_API_KEY)}`;
-        const res = await fetchWithTimeout(endpoint, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts: geminiParts }],
-            generationConfig: {
-              temperature: 0.1,
-              responseMimeType: 'application/json'
-            }
-          })
-        }, 28000);
-
-        if (!res.ok) {
-          const errBody = await res.json().catch(() => ({}));
-          throw new Error(errBody?.error?.message || `HTTP ${res.status}`);
+      const toDataUrl = async (imgSrc) => {
+        if (!imgSrc || typeof imgSrc !== 'string') return null;
+        if (imgSrc.startsWith('data:')) return imgSrc;
+        if (imgSrc.startsWith('http')) {
+          try {
+            const imgRes = await fetch(imgSrc, { mode: 'cors' });
+            if (!imgRes.ok) return null;
+            const blob = await imgRes.blob();
+            return await new Promise((resolve) => {
+              const reader = new FileReader();
+              reader.onloadend = () => resolve(reader.result);
+              reader.readAsDataURL(blob);
+            });
+          } catch (e) {
+            return null;
+          }
         }
-
-        const data = await res.json();
-        const rawText = data?.candidates?.[0]?.content?.parts?.map(p => p.text || '').join('').trim();
-        if (!rawText) throw new Error('استجابة فارغة');
-
-        const jsonMatch = rawText.match(/\{[\s\S]*\}/);
-        const cleanJson = jsonMatch ? jsonMatch[0] : rawText.replace(/```json/g, '').replace(/```/g, '').trim();
-        const parsed = JSON.parse(cleanJson);
-
-        if (typeof window !== 'undefined' && window.localStorage) {
-          localStorage.setItem('medverse_working_gemini_model', cleanModel);
-        }
-        return parsed;
+        return null;
       };
 
-      for (const m of candidateModels) {
+      const preparedDataUrls = [];
+      for (const imgUrl of visionImages) {
+        const dataUrl = await toDataUrl(imgUrl);
+        if (dataUrl && dataUrl.startsWith('data:')) {
+          preparedDataUrls.push(dataUrl);
+        }
+      }
+
+      if (preparedDataUrls.length === 0) {
+        throw new Error('تعذر تجهيز صورة الأشعة للقراءة البصرية.');
+      }
+
+      let lastApiError = '';
+
+      // المحاولة الأولى: نماذج Gemini Vision الحقيقية بالترتيب المعتمد
+      if (GEMINI_API_KEY) {
+        const imageParts = preparedDataUrls
+          .map((dataUrl) => {
+            const commaIdx = dataUrl.indexOf(',');
+            if (commaIdx === -1) return null;
+            const header = dataUrl.substring(0, commaIdx);
+            const mimeMatch = header.match(/data:(.*?);base64/);
+            const mimeType = mimeMatch ? mimeMatch[1] : 'image/jpeg';
+            const base64Data = dataUrl.substring(commaIdx + 1);
+            return { inline_data: { mime_type: mimeType, data: base64Data } };
+          })
+          .filter(Boolean);
+
+        const geminiParts = [{ text: visionPrompt }, ...imageParts];
+
+        const tryCallGeminiVisionModel = async (rawModelName) => {
+          const cleanModel = rawModelName.replace(/^models\//, '');
+          const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${cleanModel}:generateContent?key=${encodeURIComponent(GEMINI_API_KEY)}`;
+          const res = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ parts: geminiParts }],
+              generationConfig: { temperature: 0.1 }
+            })
+          });
+
+          if (res.ok) {
+            const vData = await res.json();
+            const candidate = vData?.candidates?.[0];
+            const vText = candidate?.content?.parts
+              ?.map(p => p.text || '')
+              .join('')
+              .trim();
+            if (vText) return { ok: true, text: vText };
+            const finishReason = candidate?.finishReason || vData?.promptFeedback?.blockReason || 'EMPTY_RESPONSE';
+            return { ok: false, error: `Gemini Vision (${cleanModel}) لم يُرجع نصاً (${finishReason})` };
+          } else {
+            const errJson = await res.json().catch(() => ({}));
+            const errMsg = `Gemini Vision Error (${res.status}): ${errJson?.error?.message || res.statusText}`;
+            console.error('Gemini Vision API Error:', cleanModel, errMsg);
+            return { ok: false, error: errMsg, status: res.status };
+          }
+        };
+
+        const geminiVisionModels = [
+          'gemini-2.5-flash',
+          'gemini-2.5-pro',
+          'gemini-2.0-flash'
+        ];
+
+        for (const modelName of geminiVisionModels) {
+          try {
+            const attempt = await tryCallGeminiVisionModel(modelName);
+            if (attempt.ok) return attempt.text;
+            lastApiError = attempt.error;
+          } catch (e) {
+            lastApiError = e.message || 'خطأ في الاتصال بخادم Gemini Vision';
+            console.error('Gemini Vision Fetch Error:', modelName, e);
+          }
+        }
+
+        // مسار اكتشاف تلقائي لأحدث نموذج Flash متاح على مفتاح API في حال تغيّر اسم الإصدار مستقبلاً
         try {
-          return await callModel(m);
-        } catch (e) {
-          lastErr = e.message || 'خطأ في الاتصال';
+          const listRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(GEMINI_API_KEY)}`);
+          if (listRes.ok) {
+            const listData = await listRes.json();
+            const dynamicFlashModels = (listData?.models || [])
+              .filter(m =>
+                Array.isArray(m.supportedGenerationMethods) &&
+                m.supportedGenerationMethods.includes('generateContent') &&
+                /gemini.*flash/i.test(m.name || '') &&
+                !/lite|8b|thinking|image|audio|tts/i.test(m.name || '')
+              )
+              .map(m => m.name.replace(/^models\//, ''))
+              .filter(name => !geminiVisionModels.includes(name))
+              .reverse();
+
+            for (const dynModel of dynamicFlashModels.slice(0, 2)) {
+              const attempt = await tryCallGeminiVisionModel(dynModel);
+              if (attempt.ok) return attempt.text;
+              lastApiError = attempt.error;
+            }
+          }
+        } catch (discoverErr) {
+          console.error('Gemini Model Discovery Error:', discoverErr);
         }
       }
 
-      // اكتشاف تلقائي سريع لأحدث نموذج Flash متاح فقط إذا فشل الاسمان القياسيان
-      const listRes = await fetchWithTimeout(
-        `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(GEMINI_API_KEY)}`,
-        {},
-        8000
-      );
-      if (listRes.ok) {
-        const listData = await listRes.json();
-        const fallbackModel = (listData?.models || [])
-          .filter(m =>
-            Array.isArray(m.supportedGenerationMethods) &&
-            m.supportedGenerationMethods.includes('generateContent') &&
-            /gemini.*flash/i.test(m.name || '') &&
-            !/lite|8b|thinking|image|audio|tts/i.test(m.name || '')
-          )
-          .map(m => m.name.replace(/^models\//, ''))
-          .reverse()[0];
+      // المحاولة الاحتياطية: Groq Vision API في حال تعذر Gemini Vision أو عدم توفر مفتاحه
+      if (GROQ_API_KEY) {
+        const groqVisionModels = [
+          'meta-llama/llama-4-scout-17b-16e-instruct',
+          'llama-3.2-90b-vision-preview'
+        ];
+        const groqUserContent = [
+          { type: 'text', text: visionPrompt },
+          ...preparedDataUrls.map(url => ({ type: 'image_url', image_url: { url } }))
+        ];
 
-        if (fallbackModel) {
-          return await callModel(fallbackModel);
+        for (const gModel of groqVisionModels) {
+          try {
+            const gRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${GROQ_API_KEY}`,
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                model: gModel,
+                messages: [{ role: 'user', content: groqUserContent }],
+                temperature: 0.1
+              })
+            });
+            if (gRes.ok) {
+              const gData = await gRes.json();
+              const gText = gData?.choices?.[0]?.message?.content?.trim();
+              if (gText) return gText;
+            } else {
+              const gErr = await gRes.json().catch(() => ({}));
+              lastApiError = `Groq Vision Error (${gRes.status}): ${gErr?.error?.message || gRes.statusText}`;
+            }
+          } catch (gEx) {
+            lastApiError = gEx.message || lastApiError;
+          }
         }
       }
 
-      throw new Error(lastErr || 'تعذر الوصول لخدمة القراءة البصرية');
+      if (lastApiError) {
+        throw new Error(lastApiError);
+      }
+      throw new Error('مفتاح EXPO_PUBLIC_GEMINI_API_KEY غير مفعّل في إعدادات البيئة.');
     };
 
-    try {
-      // تجهيز وضغط كل الصور بالتوازي في أقل من نصف ثانية
-      const preparedUrls = (
-        await Promise.all(
-          itemsToRead.map(item => {
-            const rawSrc = item.base64 || item.previewUrl || item.remoteUrl;
-            return rawSrc ? prepareFastVisionImage(rawSrc, 1024, 0.80) : Promise.resolve(null);
-          })
-        )
-      ).filter(Boolean);
+    const extractionSystemPrompt = `You are a strict Medical Laboratory & Radiology OCR Parser.
+You will receive raw OCR text extracted from medical lab reports and written radiology reports.
+CRITICAL RULES:
+1. Extract ONLY exact numbers and reference ranges explicitly present in the OCR text. NEVER invent or assume standard reference ranges if a range is written in the text (e.g., if the text says 0 - 15, output "0 - 15", NOT "0 - 20").
+2. Compare the extracted numeric value against the extracted reference range accurately to set "status" ("High", "Low", "Normal", "Positive", "Negative"). For example, if value is 25 and referenceRange is "0 - 15", status MUST be "High".
+3. Do NOT confuse patient age, date (e.g. 17/11/2026), or phone numbers with lab test results.
+4. Fix minor OCR typos in medical test names only (e.g., E5R -> ESR, CRp -> CRP).
+Respond ONLY with a valid JSON object without Markdown formatting:
+{
+  "labs": [
+    {
+      "testName": "Erythrocyte Sedimentation Rate (ESR)",
+      "value": "25",
+      "unit": "mm/hr",
+      "referenceRange": "0 - 15",
+      "status": "High"
+    }
+  ],
+  "radiologySummary": "ملخص تقرير الأشعة المكتوب بالعربي أو الإنجليزي إن وجد، أو نص فارغ إذا كانت الصور تحاليل فقط"
+}`;
 
-      if (preparedUrls.length === 0) {
-        throw new Error('لا توجد صور صالحة للقراءة.');
+    try {
+      const Tesseract = await loadTesseractScript();
+      const worker = await Tesseract.createWorker('eng');
+
+      let combinedOcrText = '';
+      const visionCandidateImages = [];
+      const allPreparedImagesForFallback = [];
+
+      try {
+        await worker.setParameters({
+          tessedit_pageseg_mode: '6',
+          preserve_interword_spaces: '1'
+        });
+
+        for (let i = 0; i < itemsToRead.length; i++) {
+          const item = itemsToRead[i];
+          const rawSrc = item.base64 || item.previewUrl || item.remoteUrl;
+          if (!rawSrc) continue;
+
+          const processedSrc = await prepareHighContrastOcrImage(rawSrc);
+          const { data: { text } } = await worker.recognize(processedSrc);
+          const cleanText = (text || '').trim();
+          const alphaNumCount = cleanText.replace(/[^a-zA-Z0-9]/g, '').length;
+          const hasLabKeywords = /\b(esr|crp|cbc|wbc|rbc|hgb|hb|plt|alt|ast|creatinine|urea|uric|ana|ccp|rf|anti|result|reference|range|unit|normal|high|low|mg\/dl|mmol|mm\/hr|u\/l|g\/dl)\b/i.test(cleanText);
+          const isRadiologyTitle = /x-?ray|mri|ct|scan|ultrasound|radiograph|film|أشعة|رنين|مقطعية|سونار/i.test(item.title || '');
+
+          if (alphaNumCount >= 35 && (hasLabKeywords || alphaNumCount >= 180)) {
+            combinedOcrText += `\n--- Document ${i + 1} (${item.title || 'Report'}) ---\n${cleanText}\n`;
+          }
+
+          const visionReadyUrl = await prepareImageForVisionAI(rawSrc);
+          if (visionReadyUrl && (visionReadyUrl.startsWith('data:image') || visionReadyUrl.startsWith('http'))) {
+            allPreparedImagesForFallback.push(visionReadyUrl);
+            if (!hasLabKeywords || alphaNumCount < 180 || isRadiologyTitle) {
+              visionCandidateImages.push(visionReadyUrl);
+            }
+          }
+        }
+      } finally {
+        await worker.terminate().catch(() => {});
       }
 
-      const extractedResult = await runFastGeminiVision(preparedUrls);
+      let parsedLabs = [];
+      let textRadiologySummary = '';
 
-      const parsedLabs = Array.isArray(extractedResult?.labs)
-        ? extractedResult.labs.map((r, idx) => ({
-            id: `lab_${Date.now()}_${idx}`,
-            testName: r.testName || '',
-            value: String(r.value ?? ''),
-            unit: r.unit || '',
-            referenceRange: r.referenceRange || '',
-            status: r.status || 'Normal'
-          }))
-        : [];
+      // أ) استخراج جدول التحاليل والتقارير المكتوبة إن وجد نص
+      if (combinedOcrText.trim()) {
+        const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${GROQ_API_KEY}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            model: "openai/gpt-oss-120b",
+            messages: [
+              { role: "system", content: extractionSystemPrompt },
+              { role: "user", content: `Parse the following raw OCR text from ${itemsToRead.length} medical document(s) into structured JSON without guessing values:\n${combinedOcrText}` }
+            ],
+            temperature: 0.0
+          })
+        });
 
-      const cleanedVisualReading = sanitizeRadiologyNoParens(extractedResult?.visualRadiologyReading);
-      const cleanedWrittenReport = sanitizeRadiologyNoParens(extractedResult?.writtenRadiologyReport);
+        if (response.ok) {
+          const data = await response.json();
+          const rawContent = data?.choices?.[0]?.message?.content || '{}';
+          const jsonMatch = rawContent.match(/\{[\s\S]*\}/);
+          const cleanJson = jsonMatch
+            ? jsonMatch[0]
+            : rawContent.replace(/```json/g, '').replace(/```/g, '').trim();
+          const parsed = JSON.parse(cleanJson);
 
-      if (parsedLabs.length === 0 && !cleanedVisualReading && !cleanedWrittenReport) {
+          parsedLabs = Array.isArray(parsed.labs)
+            ? parsed.labs.map((r, idx) => ({
+                id: `lab_${Date.now()}_${idx}`,
+                testName: r.testName || '',
+                value: String(r.value ?? ''),
+                unit: r.unit || '',
+                referenceRange: r.referenceRange || '',
+                status: r.status || 'Normal'
+              }))
+            : [];
+          textRadiologySummary = (parsed.radiologySummary || '').trim();
+        }
+      }
+
+      // ب) القراءة البصرية لأفلام الأشعة (X-Ray / MRI) عبر نموذج Vision AI
+      const finalVisionImages =
+        visionCandidateImages.length > 0
+          ? visionCandidateImages
+          : (parsedLabs.length === 0 && !textRadiologySummary ? allPreparedImagesForFallback : []);
+
+      let visualRadiologyReading = '';
+      if (finalVisionImages.length > 0) {
+        visualRadiologyReading = await analyzeRadiologyFilmsWithVision(finalVisionImages);
+      }
+
+      if (parsedLabs.length === 0 && !textRadiologySummary && !visualRadiologyReading) {
         throw new Error('لم يتم العثور على نصوص واضحة أو تفاصيل إشعاعية مقروءة. تأكد من إضاءة ووضوح الصورة.');
       }
 
       setExtractedLabs(parsedLabs);
 
+      const sanitizeRadiologyNoParens = (txt) => {
+        if (!txt) return '';
+        return txt
+          .replace(/^\\+/, '')
+          .replace(/\s*\(([^()]+)\)/g, ' - $1')
+          .replace(/[()]/g, '')
+          .replace(/\s+-\s+-\s+/g, ' - ')
+          .trim();
+      };
+
+      const cleanedVisualReading = sanitizeRadiologyNoParens(visualRadiologyReading);
+      const cleanedTextSummary = sanitizeRadiologyNoParens(textRadiologySummary);
+
       const combinedRadiologyNotes = [
-        cleanedVisualReading ? `🔬 القراءة البصرية لصورة الأشعة:\n${cleanedVisualReading}` : '',
-        cleanedWrittenReport ? `📋 ملخص تقرير الأشعة المرفق:\n${cleanedWrittenReport}` : ''
+        cleanedVisualReading ? `🩻 تقرير القراءة البصرية للأشعة:\n${cleanedVisualReading}` : '',
+        cleanedTextSummary ? `📄 ملخص التقرير المكتوب:\n${cleanedTextSummary}` : ''
       ].filter(Boolean).join('\n\n');
 
       if (combinedRadiologyNotes) {
         setExtractedRadiologyNotes(combinedRadiologyNotes);
         setRadiologyReportApproved(false);
+      } else {
+        setExtractedRadiologyNotes('');
+        setRadiologyReportApproved(false);
       }
 
-      // تغذية حاسبة DAS28 تلقائياً بقيم ESR أو CRP المستخرجة من الجدول
+      // تغذية حاسبة DAS28 تلقائياً بقيم ESR أو CRP المستخرجة من الجدول إن وجدت
       const foundEsr = parsedLabs.find(r => /\besr\b|sedimentation|الترسيب/i.test(r.testName));
       if (foundEsr && foundEsr.value) {
         const num = String(foundEsr.value).replace(/[^0-9.]/g, '');
@@ -1148,7 +1321,6 @@ Return ONLY valid JSON:
       setExtractingLabsTable(false);
     }
   };
-
   // تشغيل استخراج الجدول تلقائياً عند إضافة أو تحديث صور التحاليل
   useEffect(() => {
     if (aiScanItems.length === 0) {
@@ -1164,7 +1336,22 @@ Return ONLY valid JSON:
   // جلب نتيجة نفس التحليل من آخر زيارة سابقة مسجلة للمريض للمقارنة الجانبية
   const getPreviousLabValue = (testName) => {
     if (!testName || !Array.isArray(patientHistory) || patientHistory.length === 0) return null;
-    const cleanTarget = testName.toLowerCase().replace(/[^a-z0-9\u0600-\u06FF]/g, '');
+    const normalizeLabKey = (raw) => {
+      const s = String(raw || '').toLowerCase();
+      if (/\besr\b|sedimentation|الترسيب/.test(s)) return 'esr';
+      if (/\bcrp\b|creactive|البروتينالتفاعلي/.test(s.replace(/[^a-z0-9\u0600-\u06FF]/g, ''))) return 'crp';
+      if (/\bhgb\b|\bhb\b|hemoglobin|هيموجلوبين/.test(s)) return 'hemoglobin';
+      if (/\bwbc\b|whiteblood|leukocyte/.test(s.replace(/[^a-z0-9\u0600-\u06FF]/g, ''))) return 'wbc';
+      if (/\bplt\b|platelet|صفائح/.test(s)) return 'platelets';
+      if (/anticcp|anti-ccp/.test(s)) return 'anticcp';
+      if (/\brf\b|rheumatoidfactor/.test(s.replace(/[^a-z0-9]/g, ''))) return 'rf';
+      if (/uric/.test(s)) return 'uricacid';
+      if (/creatinine/.test(s)) return 'creatinine';
+      if (/\balt\b|sgpt/.test(s)) return 'alt';
+      if (/\bast\b|sgot/.test(s)) return 'ast';
+      return s.replace(/[^a-z0-9\u0600-\u06FF]/g, '');
+    };
+    const cleanTarget = normalizeLabKey(testName);
     if (!cleanTarget) return null;
 
     for (const rec of patientHistory) {
@@ -1175,7 +1362,7 @@ Return ONLY valid JSON:
       const prevList = df?.extractedLabs || df?.extracted_labs;
       if (Array.isArray(prevList) && prevList.length > 0) {
         const match = prevList.find(item => {
-          const cleanPrev = (item.testName || '').toLowerCase().replace(/[^a-z0-9\u0600-\u06FF]/g, '');
+          const cleanPrev = normalizeLabKey(item.testName || '');
           return cleanPrev && (cleanPrev === cleanTarget || cleanPrev.includes(cleanTarget) || cleanTarget.includes(cleanPrev));
         });
         if (match && match.value) {
@@ -2137,11 +2324,15 @@ Return ONLY valid JSON:
           }
           const prevDas = df?.rheumaDetails?.diseaseActivity;
           const prevDasText = prevDas ? ` | ${prevDas.formula}: ${prevDas.score}` : '';
+          const prevLabsArr = df?.extractedLabs || df?.extracted_labs;
+          const prevLabsText = Array.isArray(prevLabsArr) && prevLabsArr.length > 0
+            ? ` | Labs: ${prevLabsArr.slice(0, 6).map(l => `${l.testName}=${l.value}`).join(', ')}`
+            : '';
           const prevMeds = Array.isArray(rec.prescriptions) && rec.prescriptions.length > 0
             ? ` | Meds: ${rec.prescriptions.map(m => m.name).join(', ')}`
             : '';
           const vDate = rec.visit_date || (rec.created_at ? rec.created_at.split('T')[0] : '');
-          return `Visit ${idx + 1} (${vDate}): Diagnosis="${rec.diagnosis || 'N/A'}"${prevDasText}${prevMeds}`;
+          return `Visit ${idx + 1} (${vDate}): Diagnosis="${rec.diagnosis || 'N/A'}"${prevDasText}${prevLabsText}${prevMeds}`;
         }).join('\n')
       : 'First recorded visit (No prior visit history)';
 
@@ -2229,7 +2420,10 @@ Additional Doctor Notes & Symptoms: ${symptomsInput || 'None'} | ${doctorNotes |
       const rawContent = data?.choices?.[0]?.message?.content;
       if (!rawContent) throw new Error('استجابة فارغة من الذكاء الاصطناعي');
 
-      const cleanJsonString = rawContent.replace(/```json/g, '').replace(/```/g, '').trim();
+      const jsonMatch = rawContent.match(/\{[\s\S]*\}/);
+      const cleanJsonString = jsonMatch
+        ? jsonMatch[0]
+        : rawContent.replace(/```json/g, '').replace(/```/g, '').trim();
       const parsedResult = JSON.parse(cleanJsonString);
 
       if (parsedResult.warnings) {
@@ -2299,7 +2493,10 @@ Return JSON ONLY:
 
       const data = await res.json();
       const rawContent = data?.choices?.[0]?.message?.content || '{}';
-      const cleanJsonString = rawContent.replace(/```json/g, '').replace(/```/g, '').trim();
+      const medJsonMatch = rawContent.match(/\{[\s\S]*\}/);
+      const cleanJsonString = medJsonMatch
+        ? medJsonMatch[0]
+        : rawContent.replace(/```json/g, '').replace(/```/g, '').trim();
       const parsed = JSON.parse(cleanJsonString);
 
       if (parsed.safe) {
@@ -2526,6 +2723,11 @@ Return JSON ONLY:
                   .filter(r => r.testName && r.value)
                   .map(r => `${r.testName}: ${r.value} ${r.unit || ''} (${r.status})`)
                   .join(' | ')
+              }
+            : {}),
+          ...(includeLabsInPdf && extractedRadiologyNotes && radiologyReportApproved
+            ? {
+                'تقرير الأشعة المعتمد': extractedRadiologyNotes.replace(/\n+/g, ' - ')
               }
             : {})
         },
@@ -2811,7 +3013,7 @@ Return JSON ONLY:
         <View style={styles.bridgeModalOverlay}>
           <View style={[styles.bridgeModalCard, { maxWidth: 640, maxHeight: '90%' }]}>
             <View style={styles.bridgeModalHeader}>
-              <Text style={styles.bridgeModalTitle}>🔬 معاينة ومراجعة تقرير الأشعة قبل الاعتماد</Text>
+              <Text style={styles.bridgeModalTitle}>🩻 معاينة ومراجعة تقرير الأشعة قبل الاعتماد</Text>
               <TouchableOpacity
                 style={styles.bridgeCloseBtn}
                 onPress={() => {
@@ -3440,7 +3642,7 @@ Return JSON ONLY:
           {(hasAiScanImages || extractedLabs.length > 0 || Boolean(extractedRadiologyNotes) || extractingLabsTable) && (
             <View style={[styles.card, { borderColor: '#0284C7' }]}>
               <View style={styles.cardHeaderRow}>
-                <Text style={styles.sectionTitle}>📋 2. جدول التحاليل والأشعة المستخرج من الصور (AI Table)</Text>
+                <Text style={styles.sectionTitle}>📊 2. جدول التحاليل والأشعة المستخرج من الصور (AI Table)</Text>
                 <View style={{ flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 6 }}>
                   {patientHistory.length > 0 && extractedLabs.length > 0 && (
                     <TouchableOpacity
@@ -3601,7 +3803,7 @@ Return JSON ONLY:
                   onPress={() => handleOpenRadiologyReviewModal(false)}
                 >
                   <View style={{ flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                    <Text style={styles.radiologySummaryTitle}>🔬 تقرير الأشعة المستخلص من الصورة</Text>
+                    <Text style={styles.radiologySummaryTitle}>🩻 تقرير الأشعة المستخلص من الصورة</Text>
                     <View style={[
                       styles.radApprovalBadge,
                       radiologyReportApproved ? styles.radApprovalBadgeDone : styles.radApprovalBadgePending
