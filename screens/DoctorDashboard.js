@@ -1053,11 +1053,14 @@ Instructions:
 
           if (res.ok) {
             const vData = await res.json();
-            const vText = vData?.candidates?.[0]?.content?.parts
+            const candidate = vData?.candidates?.[0];
+            const vText = candidate?.content?.parts
               ?.map(p => p.text || '')
               .join('')
               .trim();
             if (vText) return vText;
+            const finishReason = candidate?.finishReason || vData?.promptFeedback?.blockReason || 'EMPTY_RESPONSE';
+            lastApiError = `Gemini Vision (${modelName}) لم يُرجع نصاً (${finishReason})`;
           } else {
             const errJson = await res.json().catch(() => ({}));
             lastApiError = `Gemini Vision Error (${res.status}): ${errJson?.error?.message || res.statusText}`;
@@ -1106,6 +1109,7 @@ Respond ONLY with a valid JSON object without Markdown formatting:
 
       let combinedOcrText = '';
       const visionCandidateImages = [];
+      const allPreparedImagesForFallback = [];
 
       for (let i = 0; i < itemsToRead.length; i++) {
         const item = itemsToRead[i];
@@ -1116,16 +1120,18 @@ Respond ONLY with a valid JSON object without Markdown formatting:
         const { data: { text } } = await worker.recognize(processedSrc);
         const cleanText = (text || '').trim();
         const alphaNumCount = cleanText.replace(/[^a-zA-Z0-9]/g, '').length;
-        const isRadiologyTitle = /x-?ray|mri|ct|scan|ultrasound|أشعة|رنين|مقطعية|سونار/i.test(item.title || '');
+        const hasLabKeywords = /\b(esr|crp|cbc|wbc|rbc|hgb|hb|plt|alt|ast|creatinine|urea|uric|ana|ccp|rf|anti|result|reference|range|unit|normal|high|low|mg\/dl|mmol|mm\/hr|u\/l|g\/dl)\b/i.test(cleanText);
+        const isRadiologyTitle = /x-?ray|mri|ct|scan|ultrasound|radiograph|film|أشعة|رنين|مقطعية|سونار/i.test(item.title || '');
 
         if (alphaNumCount >= 35) {
           combinedOcrText += `\n--- Document ${i + 1} (${item.title || 'Report'}) ---\n${cleanText}\n`;
         }
 
-        // إذا كانت الصورة فيلم أشعة (نصها قليل جداً أو عنوانها يدل على أشعة) نجهزها للرؤية البصرية المباشرة
-        if (alphaNumCount < 60 || isRadiologyTitle) {
-          const visionReadyUrl = await prepareImageForVisionAI(rawSrc);
-          if (visionReadyUrl && (visionReadyUrl.startsWith('data:image') || visionReadyUrl.startsWith('http'))) {
+        const visionReadyUrl = await prepareImageForVisionAI(rawSrc);
+        if (visionReadyUrl && (visionReadyUrl.startsWith('data:image') || visionReadyUrl.startsWith('http'))) {
+          allPreparedImagesForFallback.push(visionReadyUrl);
+          // إذا لم تكن الصورة ورقة تحاليل غنية بالكلمات المخبرية أو كان نصها قليلاً أو عنوانها أشعة، نمررها فوراً لـ Gemini Vision
+          if (!hasLabKeywords || alphaNumCount < 180 || isRadiologyTitle) {
             visionCandidateImages.push(visionReadyUrl);
           }
         }
@@ -1176,10 +1182,16 @@ Respond ONLY with a valid JSON object without Markdown formatting:
         }
       }
 
-      // ب) القراءة البصرية لأفلام الأشعة (X-Ray / MRI) عبر نموذج الرؤية
+      // ب) القراءة البصرية لأفلام الأشعة (X-Ray / MRI) عبر نموذج Gemini Vision
+      // إذا لم يستخرج OCR أي تحاليل أو تقارير مكتوبة، نُمرر كل الصور تلقائياً لـ Gemini Vision لضمان قراءتها
+      const finalVisionImages =
+        visionCandidateImages.length > 0
+          ? visionCandidateImages
+          : (parsedLabs.length === 0 && !textRadiologySummary ? allPreparedImagesForFallback : []);
+
       let visualRadiologyReading = '';
-      if (visionCandidateImages.length > 0) {
-        visualRadiologyReading = await analyzeRadiologyFilmsWithVision(visionCandidateImages);
+      if (finalVisionImages.length > 0) {
+        visualRadiologyReading = await analyzeRadiologyFilmsWithVision(finalVisionImages);
       }
 
       if (parsedLabs.length === 0 && !textRadiologySummary && !visualRadiologyReading) {
