@@ -424,6 +424,10 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
   // --- جدول نتائج التحاليل والأشعة المستخرج من الصور (Editable Structured Table) ---
   const [extractedLabs, setExtractedLabs] = useState([]);
   const [extractedRadiologyNotes, setExtractedRadiologyNotes] = useState('');
+  const [showRadiologyReviewModal, setShowRadiologyReviewModal] = useState(false);
+  const [radiologyDraftText, setRadiologyDraftText] = useState('');
+  const [radiologyReportApproved, setRadiologyReportApproved] = useState(false);
+  const [pendingAnalysisAfterRadiologyApproval, setPendingAnalysisAfterRadiologyApproval] = useState(false);
   const [extractingLabsTable, setExtractingLabsTable] = useState(false);
   const [labsExtractionError, setLabsExtractionError] = useState('');
   const [showPrevLabsComparison, setShowPrevLabsComparison] = useState(false);
@@ -978,11 +982,12 @@ Analyze the attached medical imaging scan(s) (X-Ray, MRI, Ultrasound, or CT) vis
 Patient Context: Age ${age || 'Unspecified'}, Gender: ${gender}, Chronic Diseases: ${chronicDiseases || 'None'}.
 Doctor's Selected Painful/Swollen Joints on Skeleton Map: ${activeJointsContext || 'None specified yet'}.
 
-Instructions:
+STRICT FORMATTING & PROFESSIONALISM RULES:
 1. Identify the anatomical region and imaging modality visible in each image.
-2. Describe key radiological findings objectively (e.g., joint space narrowing, marginal bone erosions, periarticular osteopenia, osteophytes, subchondral sclerosis, sacroiliitis, soft tissue swelling, alignment, or normal appearance).
-3. Correlate findings with the doctor's selected painful/swollen joints if applicable.
-4. Write a clear, concise, professional summary in Arabic with key English radiological terms in parentheses. Do NOT return JSON, return clean structured text only.`;
+2. Describe key radiological findings objectively: bone alignment, joint spaces, cortical margins and erosions, bone mineralization, proliferative or degenerative changes, and soft tissues.
+3. Correlate findings with the doctor's selected painful or swollen joints if applicable, and provide a concise clinical impression and recommendation.
+4. CRITICAL: Write purely in formal, polished Arabic medical prose. NEVER use any parentheses ( or ) anywhere in the report—do NOT put English terms, translations, or explanations inside parentheses.
+5. Do NOT include any leading backslashes or JSON formatting; return clean structured Arabic report text only.`;
 
       const toGeminiInlinePart = async (imgSrc) => {
         if (!imgSrc || typeof imgSrc !== 'string') return null;
@@ -1236,13 +1241,27 @@ Respond ONLY with a valid JSON object without Markdown formatting:
 
       setExtractedLabs(parsedLabs);
 
+      const sanitizeRadiologyNoParens = (txt) => {
+        if (!txt) return '';
+        return txt
+          .replace(/^\\+/, '')
+          .replace(/\s*\(([^()]+)\)/g, ' - $1')
+          .replace(/[()]/g, '')
+          .replace(/\s+-\s+-\s+/g, ' - ')
+          .trim();
+      };
+
+      const cleanedVisualReading = sanitizeRadiologyNoParens(visualRadiologyReading);
+      const cleanedTextSummary = sanitizeRadiologyNoParens(textRadiologySummary);
+
       const combinedRadiologyNotes = [
-        visualRadiologyReading ? `🩻 القراءة البصرية للأشعة (Gemini Vision):\n${visualRadiologyReading}` : '',
-        textRadiologySummary ? `📄 ملخص التقرير المكتوب:\n${textRadiologySummary}` : ''
+        cleanedVisualReading ? `🩻 تقرير القراءة البصرية للأشعة:\n${cleanedVisualReading}` : '',
+        cleanedTextSummary ? `📄 ملخص التقرير المكتوب:\n${cleanedTextSummary}` : ''
       ].filter(Boolean).join('\n\n');
 
       if (combinedRadiologyNotes) {
         setExtractedRadiologyNotes(combinedRadiologyNotes);
+        setRadiologyReportApproved(false);
       }
 
       // تغذية حاسبة DAS28 تلقائياً بقيم ESR أو CRP المستخرجة من الجدول إن وجدت
@@ -1481,8 +1500,42 @@ Respond ONLY with a valid JSON object without Markdown formatting:
     setAiScanItems([]);
     setExtractedLabs([]);
     setExtractedRadiologyNotes('');
+    setRadiologyDraftText('');
+    setRadiologyReportApproved(false);
     setLabsExtractionError('');
     setManualLabsUnlocked(false);
+  };
+
+  const handleOpenRadiologyReviewModal = (triggerAnalysisAfter = false) => {
+    setRadiologyDraftText(extractedRadiologyNotes || '');
+    setPendingAnalysisAfterRadiologyApproval(triggerAnalysisAfter);
+    setShowRadiologyReviewModal(true);
+  };
+
+  const handleApproveRadiologyReport = () => {
+    const cleaned = (radiologyDraftText || '')
+      .replace(/^\\+/, '')
+      .replace(/\s*\(([^()]+)\)/g, ' - $1')
+      .replace(/[()]/g, '')
+      .trim();
+    setExtractedRadiologyNotes(cleaned);
+    setRadiologyReportApproved(true);
+    setShowRadiologyReviewModal(false);
+    if (pendingAnalysisAfterRadiologyApproval) {
+      setPendingAnalysisAfterRadiologyApproval(false);
+      executeClinicalAnalysisCore(cleaned);
+    }
+  };
+
+  const handleDeleteRadiologyReport = () => {
+    setExtractedRadiologyNotes('');
+    setRadiologyDraftText('');
+    setRadiologyReportApproved(false);
+    setShowRadiologyReviewModal(false);
+    if (pendingAnalysisAfterRadiologyApproval) {
+      setPendingAnalysisAfterRadiologyApproval(false);
+      executeClinicalAnalysisCore('');
+    }
   };
 
   // --- إرسال صورة (أو كل الصور) من أرشيف أشعة المريض إلى الذكاء الاصطناعي لقراءتها فوراً ---
@@ -2152,6 +2205,15 @@ Respond ONLY with a valid JSON object without Markdown formatting:
       return;
     }
 
+    if (extractedRadiologyNotes && extractedRadiologyNotes.trim() !== '' && !radiologyReportApproved) {
+      handleOpenRadiologyReviewModal(true);
+      return;
+    }
+
+    await executeClinicalAnalysisCore(extractedRadiologyNotes);
+  };
+
+  const executeClinicalAnalysisCore = async (approvedRadiologyText = extractedRadiologyNotes) => {
     setAnalyzing(true);
     setAiReport(null);
 
@@ -2260,7 +2322,7 @@ Family History: ${familyHistoryText || 'None'} | Family Risk Signs: ${familySign
 
 -- Verified Extracted Lab Table (Doctor-Reviewed OCR Results from ${aiScanItems.length} Scanned Document(s)) --
 ${structuredTableSummary || 'No structured lab table rows extracted'}
-${extractedRadiologyNotes ? `\n-- Extracted Radiology Notes --\n${extractedRadiologyNotes}` : ''}
+${approvedRadiologyText ? `\n-- Doctor-Approved Radiology Report --\n${approvedRadiologyText}` : ''}
 
 -- Core Serology & Safety Quick Chips --
 ${manualLabsSummary.length > 0 ? manualLabsSummary.map(l => `- ${l}`).join('\n') : '- None selected'}
@@ -2872,6 +2934,59 @@ Return JSON ONLY:
             <TouchableOpacity style={styles.bridgeDoneBtn} onPress={handleCloseQrBridgeModal}>
               <Text style={styles.bridgeBtnText}>✅ إغلاق النافذة ومتابعة التحليل ({aiScanItems.length} صورة جاهزة)</Text>
             </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Radiology Report Review, Edit & Approval Modal */}
+      <Modal visible={showRadiologyReviewModal} transparent animationType="fade">
+        <View style={styles.bridgeModalOverlay}>
+          <View style={[styles.bridgeModalCard, { maxWidth: 640, maxHeight: '90%' }]}>
+            <View style={styles.bridgeModalHeader}>
+              <Text style={styles.bridgeModalTitle}>🩻 معاينة ومراجعة تقرير الأشعة قبل الاعتماد</Text>
+              <TouchableOpacity
+                style={styles.bridgeCloseBtn}
+                onPress={() => {
+                  setShowRadiologyReviewModal(false);
+                  setPendingAnalysisAfterRadiologyApproval(false);
+                }}
+              >
+                <Text style={styles.bridgeCloseBtnText}>إغلاق ✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            <ClinicalHint text="راجع نص تقرير الأشعة المستخلص أدناه؛ يمكنك تعديل أي صياغة أو حذف أي جزء غير مرغوب فيه بحرية، ثم اضغط (اعتماد التقرير) لإدراجه في التشخيص النهائي الكامل." />
+
+            <ScrollView style={{ maxHeight: 360, marginBottom: 12 }}>
+              <TextInput
+                style={styles.radiologyModalEditor}
+                multiline
+                value={radiologyDraftText}
+                onChangeText={setRadiologyDraftText}
+                placeholder="اكتب أو عدّل نص تقرير الأشعة هنا..."
+                placeholderTextColor="#64748B"
+              />
+            </ScrollView>
+
+            <View style={styles.bridgeActionRow}>
+              <TouchableOpacity
+                style={[styles.bridgeCaptureBtn, { flex: 2 }]}
+                onPress={handleApproveRadiologyReport}
+              >
+                <Text style={styles.bridgeBtnText}>
+                  {pendingAnalysisAfterRadiologyApproval
+                    ? '✅ اعتماد التقرير وبدء التشخيص النهائي'
+                    : '✅ حفظ واعتماد تقرير الأشعة'}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.bridgeCloseBtn, { flex: 1, justifyContent: 'center', alignItems: 'center', paddingVertical: 12, borderRadius: 8 }]}
+                onPress={handleDeleteRadiologyReport}
+              >
+                <Text style={styles.bridgeBtnText}>🗑️ حذف التقرير</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
@@ -3609,15 +3724,32 @@ Return JSON ONLY:
               </TouchableOpacity>
 
               {extractedRadiologyNotes ? (
-                <View style={styles.radiologySummaryBox}>
-                  <Text style={styles.radiologySummaryTitle}>🩻 ملخص تقارير الأشعة المستخرج:</Text>
-                  <TextInput
-                    style={styles.radiologySummaryInput}
-                    multiline
-                    value={extractedRadiologyNotes}
-                    onChangeText={setExtractedRadiologyNotes}
-                  />
-                </View>
+                <TouchableOpacity
+                  activeOpacity={0.85}
+                  style={[
+                    styles.radiologySummaryBox,
+                    radiologyReportApproved && { borderColor: '#10B981', backgroundColor: 'rgba(16, 185, 129, 0.08)' }
+                  ]}
+                  onPress={() => handleOpenRadiologyReviewModal(false)}
+                >
+                  <View style={{ flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                    <Text style={styles.radiologySummaryTitle}>🩻 تقرير الأشعة المستخلص من الصورة</Text>
+                    <View style={[
+                      styles.radApprovalBadge,
+                      radiologyReportApproved ? styles.radApprovalBadgeDone : styles.radApprovalBadgePending
+                    ]}>
+                      <Text style={styles.radApprovalBadgeText}>
+                        {radiologyReportApproved ? '✅ معتمد من الطبيب' : '⏳ اضغط للمراجعة والاعتماد'}
+                      </Text>
+                    </View>
+                  </View>
+                  <Text style={styles.radiologyPreviewText} numberOfLines={5}>
+                    {extractedRadiologyNotes}
+                  </Text>
+                  <Text style={styles.radiologyClickHint}>
+                    👆 انقر هنا لفتح التقرير في نافذة معاينة كاملة لتعديله أو حذف أجزاء منه قبل التشخيص النهائي
+                  </Text>
+                </TouchableOpacity>
               ) : null}
             </View>
           )}
@@ -4263,8 +4395,27 @@ const styles = StyleSheet.create({
     padding: 10,
     marginTop: 4
   },
-  radiologySummaryTitle: { color: '#00F2FE', fontSize: 12, fontWeight: 'bold', textAlign: 'right', marginBottom: 4 },
+  radiologySummaryTitle: { color: '#00F2FE', fontSize: 12, fontWeight: 'bold', textAlign: 'right' },
   radiologySummaryInput: { color: '#E2E8F0', fontSize: 12, textAlign: 'right', lineHeight: 18 },
+  radiologyPreviewText: { color: '#E2E8F0', fontSize: 12, textAlign: 'right', lineHeight: 20, marginBottom: 8 },
+  radiologyClickHint: { color: '#38BDF8', fontSize: 11, fontWeight: 'bold', textAlign: 'right', borderTopWidth: 1, borderTopColor: '#1E293B', paddingTop: 6 },
+  radApprovalBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, borderWidth: 1 },
+  radApprovalBadgePending: { backgroundColor: 'rgba(245, 158, 11, 0.16)', borderColor: '#F59E0B' },
+  radApprovalBadgeDone: { backgroundColor: 'rgba(16, 185, 129, 0.2)', borderColor: '#10B981' },
+  radApprovalBadgeText: { color: '#FFFFFF', fontSize: 10, fontWeight: 'bold' },
+  radiologyModalEditor: {
+    backgroundColor: '#060911',
+    color: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#0284C7',
+    borderRadius: 10,
+    padding: 14,
+    fontSize: 13,
+    lineHeight: 22,
+    minHeight: 260,
+    textAlign: 'right',
+    textAlignVertical: 'top'
+  },
 
   // --- أنماط حاسبة نشاط الروماتويد التلقائية (Auto DAS28 / CDAI) ---
   dasCalculatorBox: {
