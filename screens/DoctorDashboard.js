@@ -9,6 +9,7 @@ import { verifyDoctorAccess } from '../src/services/subscriptionService';
 import PrivacyPolicy from './PrivacyPolicy';
 
 const GROQ_API_KEY = process.env.EXPO_PUBLIC_GROQ_API_KEY;
+const GEMINI_API_KEY = process.env.EXPO_PUBLIC_GEMINI_API_KEY;
 
 const SPECIALITIES_LIST = [
   "استشاري أمراض القلب والباطنة",
@@ -172,22 +173,44 @@ const RHEUMA_OPTIONS = {
   ]
 };
 
-// --- حساب نشاط مرض الروماتويد التلقائي (DAS28-ESR / DAS28-CRP / CDAI) ---
+// --- حساب نشاط مرض الروماتويد التلقائي (DAS28-ESR / DAS28-CRP / CDAI) وفق معيار الـ 28 مفصلاً فقط دون المساس بالخريطة ---
 const calculateRheumaActivityScore = (jointStates, esrVal, crpVal, vasVal = 40) => {
-  const uniqueRegions = new Set();
-  Object.entries(jointStates || {}).forEach(([id, state]) => {
+  const entries = Object.entries(jointStates || {});
+
+  // التحقق من وجود تخصيص دقيق لليد (MCPs أو PIPs) لمنع ازدواجية حساب اليد العامة (Hand)
+  const hasRightSpecificHand = entries.some(([id]) => id === 'Sub_R_MCPs' || id === 'Sub_R_PIPs');
+  const hasLeftSpecificHand = entries.some(([id]) => id === 'Sub_L_MCPs' || id === 'Sub_L_PIPs');
+
+  // المفاصل غير المشمولة في معيار DAS28 القياسي (القدم، الكاحل، الفخذ، الحوض، العمود الفقري، الفك، السلاميات الطرفية DIPs)
+  const nonDas28Terms = ['ankle', 'mtp', 'midfoot', 'toes', 'hip', 'pelvis', 'tmj', 'neck', 'cervical', 'thoracic', 'lumbar', 'sij', 'dips'];
+
+  // توحيد المفاصل الفريدة (أمامي/خلفي/فرعي) مع إعطاء الأولوية لحالة التورم (inflamed) لمنع التكرار
+  const uniqueJointMap = {};
+  entries.forEach(([id, state]) => {
+    const lowerId = id.toLowerCase();
+
+    // استبعاد المفاصل غير الداخلة في معادلة DAS28
+    if (nonDas28Terms.some(term => lowerId.includes(term))) return;
+
+    // منع الازدواجية إذا تم اختيار اليد العامة مع مفاصل MCPs/PIPs التفصيلية
+    if (id === 'Ant_R_MCP' && hasRightSpecificHand) return;
+    if (id === 'Ant_L_MCP' && hasLeftSpecificHand) return;
+
     const cleanKey = id
       .replace(/^Ant_/, '')
       .replace(/^Post_/, '')
       .replace(/^Sub_/, '');
-    uniqueRegions.add(`${cleanKey}:${state}`);
+
+    if (uniqueJointMap[cleanKey] !== 'inflamed') {
+      uniqueJointMap[cleanKey] = state;
+    }
   });
 
   let swollenCount = 0;
   let tenderOnlyCount = 0;
-  uniqueRegions.forEach(entry => {
-    if (entry.endsWith(':inflamed')) swollenCount++;
-    else if (entry.endsWith(':painful')) tenderOnlyCount++;
+  Object.values(uniqueJointMap).forEach(state => {
+    if (state === 'inflamed') swollenCount++;
+    else if (state === 'painful') tenderOnlyCount++;
   });
 
   // في مقياس DAS28، المفصل المتورم يُعدّ مؤلماً ضمن إجمالي TJC
@@ -938,12 +961,12 @@ export default function DoctorDashboard({ specialty: initialSpecialty, onSwitchP
       });
     };
 
-    // 3. دالة تحليل أفلام الأشعة بصرياً عبر نموذج Groq Vision وربطها بمواضع الألم على الخريطة
+    // 3. دالة تحليل أفلام الأشعة غير النصية بصرياً عبر نموذج Gemini Vision (gemini-2.5-flash) وربطها بمواضع الألم على الخريطة
     const analyzeRadiologyFilmsWithVision = async (visionImages) => {
       if (!visionImages || visionImages.length === 0) return '';
 
-      if (!GROQ_API_KEY) {
-        throw new Error('مفتاح GROQ_API_KEY غير مفعّل في إعدادات Vercel (تأكد من إضافته في Environment Variables ثم عمل Redeploy).');
+      if (!GEMINI_API_KEY) {
+        throw new Error('مفتاح EXPO_PUBLIC_GEMINI_API_KEY غير مفعّل في إعدادات Vercel (تأكد من إضافته في Environment Variables ثم عمل Redeploy).');
       }
 
       const activeJointsContext = Object.entries(selectedJointStates || {})
@@ -961,48 +984,88 @@ Instructions:
 3. Correlate findings with the doctor's selected painful/swollen joints if applicable.
 4. Write a clear, concise, professional summary in Arabic with key English radiological terms in parentheses. Do NOT return JSON, return clean structured text only.`;
 
-      const userContentArray = [
-        { type: 'text', text: visionPrompt },
-        ...visionImages.map(imgDataUrl => ({
-          type: 'image_url',
-          image_url: { url: imgDataUrl }
-        }))
+      const toGeminiInlinePart = async (imgSrc) => {
+        if (!imgSrc || typeof imgSrc !== 'string') return null;
+        if (imgSrc.startsWith('data:')) {
+          const commaIdx = imgSrc.indexOf(',');
+          if (commaIdx === -1) return null;
+          const header = imgSrc.substring(0, commaIdx);
+          const mimeMatch = header.match(/data:(.*?);base64/);
+          const mimeType = mimeMatch ? mimeMatch[1] : 'image/jpeg';
+          const base64Data = imgSrc.substring(commaIdx + 1);
+          return { inline_data: { mime_type: mimeType, data: base64Data } };
+        }
+        if (imgSrc.startsWith('http')) {
+          try {
+            const imgRes = await fetch(imgSrc, { mode: 'cors' });
+            if (!imgRes.ok) return null;
+            const blob = await imgRes.blob();
+            const dataUrl = await new Promise((resolve) => {
+              const reader = new FileReader();
+              reader.onloadend = () => resolve(reader.result);
+              reader.readAsDataURL(blob);
+            });
+            return await toGeminiInlinePart(dataUrl);
+          } catch (e) {
+            return null;
+          }
+        }
+        return null;
+      };
+
+      const imageParts = [];
+      for (const imgUrl of visionImages) {
+        const part = await toGeminiInlinePart(imgUrl);
+        if (part) imageParts.push(part);
+      }
+
+      if (imageParts.length === 0) {
+        throw new Error('تعذر تجهيز صورة الأشعة للقراءة البصرية via Gemini Vision.');
+      }
+
+      const geminiParts = [
+        { text: visionPrompt },
+        ...imageParts
       ];
 
-      const visionModels = [
-        'meta-llama/llama-4-scout-17b-16e-instruct',
-        'meta-llama/llama-4-maverick-17b-128e-instruct'
+      const geminiVisionModels = [
+        'gemini-2.5-flash',
+        'gemini-2.0-flash'
       ];
 
       let lastApiError = '';
 
-      for (const modelName of visionModels) {
+      for (const modelName of geminiVisionModels) {
         try {
-          const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+          const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${encodeURIComponent(GEMINI_API_KEY)}`;
+          const res = await fetch(endpoint, {
             method: 'POST',
             headers: {
-              'Authorization': `Bearer ${GROQ_API_KEY}`,
               'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-              model: modelName,
-              messages: [{ role: 'user', content: userContentArray }],
-              temperature: 0.1
+              contents: [{ parts: geminiParts }],
+              generationConfig: {
+                temperature: 0.1
+              }
             })
           });
 
           if (res.ok) {
             const vData = await res.json();
-            const vText = vData?.choices?.[0]?.message?.content?.trim();
+            const vText = vData?.candidates?.[0]?.content?.parts
+              ?.map(p => p.text || '')
+              .join('')
+              .trim();
             if (vText) return vText;
           } else {
             const errJson = await res.json().catch(() => ({}));
-            lastApiError = `Groq Error (${res.status}): ${errJson?.error?.message || res.statusText}`;
-            console.error('Groq Vision API Error:', modelName, lastApiError);
+            lastApiError = `Gemini Vision Error (${res.status}): ${errJson?.error?.message || res.statusText}`;
+            console.error('Gemini Vision API Error:', modelName, lastApiError);
           }
         } catch (e) {
-          lastApiError = e.message || 'خطأ في الاتصال بخادم Groq';
-          console.error('Groq Vision Fetch Error:', modelName, e);
+          lastApiError = e.message || 'خطأ في الاتصال بخادم Gemini Vision';
+          console.error('Gemini Vision Fetch Error:', modelName, e);
         }
       }
 
@@ -1126,7 +1189,7 @@ Respond ONLY with a valid JSON object without Markdown formatting:
       setExtractedLabs(parsedLabs);
 
       const combinedRadiologyNotes = [
-        visualRadiologyReading ? `🩻 القراءة البصرية للأشعة (Vision AI):\n${visualRadiologyReading}` : '',
+        visualRadiologyReading ? `🩻 القراءة البصرية للأشعة (Gemini Vision):\n${visualRadiologyReading}` : '',
         textRadiologySummary ? `📄 ملخص التقرير المكتوب:\n${textRadiologySummary}` : ''
       ].filter(Boolean).join('\n\n');
 
