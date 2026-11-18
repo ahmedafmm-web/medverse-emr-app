@@ -1028,48 +1028,84 @@ Instructions:
         ...imageParts
       ];
 
+      const tryCallGeminiVisionModel = async (rawModelName) => {
+        const cleanModel = rawModelName.replace(/^models\//, '');
+        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${cleanModel}:generateContent?key=${encodeURIComponent(GEMINI_API_KEY)}`;
+        const res = await fetch(endpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            contents: [{ parts: geminiParts }],
+            generationConfig: {
+              temperature: 0.1
+            }
+          })
+        });
+
+        if (res.ok) {
+          const vData = await res.json();
+          const candidate = vData?.candidates?.[0];
+          const vText = candidate?.content?.parts
+            ?.map(p => p.text || '')
+            .join('')
+            .trim();
+          if (vText) return { ok: true, text: vText };
+          const finishReason = candidate?.finishReason || vData?.promptFeedback?.blockReason || 'EMPTY_RESPONSE';
+          return { ok: false, error: `Gemini Vision (${cleanModel}) لم يُرجع نصاً (${finishReason})` };
+        } else {
+          const errJson = await res.json().catch(() => ({}));
+          const errMsg = `Gemini Vision Error (${res.status}): ${errJson?.error?.message || res.statusText}`;
+          console.error('Gemini Vision API Error:', cleanModel, errMsg);
+          return { ok: false, error: errMsg, status: res.status };
+        }
+      };
+
       const geminiVisionModels = [
-        'gemini-2.5-flash',
-        'gemini-2.0-flash'
+        'gemini-3.8-flash',
+        'gemini-3.5-flash',
+        'gemini-3-flash-preview',
+        'gemini-2.5-flash'
       ];
 
       let lastApiError = '';
 
       for (const modelName of geminiVisionModels) {
         try {
-          const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${encodeURIComponent(GEMINI_API_KEY)}`;
-          const res = await fetch(endpoint, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              contents: [{ parts: geminiParts }],
-              generationConfig: {
-                temperature: 0.1
-              }
-            })
-          });
-
-          if (res.ok) {
-            const vData = await res.json();
-            const candidate = vData?.candidates?.[0];
-            const vText = candidate?.content?.parts
-              ?.map(p => p.text || '')
-              .join('')
-              .trim();
-            if (vText) return vText;
-            const finishReason = candidate?.finishReason || vData?.promptFeedback?.blockReason || 'EMPTY_RESPONSE';
-            lastApiError = `Gemini Vision (${modelName}) لم يُرجع نصاً (${finishReason})`;
-          } else {
-            const errJson = await res.json().catch(() => ({}));
-            lastApiError = `Gemini Vision Error (${res.status}): ${errJson?.error?.message || res.statusText}`;
-            console.error('Gemini Vision API Error:', modelName, lastApiError);
-          }
+          const attempt = await tryCallGeminiVisionModel(modelName);
+          if (attempt.ok) return attempt.text;
+          lastApiError = attempt.error;
         } catch (e) {
           lastApiError = e.message || 'خطأ في الاتصال بخادم Gemini Vision';
           console.error('Gemini Vision Fetch Error:', modelName, e);
         }
+      }
+
+      // مسار اكتشاف تلقائي لأحدث نموذج Flash متاح على مفتاح API في حال تغيّر اسم الإصدار مستقبلاً
+      try {
+        const listRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(GEMINI_API_KEY)}`);
+        if (listRes.ok) {
+          const listData = await listRes.json();
+          const dynamicFlashModels = (listData?.models || [])
+            .filter(m =>
+              Array.isArray(m.supportedGenerationMethods) &&
+              m.supportedGenerationMethods.includes('generateContent') &&
+              /gemini.*flash/i.test(m.name || '') &&
+              !/lite|8b|thinking|image|audio|tts/i.test(m.name || '')
+            )
+            .map(m => m.name.replace(/^models\//, ''))
+            .filter(name => !geminiVisionModels.includes(name))
+            .reverse();
+
+          for (const dynModel of dynamicFlashModels.slice(0, 3)) {
+            const attempt = await tryCallGeminiVisionModel(dynModel);
+            if (attempt.ok) return attempt.text;
+            lastApiError = attempt.error;
+          }
+        }
+      } catch (discoverErr) {
+        console.error('Gemini Model Discovery Error:', discoverErr);
       }
 
       if (lastApiError) {
